@@ -6,16 +6,51 @@ async function activeTab() {
   return tab;
 }
 
-// Ask the content script which ATS it sees. If the content script isn't there
-// (e.g. chrome:// pages), disable filling.
+// Pages we can inject into on demand (activeTab). chrome://, extension, and
+// other privileged schemes reject scripting.executeScript.
+const canInject = (tab) => /^(https?|file):/.test(tab.url || "");
+
+// Ask the content script which ATS it sees. If it isn't there, offer to inject
+// it on demand (embedded ATS on a custom domain the manifest doesn't match) or,
+// on a page we can't script, fall back to disabling.
 async function ping() {
   const tab = await activeTab();
   try {
     const res = await chrome.tabs.sendMessage(tab.id, { type: "AVID_PING" });
     $("ats").textContent = res.beta ? `${res.ats} (beta)` : res.ats;
+    $("fill").disabled = false;
+    $("enable-page").classList.add("hidden");
   } catch (_) {
-    $("ats").textContent = "no form page";
     $("fill").disabled = true;
+    const injectable = canInject(tab);
+    $("ats").textContent = injectable ? "not enabled" : "no form page";
+    $("enable-page").classList.toggle("hidden", !injectable);
+  }
+}
+
+// Inject the same content scripts the manifest declares, then re-ping. The list
+// comes from the manifest so it can't drift; main.js guards double-injection.
+async function enableOnPage() {
+  const btn = $("enable-btn");
+  btn.disabled = true;
+  btn.textContent = "Enabling…";
+  try {
+    const tab = await activeTab();
+    const files = chrome.runtime.getManifest().content_scripts[0].js;
+    try {
+      await chrome.scripting.executeScript({ target: { tabId: tab.id }, files });
+    } catch (err) {
+      // e.g. file:// pages without "Allow access to file URLs" reject here.
+      console.error("Avid Autofill: couldn't inject content scripts", err);
+      $("ats").textContent = "couldn't enable";
+      return;
+    }
+    // Injection succeeded; verify separately so a benign ping failure isn't
+    // reported as an injection failure.
+    await ping();
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Enable on this page";
   }
 }
 
@@ -73,6 +108,8 @@ $("fill").addEventListener("click", async () => {
     $("fill").textContent = "Fill this page";
   }
 });
+
+$("enable-btn").addEventListener("click", enableOnPage);
 
 for (const id of ["overwrite", "eeo"]) $(id).addEventListener("change", persistSettings);
 for (const id of ["open-options-1", "open-options-2"])

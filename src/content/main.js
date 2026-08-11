@@ -2,7 +2,14 @@
 // Also answers the toolbar popup's messages (ping + fill) so both entry points
 // work against the same engine.
 (function () {
-  const AvidAutofill = globalThis.AvidAutofill;
+  const g = globalThis;
+  // Guard against double-injection: on a declared ATS site the content scripts
+  // already ran, and the popup's activeTab fallback may inject them again. Only
+  // main.js has side effects (mount + listener), so a single flag here is enough.
+  if (g.__avidAutofillMainLoaded) return;
+  g.__avidAutofillMainLoaded = true;
+
+  const AvidAutofill = g.AvidAutofill;
 
   // Mount the floating widget when we recognize the ATS (skip unknown pages,
   // including local dev files that aren't the sample form).

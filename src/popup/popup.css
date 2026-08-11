@@ -55,4 +55,9 @@ footer { margin-top: 12px; display: flex; flex-direction: column; gap: 4px; }
 .reminder { color: var(--warn); font-size: 11px; }
 a { color: var(--accent); text-decoration: none; }
 .notice { background: color-mix(in srgb, var(--warn) 14%, transparent); padding: 8px; border-radius: 6px; margin-bottom: 10px; }
+.link-btn {
+  display: block; margin-top: 6px; padding: 0; border: 0; background: none;
+  color: var(--accent); font: inherit; font-weight: 600; cursor: pointer;
+}
+.link-btn:disabled { opacity: .5; cursor: default; }
 .hidden { display: none; }
