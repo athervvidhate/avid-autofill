@@ -1,8 +1,16 @@
 // Content-script entry point. On a supported job site, mount the in-page widget.
-// Also answers the toolbar popup's messages (ping + fill) so both entry points
-// work against the same engine.
+// Also answers the toolbar popup's AVID_FILL message so both entry points work
+// against the same engine. Runs in every matched frame (all_frames), so an ATS
+// embedded in an iframe gets the widget too.
 (function () {
-  const AvidAutofill = globalThis.AvidAutofill;
+  const g = globalThis;
+  // Guard against double-injection: on a declared ATS site the content scripts
+  // already ran, and the popup's activeTab fallback may inject them again. Only
+  // main.js has side effects (mount + listener), so a single flag here is enough.
+  if (g.__avidAutofillMainLoaded) return;
+  g.__avidAutofillMainLoaded = true;
+
+  const AvidAutofill = g.AvidAutofill;
 
   // Mount the floating widget when we recognize the ATS (skip unknown pages,
   // including local dev files that aren't the sample form).
@@ -19,11 +27,6 @@
   else setTimeout(init, 800);
 
   chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-    if (msg && msg.type === "AVID_PING") {
-      const adapter = AvidAutofill.adapters.detect();
-      sendResponse({ ok: true, ats: adapter.name, beta: !!(adapter.beta || adapter.stub) });
-      return true;
-    }
     if (msg && msg.type === "AVID_FILL") {
       (async () => {
         try {

@@ -6,16 +6,103 @@ async function activeTab() {
   return tab;
 }
 
-// Ask the content script which ATS it sees. If the content script isn't there
-// (e.g. chrome:// pages), disable filling.
+// Pages we can inject into on demand (activeTab). chrome://, extension, and
+// other privileged schemes reject scripting.executeScript.
+const canInject = (tab) => /^(https?|file):/.test(tab.url || "");
+
+// The frame the fill targets. An ATS form can be embedded in an iframe (e.g. a
+// greenhouse.io frame on careers.acme.com), so we can't assume the top frame.
+// Defaults to 0 (top) until a ping resolves a better one.
+let targetFrameId = 0;
+
+// Runs inside each frame's content-script world. Returns null where our content
+// script isn't loaded, else what that frame sees. Must be self-contained: it is
+// serialized and injected, so it can't reference popup scope.
+function detectInFrame() {
+  const A = globalThis.AvidAutofill;
+  if (!A || !A.adapters) return null;
+  const a = A.adapters.detect();
+  // Count fillable fields, not <form> tags: many ATS pages (and our fixture)
+  // put inputs in plain divs, and the engine fills them either way.
+  const fields = document.querySelectorAll(
+    "input:not([type=hidden]):not([type=submit]):not([type=button]), select, textarea"
+  ).length;
+  return { ats: a.name, beta: !!(a.beta || a.stub), fields };
+}
+
+// Ask every frame what it sees (broadcast messaging can't enumerate frames, but
+// executeScript returns a result per frame), then pick the frame most worth
+// filling: a recognized ATS first, else the frame with the most fillable fields
+// (an empty wrapper frame embedding an iframe has none), else the top frame.
+async function resolveTarget(tabId) {
+  const injections = await chrome.scripting.executeScript({
+    target: { tabId, allFrames: true },
+    func: detectInFrame,
+  });
+  const loaded = injections.filter((i) => i.result);
+  if (!loaded.length) return null;
+  const ats = loaded.find((i) => i.result.ats !== "Generic");
+  const mostFields = loaded
+    .filter((i) => i.result.fields > 0)
+    .sort((a, b) => b.result.fields - a.result.fields)[0];
+  const best = ats || mostFields || loaded[0];
+  return { frameId: best.frameId, ...best.result };
+}
+
+// Find the ATS across all frames. If our content script isn't in any of them,
+// offer to inject it on demand (embedded ATS on a domain the manifest doesn't
+// match); on a page we can't script at all, fall back to disabling.
 async function ping() {
   const tab = await activeTab();
-  try {
-    const res = await chrome.tabs.sendMessage(tab.id, { type: "AVID_PING" });
-    $("ats").textContent = res.beta ? `${res.ats} (beta)` : res.ats;
-  } catch (_) {
+  if (!canInject(tab)) {
+    targetFrameId = 0;
     $("ats").textContent = "no form page";
     $("fill").disabled = true;
+    $("enable-page").classList.add("hidden");
+    return;
+  }
+  let target = null;
+  try {
+    target = await resolveTarget(tab.id);
+  } catch (_) {
+    // Some injectable-looking pages still reject scripting; treat as no form.
+  }
+  if (target) {
+    targetFrameId = target.frameId;
+    $("ats").textContent = target.beta ? `${target.ats} (beta)` : target.ats;
+    $("fill").disabled = false;
+    $("enable-page").classList.add("hidden");
+  } else {
+    targetFrameId = 0;
+    $("fill").disabled = true;
+    $("ats").textContent = "not enabled";
+    $("enable-page").classList.remove("hidden");
+  }
+}
+
+// Inject the same content scripts the manifest declares, then re-ping. The list
+// comes from the manifest so it can't drift; main.js guards double-injection.
+async function enableOnPage() {
+  const btn = $("enable-btn");
+  btn.disabled = true;
+  btn.textContent = "Enabling…";
+  try {
+    const tab = await activeTab();
+    const files = chrome.runtime.getManifest().content_scripts[0].js;
+    try {
+      await chrome.scripting.executeScript({ target: { tabId: tab.id, allFrames: true }, files });
+    } catch (err) {
+      // e.g. file:// pages without "Allow access to file URLs" reject here.
+      console.error("Avid Autofill: couldn't inject content scripts", err);
+      $("ats").textContent = "couldn't enable";
+      return;
+    }
+    // Injection succeeded; verify separately so a benign ping failure isn't
+    // reported as an injection failure.
+    await ping();
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Enable on this page";
   }
 }
 
@@ -65,7 +152,7 @@ $("fill").addEventListener("click", async () => {
   $("fill").textContent = "Filling…";
   try {
     const tab = await activeTab();
-    const res = await chrome.tabs.sendMessage(tab.id, { type: "AVID_FILL" });
+    const res = await chrome.tabs.sendMessage(tab.id, { type: "AVID_FILL" }, { frameId: targetFrameId });
     if (res.ok) renderReport(res.report);
     else $("summary").textContent = "Error: " + res.error, $("summary").classList.remove("hidden");
   } finally {
@@ -73,6 +160,8 @@ $("fill").addEventListener("click", async () => {
     $("fill").textContent = "Fill this page";
   }
 });
+
+$("enable-btn").addEventListener("click", enableOnPage);
 
 for (const id of ["overwrite", "eeo"]) $(id).addEventListener("change", persistSettings);
 for (const id of ["open-options-1", "open-options-2"])
