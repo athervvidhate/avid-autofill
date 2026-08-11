@@ -1,0 +1,13 @@
+{
+  "name": "avid-autofill",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Chrome extension that autofills job applications from your saved profile.",
+  "scripts": {
+    "import": "node build/import-from-career-ops.mjs"
+  },
+  "dependencies": {
+    "js-yaml": "^4.1.0"
+  }
+}

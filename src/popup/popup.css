@@ -1,0 +1,58 @@
+:root {
+  --bg: #ffffff;
+  --fg: #1a1a1e;
+  --muted: #6b7280;
+  --accent: #4f7cff;
+  --border: #e5e7eb;
+  --ok: #128a3a;
+  --warn: #b45309;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #17181c;
+    --fg: #e8e8ea;
+    --muted: #9aa0aa;
+    --accent: #6b93ff;
+    --border: #2c2e35;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  width: 340px;
+  margin: 0;
+  padding: 14px;
+  font: 13px/1.4 -apple-system, system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+}
+header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+h1 { font-size: 15px; margin: 0; flex: 1; }
+.badge {
+  font-size: 11px; padding: 2px 8px; border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--accent);
+}
+button.primary {
+  width: 100%; padding: 10px; border: 0; border-radius: 8px;
+  background: var(--accent); color: #fff; font-weight: 600; font-size: 13px;
+  cursor: pointer;
+}
+button.primary:disabled { opacity: .5; cursor: default; }
+.options-row { display: flex; flex-direction: column; gap: 6px; margin: 10px 0; color: var(--muted); }
+.options-row label { display: flex; gap: 6px; align-items: center; cursor: pointer; }
+.summary { font-weight: 600; margin: 6px 0; }
+.results { list-style: none; margin: 0; padding: 0; max-height: 260px; overflow-y: auto; }
+.results li {
+  display: flex; justify-content: space-between; gap: 8px;
+  padding: 5px 0; border-top: 1px solid var(--border); font-size: 12px;
+}
+.results .lbl { color: var(--muted); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.results .val { max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.results .st-filled, .results .st-checked { color: var(--ok); }
+.results .st-kept-existing, .results .st-skipped, .results .st-no-option-match { color: var(--warn); }
+.results .st-error { color: #c0392b; }
+footer { margin-top: 12px; display: flex; flex-direction: column; gap: 4px; }
+.reminder { color: var(--warn); font-size: 11px; }
+a { color: var(--accent); text-decoration: none; }
+.notice { background: color-mix(in srgb, var(--warn) 14%, transparent); padding: 8px; border-radius: 6px; margin-bottom: 10px; }
+.hidden { display: none; }

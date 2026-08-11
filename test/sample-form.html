@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<!--
+  Local test fixture. Open this file in Chrome with the extension loaded, then
+  click the extension and "Fill this page". It exercises the label styles the
+  matcher handles: <label for>, wrapping label, placeholder-only, name-only,
+  native select, radio group, and checkbox. No real ATS needed.
+-->
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Sample Application Form</title>
+    <style>
+      body { font: 15px system-ui; max-width: 560px; margin: 40px auto; }
+      .row { margin: 14px 0; display: flex; flex-direction: column; gap: 4px; }
+      input, select, textarea { padding: 8px; font: inherit; }
+      fieldset { margin: 14px 0; }
+      h2 { margin-top: 28px; }
+    </style>
+  </head>
+  <body>
+    <h1>Mock Job Application</h1>
+
+    <div class="row">
+      <label for="fn">First Name *</label>
+      <input id="fn" name="first_name" />
+    </div>
+    <div class="row">
+      <label for="ln">Last Name *</label>
+      <input id="ln" name="last_name" />
+    </div>
+    <div class="row">
+      <label>Email
+        <input name="email" type="email" />
+      </label>
+    </div>
+    <div class="row">
+      <!-- placeholder-only -->
+      <input placeholder="Phone number" name="q_phone" />
+    </div>
+    <div class="row">
+      <label for="li">LinkedIn Profile</label>
+      <input id="li" name="urls[LinkedIn]" />
+    </div>
+    <div class="row">
+      <label for="gh">GitHub</label>
+      <input id="gh" />
+    </div>
+    <div class="row">
+      <label for="city">City</label>
+      <input id="city" />
+    </div>
+
+    <h2>Details</h2>
+    <div class="row">
+      <label for="comp">Current Company</label>
+      <input id="comp" />
+    </div>
+    <div class="row">
+      <label for="title">Current Title</label>
+      <input id="title" />
+    </div>
+    <div class="row">
+      <label for="school">School / University</label>
+      <input id="school" />
+    </div>
+
+    <div class="row">
+      <label for="country">Country</label>
+      <select id="country">
+        <option value="">Select…</option>
+        <option>Canada</option>
+        <option>United States</option>
+        <option>Mexico</option>
+      </select>
+    </div>
+
+    <fieldset>
+      <legend>Are you legally authorized to work in the United States?</legend>
+      <label><input type="radio" name="auth" value="Yes" /> Yes</label>
+      <label><input type="radio" name="auth" value="No" /> No</label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Will you now or in the future require visa sponsorship?</legend>
+      <label><input type="radio" name="sponsor" value="Yes" /> Yes</label>
+      <label><input type="radio" name="sponsor" value="No" /> No</label>
+    </fieldset>
+
+    <div class="row">
+      <label>Salary expectation
+        <input name="expected_salary" />
+      </label>
+    </div>
+
+    <div class="row">
+      <label for="cover">Cover Letter</label>
+      <textarea id="cover" rows="4"></textarea>
+    </div>
+
+    <h2>Resume</h2>
+    <div class="row">
+      <label for="resume">Attach your resume (PDF)</label>
+      <input id="resume" type="file" name="resume" accept=".pdf,.doc,.docx" />
+    </div>
+
+    <h2>Legal / Eligibility (Tesla-style)</h2>
+    <div class="row">
+      <label for="grad">Anticipated graduation date</label>
+      <input id="grad" name="graduation_date" />
+    </div>
+    <fieldset>
+      <legend>Are you a current university student?</legend>
+      <label><input type="radio" name="student" value="Yes" /> Yes</label>
+      <label><input type="radio" name="student" value="No" /> No</label>
+    </fieldset>
+    <fieldset>
+      <legend>Have you previously been employed by this company?</legend>
+      <label><input type="radio" name="prev" value="Yes" /> Yes</label>
+      <label><input type="radio" name="prev" value="No" /> No</label>
+    </fieldset>
+    <fieldset>
+      <legend>Do you consent to receiving text messages throughout your application process?</legend>
+      <label><input type="radio" name="sms" value="Yes" /> Yes</label>
+      <label><input type="radio" name="sms" value="No" /> No</label>
+    </fieldset>
+    <div class="row">
+      <label>
+        <input type="checkbox" name="ack" />
+        I have read and understand the statements above and accept them as conditions of employment.
+      </label>
+    </div>
+  </body>
+</html>

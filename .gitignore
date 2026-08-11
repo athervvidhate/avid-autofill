@@ -1,0 +1,3 @@
+node_modules/
+# Contains your personal data — never commit
+profile.json

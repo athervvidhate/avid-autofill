@@ -1,0 +1,18 @@
+<svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#5b8bff"/>
+      <stop offset="1" stop-color="#3a5fe0"/>
+    </linearGradient>
+  </defs>
+  <rect width="128" height="128" rx="28" fill="url(#bg)"/>
+  <!-- form card -->
+  <rect x="30" y="24" width="68" height="80" rx="9" fill="#ffffff"/>
+  <!-- filled form lines -->
+  <rect x="41" y="40" width="46" height="7" rx="3.5" fill="#3a5fe0"/>
+  <rect x="41" y="55" width="46" height="7" rx="3.5" fill="#c7d4ff"/>
+  <rect x="41" y="70" width="30" height="7" rx="3.5" fill="#c7d4ff"/>
+  <!-- auto-fill lightning bolt -->
+  <path d="M78 60 L58 88 L70 88 L64 108 L92 76 L78 76 L86 60 Z"
+        fill="#ffcf33" stroke="#3a5fe0" stroke-width="3" stroke-linejoin="round"/>
+</svg>

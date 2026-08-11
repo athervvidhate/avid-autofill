@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>Avid Autofill — My Info</h1>
+      <p class="sub">
+        This data stays on your machine (<code>chrome.storage.local</code>) and is
+        used to fill application forms. Nothing is sent anywhere.
+      </p>
+
+      <div class="toolbar">
+        <label class="btn">
+          Import profile.json
+          <input type="file" id="import-file" accept="application/json" hidden />
+        </label>
+        <button class="btn" id="export">Export JSON</button>
+        <span id="io-msg" class="io-msg"></span>
+      </div>
+
+      <section>
+        <h2>Resume</h2>
+        <p class="sub">
+          Stored locally and injected into the application's resume field. Browsers
+          can't read files off your disk during autofill, so the resume must live
+          in the extension. PDF or DOCX.
+        </p>
+        <div class="toolbar">
+          <label class="btn">
+            Choose resume
+            <input type="file" id="resume-file" accept=".pdf,.doc,.docx,application/pdf" hidden />
+          </label>
+          <button class="btn" id="resume-remove">Remove</button>
+          <span id="resume-name" class="io-msg"></span>
+        </div>
+      </section>
+
+      <section>
+        <h2>Personal</h2>
+        <div class="grid" id="personal"></div>
+      </section>
+
+      <section>
+        <h2>Links</h2>
+        <div class="grid" id="links"></div>
+      </section>
+
+      <section>
+        <h2>Work experience</h2>
+        <div id="work-list"></div>
+        <button class="btn add" data-add="work">+ Add role</button>
+      </section>
+
+      <section>
+        <h2>Education</h2>
+        <div id="education-list"></div>
+        <button class="btn add" data-add="education">+ Add school</button>
+      </section>
+
+      <section>
+        <h2>Work authorization &amp; logistics</h2>
+        <div class="grid" id="workAuth"></div>
+        <div class="grid" id="misc"></div>
+      </section>
+
+      <section>
+        <h2>Common application questions</h2>
+        <p class="sub">Default answers to yes/no questions that show up across applications. Leave blank to always skip a question.</p>
+        <div class="grid" id="questions"></div>
+      </section>
+
+      <section>
+        <h2>Voluntary self-ID (EEO)</h2>
+        <p class="sub">Only used if you enable "Fill voluntary self-ID" in the popup. Leave blank to always skip.</p>
+        <div class="grid" id="eeo"></div>
+      </section>
+
+      <div class="save-bar">
+        <button class="btn primary" id="save">Save</button>
+        <span id="save-msg" class="io-msg"></span>
+      </div>
+    </div>
+
+    <script src="../shared/schema.js"></script>
+    <script src="options.js"></script>
+  </body>
+</html>

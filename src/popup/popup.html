@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Avid Autofill</h1>
+      <span id="ats" class="badge">…</span>
+    </header>
+
+    <div id="no-profile" class="notice hidden">
+      No profile saved yet.
+      <a href="#" id="open-options-1">Set up your info →</a>
+    </div>
+
+    <button id="fill" class="primary">Fill this page</button>
+
+    <div class="options-row">
+      <label><input type="checkbox" id="overwrite" /> Overwrite filled fields</label>
+      <label><input type="checkbox" id="eeo" /> Fill voluntary self-ID (EEO)</label>
+    </div>
+
+    <div id="summary" class="summary hidden"></div>
+    <ul id="results" class="results"></ul>
+
+    <footer>
+      <a href="#" id="open-options-2">Edit my info</a>
+      <span class="reminder">Review everything before you submit.</span>
+    </footer>
+
+    <script src="../shared/schema.js"></script>
+    <script src="popup.js"></script>
+  </body>
+</html>
