@@ -9,8 +9,7 @@
 Open a posting on Greenhouse, Lever, Ashby, Workday and more, and a small panel
 appears. Click once and your name, contact, links, work history, education,
 work authorization, resume, and the usual yes/no questions are filled in. You
-review, then submit. Nothing is ever sent anywhere: your data lives in your
-browser.
+review, then submit. Your data lives in your browser, not on someone's server.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Manifest V3](https://img.shields.io/badge/Manifest-V3-34a853.svg)](manifest.json)
@@ -26,9 +25,11 @@ browser.
 Job seekers retype the same fifteen fields into a dozen different applicant
 tracking systems every week. Existing autofillers work, but they route your
 personal data through a third-party account. Avid Autofill does the same job
-with a different contract: **the extension holds your profile locally and talks
-to no server.** It is open source so you can verify that claim, and hackable so
-you can bend the field matching to your own search.
+with a different contract: **today it holds your profile locally and talks to no
+server.** It is open source so you can verify that, and hackable so you can bend
+the field matching to your own search. If cloud features arrive later (see
+[Privacy](#privacy)), they will be opt-in and local-first will remain the
+default.
 
 ## Features
 
@@ -47,7 +48,7 @@ you can bend the field matching to your own search.
 - **Common questions** - default answers for the recurring yes/no and legal
   acknowledgment questions (sponsorship, prior employment, student status, SMS
   consent, "consider me for other roles").
-- **Local and private** - everything lives in `chrome.storage.local`. No
+- **Local and private** - today everything lives in `chrome.storage.local`. No
   account, no network calls, no telemetry.
 - **Review-first by design** - it fills, you submit. It never clicks the final
   button.
@@ -123,11 +124,24 @@ it and its styles never leak out.
 
 ## Privacy
 
-Avid Autofill stores your profile and resume in `chrome.storage.local` on your
-machine. It makes no network requests, has no analytics, and has no backend. The
-resume is held as bytes so it can be injected into a file input; browsers cannot
-read files off your disk during autofill, which is why it must be saved once in
-the extension first.
+**Today:** Avid Autofill stores your profile and resume in `chrome.storage.local`
+on your machine. It makes no network requests, has no analytics, has no account,
+and has no backend. The resume is held as bytes so it can be injected into a file
+input; browsers cannot read files off your disk during autofill, which is why it
+must be saved once in the extension first.
+
+**Going forward:** optional cloud features may be added later, such as syncing
+your profile across devices or drafting answers to open-ended questions with an
+LLM. These will always be:
+
+- **Opt-in** - off by default; local-only stays the default experience.
+- **Disclosed** - clearly stated what leaves your device and where it goes.
+- **BYOK-friendly** - for any AI feature, bringing your own provider key (request
+  goes straight from your browser to the provider, no server of ours in the
+  middle) will always remain available, even if a hosted option also exists.
+
+The extension is open source, so you can verify exactly what it does at any
+version.
 
 ## Limits
 
