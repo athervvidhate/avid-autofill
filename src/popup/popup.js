@@ -22,12 +22,18 @@ function detectInFrame() {
   const A = globalThis.AvidAutofill;
   if (!A || !A.adapters) return null;
   const a = A.adapters.detect();
-  return { ats: a.name, beta: !!(a.beta || a.stub), hasForm: !!document.querySelector("form") };
+  // Count fillable fields, not <form> tags: many ATS pages (and our fixture)
+  // put inputs in plain divs, and the engine fills them either way.
+  const fields = document.querySelectorAll(
+    "input:not([type=hidden]):not([type=submit]):not([type=button]), select, textarea"
+  ).length;
+  return { ats: a.name, beta: !!(a.beta || a.stub), fields };
 }
 
 // Ask every frame what it sees (broadcast messaging can't enumerate frames, but
 // executeScript returns a result per frame), then pick the frame most worth
-// filling: a recognized ATS first, else any frame with a form, else the top.
+// filling: a recognized ATS first, else the frame with the most fillable fields
+// (an empty wrapper frame embedding an iframe has none), else the top frame.
 async function resolveTarget(tabId) {
   const injections = await chrome.scripting.executeScript({
     target: { tabId, allFrames: true },
@@ -35,10 +41,11 @@ async function resolveTarget(tabId) {
   });
   const loaded = injections.filter((i) => i.result);
   if (!loaded.length) return null;
-  const best =
-    loaded.find((i) => i.result.ats !== "Generic") ||
-    loaded.find((i) => i.result.hasForm) ||
-    loaded[0];
+  const ats = loaded.find((i) => i.result.ats !== "Generic");
+  const mostFields = loaded
+    .filter((i) => i.result.fields > 0)
+    .sort((a, b) => b.result.fields - a.result.fields)[0];
+  const best = ats || mostFields || loaded[0];
   return { frameId: best.frameId, ...best.result };
 }
 
