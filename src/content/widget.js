@@ -82,6 +82,14 @@
     .foot a { color: var(--accent); text-decoration: none; font-size: 12.5px; font-weight: 600; cursor: pointer; }
     .review { color: var(--warn); font-size: 11px; }
     .empty { color: var(--muted); font-size: 12.5px; margin-top: 10px; }
+
+    /* dev-only: fixture capture. Never rendered in store builds. */
+    .dev { display: flex; align-items: center; gap: 6px; padding: 10px 16px; border-top: 1px dashed var(--border); background: repeating-linear-gradient(45deg, transparent, transparent 6px, rgba(180,83,9,.06) 6px, rgba(180,83,9,.06) 12px); }
+    .dev input { flex: 1; min-width: 0; padding: 6px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--fg); font-size: 12px; }
+    .dev button { border: 1px solid var(--warn); background: none; color: var(--warn); font-size: 12px; font-weight: 600; padding: 6px 10px; border-radius: 8px; cursor: pointer; white-space: nowrap; }
+    .dev button:hover { background: rgba(180,83,9,.1); }
+    .dev-msg { font-size: 11px; color: var(--muted); padding: 0 16px 10px; }
+    .dev-msg:empty { display: none; }
   `;
 
   const BOLT = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2 4.5 13.5H11l-1.5 8.5L20 10h-6.5L15 2z"/></svg>`;
@@ -159,6 +167,8 @@
     $(".ov").addEventListener("change", persistToggles);
     $(".eeo").addEventListener("change", persistToggles);
 
+    if (isDevBuild()) mountDevTools(panel, adapter);
+
     $(".fill").addEventListener("click", async () => {
       const btn = $(".fill");
       btn.disabled = true;
@@ -212,5 +222,101 @@
     }
   }
 
+  // --- Dev-only fixture capture -------------------------------------------
+  // Workday (and other auth-walled ATS) forms can only be captured from a real
+  // logged-in session. This lets the maintainer save the live DOM into
+  // test/fixtures/ for the regression suite. Gated on isDevBuild() so store
+  // users never see the button.
+
+  // Store builds are repackaged by the Chrome Web Store with an update_url in
+  // the manifest; an unpacked/dev load has none.
+  function isDevBuild() {
+    try {
+      return !("update_url" in chrome.runtime.getManifest());
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // The user's own PII, longest strings first so full values are redacted
+  // before their substrings (e.g. full name before first name).
+  function collectPii(profile) {
+    const vals = [];
+    const push = (v) => {
+      const s = String(v == null ? "" : v).trim();
+      if (s.length >= 3) vals.push(s);
+    };
+    const p = profile.personal || {};
+    [p.firstName, p.lastName, p.fullName, p.preferredName, p.email, p.phone,
+     p.address, p.city, p.postalCode].forEach(push);
+    Object.values(profile.links || {}).forEach(push);
+    return [...new Set(vals)].sort((a, b) => b.length - a.length);
+  }
+
+  function escapeRegExp(s) {
+    return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+
+  // Best-effort scrub. Two layers:
+  //  1. Structural — clone the page, drop our widget + scripts, and clear the
+  //     values the user typed (input value/checked/selected attributes; the
+  //     live dirty value isn't carried by cloneNode, so clearing attributes is
+  //     enough). Keeps labels, placeholders, and structure the matcher needs.
+  //  2. String redaction — replace any of the user's known profile values that
+  //     the page server-rendered into text or attributes.
+  function buildFixtureHtml(profile) {
+    const clone = document.documentElement.cloneNode(true);
+    clone.querySelectorAll("#avid-autofill-root, script").forEach((n) => n.remove());
+    clone.querySelectorAll("input").forEach((i) => {
+      const t = (i.getAttribute("type") || "text").toLowerCase();
+      if (t === "checkbox" || t === "radio") i.removeAttribute("checked");
+      else if (t !== "submit" && t !== "button" && t !== "image" && t !== "reset")
+        i.setAttribute("value", "");
+    });
+    clone.querySelectorAll("textarea").forEach((t) => { t.textContent = ""; });
+    clone.querySelectorAll("option").forEach((o) => o.removeAttribute("selected"));
+
+    let html = "<!doctype html>\n" + clone.outerHTML;
+    for (const val of collectPii(profile)) {
+      html = html.replace(new RegExp(escapeRegExp(val), "gi"), "[REDACTED]");
+    }
+    return html;
+  }
+
+  function slugify(s) {
+    return String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  }
+
+  function download(filename, text) {
+    const blob = new Blob([text], { type: "text/html" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+
+  function mountDevTools(panel, adapter) {
+    const ats = slugify(adapter.name) || "generic";
+    const dev = el(`
+      <div class="dev" title="Dev only — capture this page as a test fixture">
+        <input class="step" type="text" placeholder="step (e.g. page1)" spellcheck="false">
+        <button class="export">Export DOM</button>
+      </div>
+    `);
+    const msg = el(`<div class="dev-msg"></div>`);
+    // Sits below the results, above the footer.
+    panel.querySelector(".foot").before(dev, msg);
+
+    dev.querySelector(".export").addEventListener("click", async () => {
+      const step = slugify(dev.querySelector(".step").value) || "capture";
+      const profile = await AvidAutofill.getProfile();
+      const html = buildFixtureHtml(profile);
+      download(`${ats}-${step}.html`, html);
+      msg.textContent = `Saved ${ats}-${step}.html → move into test/fixtures/`;
+    });
+  }
+
   AvidAutofill.widget = { mount };
+  AvidAutofill.isDevBuild = isDevBuild;
 })();
