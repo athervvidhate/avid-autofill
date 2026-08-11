@@ -10,21 +10,66 @@ async function activeTab() {
 // other privileged schemes reject scripting.executeScript.
 const canInject = (tab) => /^(https?|file):/.test(tab.url || "");
 
-// Ask the content script which ATS it sees. If it isn't there, offer to inject
-// it on demand (embedded ATS on a custom domain the manifest doesn't match) or,
-// on a page we can't script, fall back to disabling.
+// The frame the fill targets. An ATS form can be embedded in an iframe (e.g. a
+// greenhouse.io frame on careers.acme.com), so we can't assume the top frame.
+// Defaults to 0 (top) until a ping resolves a better one.
+let targetFrameId = 0;
+
+// Runs inside each frame's content-script world. Returns null where our content
+// script isn't loaded, else what that frame sees. Must be self-contained: it is
+// serialized and injected, so it can't reference popup scope.
+function detectInFrame() {
+  const A = globalThis.AvidAutofill;
+  if (!A || !A.adapters) return null;
+  const a = A.adapters.detect();
+  return { ats: a.name, beta: !!(a.beta || a.stub), hasForm: !!document.querySelector("form") };
+}
+
+// Ask every frame what it sees (broadcast messaging can't enumerate frames, but
+// executeScript returns a result per frame), then pick the frame most worth
+// filling: a recognized ATS first, else any frame with a form, else the top.
+async function resolveTarget(tabId) {
+  const injections = await chrome.scripting.executeScript({
+    target: { tabId, allFrames: true },
+    func: detectInFrame,
+  });
+  const loaded = injections.filter((i) => i.result);
+  if (!loaded.length) return null;
+  const best =
+    loaded.find((i) => i.result.ats !== "Generic") ||
+    loaded.find((i) => i.result.hasForm) ||
+    loaded[0];
+  return { frameId: best.frameId, ...best.result };
+}
+
+// Find the ATS across all frames. If our content script isn't in any of them,
+// offer to inject it on demand (embedded ATS on a domain the manifest doesn't
+// match); on a page we can't script at all, fall back to disabling.
 async function ping() {
   const tab = await activeTab();
+  if (!canInject(tab)) {
+    targetFrameId = 0;
+    $("ats").textContent = "no form page";
+    $("fill").disabled = true;
+    $("enable-page").classList.add("hidden");
+    return;
+  }
+  let target = null;
   try {
-    const res = await chrome.tabs.sendMessage(tab.id, { type: "AVID_PING" });
-    $("ats").textContent = res.beta ? `${res.ats} (beta)` : res.ats;
+    target = await resolveTarget(tab.id);
+  } catch (_) {
+    // Some injectable-looking pages still reject scripting; treat as no form.
+  }
+  if (target) {
+    targetFrameId = target.frameId;
+    $("ats").textContent = target.beta ? `${target.ats} (beta)` : target.ats;
     $("fill").disabled = false;
     $("enable-page").classList.add("hidden");
-  } catch (_) {
+  } else {
+    targetFrameId = 0;
     $("fill").disabled = true;
-    const injectable = canInject(tab);
-    $("ats").textContent = injectable ? "not enabled" : "no form page";
-    $("enable-page").classList.toggle("hidden", !injectable);
+    $("ats").textContent = "not enabled";
+    $("enable-page").classList.remove("hidden");
   }
 }
 
@@ -38,7 +83,7 @@ async function enableOnPage() {
     const tab = await activeTab();
     const files = chrome.runtime.getManifest().content_scripts[0].js;
     try {
-      await chrome.scripting.executeScript({ target: { tabId: tab.id }, files });
+      await chrome.scripting.executeScript({ target: { tabId: tab.id, allFrames: true }, files });
     } catch (err) {
       // e.g. file:// pages without "Allow access to file URLs" reject here.
       console.error("Avid Autofill: couldn't inject content scripts", err);
@@ -100,7 +145,7 @@ $("fill").addEventListener("click", async () => {
   $("fill").textContent = "Filling…";
   try {
     const tab = await activeTab();
-    const res = await chrome.tabs.sendMessage(tab.id, { type: "AVID_FILL" });
+    const res = await chrome.tabs.sendMessage(tab.id, { type: "AVID_FILL" }, { frameId: targetFrameId });
     if (res.ok) renderReport(res.report);
     else $("summary").textContent = "Error: " + res.error, $("summary").classList.remove("hidden");
   } finally {
