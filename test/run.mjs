@@ -21,13 +21,16 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-// The pure logic, in manifest load order. Deliberately excludes workday.js,
-// engine.js, widget.js and main.js (UI / chrome listeners / live-only fill).
+// The pure logic, in manifest load order. workday.js is pure DOM logic (no
+// chrome APIs) so it's included to cover the work-experience repeater and
+// typeable date sections; engine.js, widget.js and main.js stay excluded
+// (UI / chrome listeners / live-only fill).
 const SCRIPTS = [
   "src/shared/schema.js",
   "src/content/fillers.js",
   "src/content/matcher.js",
   "src/content/adapters.js",
+  "src/content/workday.js",
 ].map((p) => fs.readFileSync(path.join(ROOT, p), "utf8"));
 
 // Minimal in-memory chrome shim. schema.js references chrome.storage.local at
@@ -196,19 +199,140 @@ test("page2: work experience and social links", () => {
     value: "https://linkedin.com/in/alexrivera",
   });
 
-  // TODO(#8/#9): Workday labels the employer field "Company", but the current
-  // company rule only matches an anchored /^company$/ or /employer/ — the
-  // signal "company* | company* | company name | ..." matches neither, so the
-  // company field does NOT map. High-value gap for #8/#9.
+  // (#9) The generic matcher.match RULES table intentionally does NOT gain a
+  // "company"/"location"/"description" rule here — a global regex for those
+  // words would also fire on unrelated fields on other ATS's (e.g. a
+  // Greenhouse "Preferred Location" field). Company/location/description/dates
+  // are instead filled per-panel by workday.workExperiencePass (see below),
+  // which resolves them directly from profile.work[N] scoped to panel N's own
+  // container, bypassing the generic rules table entirely. So plain
+  // matcher.match still returns no mapping for these signals in isolation —
+  // that is by design, not a gap.
   assertMapping(document, A, p, "company* | company*", null);
-
-  // TODO(#8/#9): the work-experience END DATE (year) matches the /end date/
-  // rule, which resolves to education.endDate — a work field pulling an
-  // education value. False positive to fix when work dates get their own rule.
-  assertMapping(document, A, p, "end date date section year", { value: "2020" });
-
-  // Free-text role description has no rule (expected: no mapping).
   assertMapping(document, A, p, "role description", null);
+
+  // Plain matcher.match (no panel scoping) still resolves "end date" via the
+  // generic /end date/ -> education.endDate rule — workExperiencePass is what
+  // prevents this from reaching the work-experience date fields in the real
+  // fill flow (see the "datePass skips..." regression test below).
+  assertMapping(document, A, p, "end date date section year", { value: "2020" });
+});
+
+// --- Page 2: work-experience repeater, panel-scoped (#9) --------------------
+
+test("page2: workExperiencePass fills a panel scoped to its own container", async () => {
+  const { dom, document, A } = loadFixture("workday-page2.html");
+  const p = testProfile(A);
+  p.work = [
+    {
+      title: "Staff Engineer",
+      company: "Acme Corp",
+      location: "Remote",
+      description: "Led the platform team.",
+      startDate: "2021-03",
+      endDate: "2023-06",
+      current: false,
+    },
+  ];
+
+  const handled = new dom.window.WeakSet();
+  const records = [];
+  await A.workday.workExperiencePass(p, {
+    fillers: A.fillers,
+    record: (label, value, status) => records.push({ label, value, status }),
+    handled,
+  });
+
+  const panel = document.querySelector('[aria-labelledby="Work-Experience-1-panel"]');
+  assert.ok(panel, "fixture has a Work Experience 1 panel");
+  assert.equal(panel.querySelector('[data-automation-id="formField-jobTitle"] input').value, "Staff Engineer");
+  assert.equal(panel.querySelector('[data-automation-id="formField-companyName"] input').value, "Acme Corp");
+  assert.equal(panel.querySelector('[data-automation-id="formField-location"] input').value, "Remote");
+  assert.equal(
+    panel.querySelector('[data-automation-id="formField-roleDescription"] textarea').value,
+    "Led the platform team."
+  );
+
+  const startMonth = panel.querySelector(
+    '[data-automation-id="formField-startDate"] input[data-automation-id="dateSectionMonth-input"]'
+  );
+  const startYear = panel.querySelector(
+    '[data-automation-id="formField-startDate"] input[data-automation-id="dateSectionYear-input"]'
+  );
+  assert.equal(startMonth.value, "03");
+  assert.equal(startYear.value, "2021");
+
+  const endMonth = panel.querySelector(
+    '[data-automation-id="formField-endDate"] input[data-automation-id="dateSectionMonth-input"]'
+  );
+  assert.equal(endMonth.value, "06");
+
+  // Every field workExperiencePass touched is marked handled so the generic
+  // engine passes skip it (no double-fill / no collision).
+  const jobTitleEl = panel.querySelector('[data-automation-id="formField-jobTitle"] input');
+  assert.ok(handled.has(jobTitleEl));
+});
+
+test("page2: a currently-employed panel checks the box and leaves end date blank", async () => {
+  const { dom, document, A } = loadFixture("workday-page2.html");
+  const p = testProfile(A);
+  p.work = [
+    { title: "Engineer", company: "Acme", startDate: "2022-01", endDate: "2099-12", current: true },
+  ];
+
+  const handled = new dom.window.WeakSet();
+  await A.workday.workExperiencePass(p, { fillers: A.fillers, record: () => {}, handled });
+
+  const panel = document.querySelector('[aria-labelledby="Work-Experience-1-panel"]');
+  const box = panel.querySelector('[data-automation-id="formField-currentlyWorkHere"] input');
+  assert.equal(box.checked, true);
+  const endYear = panel.querySelector(
+    '[data-automation-id="formField-endDate"] input[data-automation-id="dateSectionYear-input"]'
+  );
+  assert.equal(endYear.value, "", "end date is left blank when currently employed");
+});
+
+test("page2: datePass skips date sections workExperiencePass already filled", async () => {
+  const { dom, document, A } = loadFixture("workday-page2.html");
+  const p = testProfile(A);
+  p.work = [{ title: "Engineer", company: "Acme", startDate: "2021-03", endDate: "2022-05" }];
+  p.education = [{ school: "State University", endDate: "2020" }];
+
+  const handled = new dom.window.WeakSet();
+  const helpers = A.matcher.makeHelpers(p);
+  const record = () => {};
+
+  await A.workday.workExperiencePass(p, { fillers: A.fillers, record, handled });
+  await A.workday.datePass(p, { matcher: A.matcher, helpers, fillers: A.fillers, record, handled });
+
+  const panel = document.querySelector('[aria-labelledby="Work-Experience-1-panel"]');
+  const endYear = panel.querySelector(
+    '[data-automation-id="formField-endDate"] input[data-automation-id="dateSectionYear-input"]'
+  );
+  // Without the handled-skip in datePass, its generic /end date/ rule would
+  // overwrite this with profile.education[0].endDate ("2020") — see the
+  // "plain matcher.match" assertion above documenting that rule in isolation.
+  assert.equal(endYear.value, "2022", "work end date is not clobbered by the generic end-date rule");
+});
+
+test("page2: extra work entries beyond available panels do not throw (click-to-add is live-only)", async () => {
+  const { dom, document, A } = loadFixture("workday-page2.html");
+  const p = testProfile(A);
+  p.work = [
+    { title: "Engineer II", company: "Acme" },
+    { title: "Engineer I", company: "Beta" },
+  ];
+
+  const handled = new dom.window.WeakSet();
+  // jsdom has no React runtime, so clicking "Add Another" is a no-op and no
+  // second panel ever appears — this exercises the guard/give-up path, not the
+  // real click-to-grow flow (that needs a live Workday page, see comment on
+  // workExperiencePass in src/content/workday.js).
+  await assert.doesNotReject(() =>
+    A.workday.workExperiencePass(p, { fillers: A.fillers, record: () => {}, handled })
+  );
+  const panel = document.querySelector('[aria-labelledby="Work-Experience-1-panel"]');
+  assert.equal(panel.querySelector('[data-automation-id="formField-jobTitle"] input').value, "Engineer II");
 });
 
 // --- Page 3: work authorization (yes/no) -----------------------------------

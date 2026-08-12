@@ -26,9 +26,15 @@
     // --- 0. Resume upload (if a resume is stored). ---
     if (resume) await uploadResume(resume, matcher, fillers, record);
 
-    // Workday typeable date sections (MM/DD/YYYY spinbuttons).
+    // Workday work-history repeater (Add Another + per-panel fill) runs before
+    // the generic date sweep so its date sections are marked handled first and
+    // can't be re-matched (and mis-mapped) by the page-wide date pass below.
     if (adapter.hasDateSections && AvidAutofill.workday) {
-      await AvidAutofill.workday.datePass(profile, { matcher, helpers, fillers, record });
+      if (AvidAutofill.workday.workExperiencePass) {
+        await AvidAutofill.workday.workExperiencePass(profile, { fillers, record, handled });
+      }
+      // Workday typeable date sections (MM/DD/YYYY spinbuttons).
+      await AvidAutofill.workday.datePass(profile, { matcher, helpers, fillers, record, handled });
     }
 
     // --- 1. Custom (react-select / combobox / Workday) dropdowns first, so their
