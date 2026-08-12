@@ -21,13 +21,16 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-// The pure logic, in manifest load order. Deliberately excludes workday.js,
-// engine.js, widget.js and main.js (UI / chrome listeners / live-only fill).
+// The pure logic, in manifest load order. Deliberately excludes engine.js,
+// widget.js and main.js (UI / chrome listeners / live-only fill). workday.js
+// is included for its pure parseDate/yearSpinPlan helpers — its DOM-driving
+// passes (datePass, popoverDatePass) are not invoked here.
 const SCRIPTS = [
   "src/shared/schema.js",
   "src/content/fillers.js",
   "src/content/matcher.js",
   "src/content/adapters.js",
+  "src/content/workday.js",
 ].map((p) => fs.readFileSync(path.join(ROOT, p), "utf8"));
 
 // Minimal in-memory chrome shim. schema.js references chrome.storage.local at
@@ -361,4 +364,34 @@ test("adapters.detect resolves an adapter without throwing", () => {
   const { A } = loadFixture("workday-page1.html");
   const adapter = A.adapters.detect();
   assert.ok(adapter && typeof adapter.name === "string");
+});
+
+// --- Workday date helpers (#8) -----------------------------------------------
+// parseDate and yearSpinPlan are the pure pieces of the calendar-icon popover
+// date picker; the actual click-open-spin DOM interaction (popoverDatePass)
+// needs a live Workday page that renders the popover and is not covered here.
+
+test("workday.parseDate handles the date formats a Workday posting emits", () => {
+  const win = blankWindow();
+  const { parseDate } = win.AvidAutofill.workday;
+
+  assert.deepEqual({ ...parseDate("March 2027") }, { mm: "03", dd: "", yyyy: "2027" });
+  assert.deepEqual({ ...parseDate("August 11, 2026") }, { mm: "08", dd: "11", yyyy: "2026" });
+  assert.deepEqual({ ...parseDate("03/2027") }, { mm: "03", dd: "", yyyy: "2027" });
+  assert.deepEqual({ ...parseDate("2027-03-01") }, { mm: "03", dd: "01", yyyy: "2027" });
+  assert.deepEqual({ ...parseDate("Jun 2025") }, { mm: "06", dd: "", yyyy: "2025" });
+  assert.equal(parseDate(""), null);
+  assert.equal(parseDate("not a date"), null);
+});
+
+test("workday.yearSpinPlan computes the monthPicker spinner clicks to reach the target year", () => {
+  const win = blankWindow();
+  const { yearSpinPlan } = win.AvidAutofill.workday;
+
+  // Target year is later -> spin the right (forward) spinner.
+  assert.deepEqual({ ...yearSpinPlan(2024, 2027) }, { direction: "right", clicks: 3 });
+  // Target year is earlier -> spin the left (back) spinner.
+  assert.deepEqual({ ...yearSpinPlan(2027, 2020) }, { direction: "left", clicks: 7 });
+  // Already on the target year -> no clicks (direction is a no-op either way).
+  assert.deepEqual({ ...yearSpinPlan(2025, 2025) }, { direction: "right", clicks: 0 });
 });

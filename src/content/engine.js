@@ -26,9 +26,12 @@
     // --- 0. Resume upload (if a resume is stored). ---
     if (resume) await uploadResume(resume, matcher, fillers, record);
 
-    // Workday typeable date sections (MM/DD/YYYY spinbuttons).
+    // Workday typeable date sections (MM/DD/YYYY spinbuttons), and the
+    // calendar-icon popover variant (dateIcon -> monthPicker spinner) used on
+    // postings that don't render the typeable sections.
     if (adapter.hasDateSections && AvidAutofill.workday) {
       await AvidAutofill.workday.datePass(profile, { matcher, helpers, fillers, record });
+      await AvidAutofill.workday.popoverDatePass(profile, { matcher, helpers, fillers, record });
     }
 
     // --- 1. Custom (react-select / combobox / Workday) dropdowns first, so their
