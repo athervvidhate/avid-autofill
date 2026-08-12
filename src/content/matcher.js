@@ -100,7 +100,7 @@
     { any: [/first name/, /given name/, /^fname$/, /legal first/], get: (p, h) => h.firstName() },
     { any: [/last name/, /family name/, /surname/, /^lname$/, /legal last/], get: (p, h) => h.lastName() },
     { any: [/preferred name/, /nick ?name/, /goes by/], get: (p) => p.personal.preferredName || p.personal.firstName },
-    { any: [/legal name/, /full name/, /^name$/, /your name/, /candidate name/], not: [/company|user|file|first|last|event|account/], get: (p) => p.personal.fullName || `${p.personal.firstName} ${p.personal.lastName}`.trim() },
+    { any: [/legal name/, /full name/, /^name$/, /(^|\| )name(\*| \||$)/, /your name/, /candidate name/], not: [/company|user|file|first|last|middle|event|account|maiden|screen/], get: (p) => p.personal.fullName || `${p.personal.firstName} ${p.personal.lastName}`.trim() },
 
     // --- Contact ---
     { any: [/e-?mail/, /^email address$/], not: [/confirm|company/], get: (p) => p.personal.email },
@@ -144,7 +144,7 @@
     { any: [/graduation date/, /anticipated graduation/, /expected graduation/, /grad(uation)? date/], get: (p, h) => p.misc.graduationDate || h.edu0().endDate },
 
     // --- Common yes/no application questions (Tesla-style legal/consent step) ---
-    { any: [/previously (been )?employed/, /previously worked (here|for|at)/, /former employee/, /worked (here|for us) before/], kind: "yesno", get: (p) => p.questions.previouslyEmployedHere },
+    { any: [/previously (been )?employed/, /previously worked (here|for|at)/, /former employee/, /worked (here|for us) before/, /previous worker/], kind: "yesno", get: (p) => p.questions.previouslyEmployedHere },
     { any: [/intern or contractor/, /current or former (intern|contractor)/, /former\/current (intern|contractor)/, /contractor/], kind: "yesno", get: (p) => p.questions.formerContractorOrIntern },
     { any: [/current(ly)? (a )?(university |college )?student/, /currently enrolled/, /enrolled in an academic/, /pursuing a degree/], kind: "yesno", get: (p) => p.questions.currentStudent },
     { any: [/text message/, /sms/, /consent to receiv/, /receive.*(notification|message)/], kind: "yesno", get: (p) => p.questions.consentToContact },
@@ -153,7 +153,7 @@
     { any: [/i have read/, /read and understand/, /i certify/, /i acknowledge/, /i agree/, /accept.*(terms|conditions|agreement)/, /conditions of employment/], kind: "yesno", get: (p) => p.questions.agreeToTerms },
 
     // --- Voluntary self-ID (only fired when settings.fillEEO) ---
-    { eeo: true, any: [/gender/, /gender identity/], get: (p) => p.eeo.gender },
+    { eeo: true, any: [/gender/, /gender identity/, /\bsex\b/], get: (p) => p.eeo.gender },
     { eeo: true, any: [/hispanic|latino/], kind: "yesno", get: (p) => p.eeo.hispanicLatino },
     { eeo: true, any: [/race|ethnicit/], get: (p) => p.eeo.race },
     { eeo: true, any: [/veteran/], get: (p) => p.eeo.veteranStatus },

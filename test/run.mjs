@@ -174,10 +174,9 @@ test("page1: personal, contact and address fields map correctly", () => {
   // "How did you hear about us" -> profile.misc.howHeard is blank here, so no fill.
   assertMapping(document, A, p, "how did you hear about us", null);
 
-  // TODO(#8/#9): the "Are you a previous worker?" Yes/No radio group does not map.
-  // "candidate is previous worker" matches none of the previouslyEmployedHere
-  // patterns (/previously employed/, /previously worked/, /former employee/).
-  assertMapping(document, A, p, "candidate is previous worker", null);
+  // Workday's "Are you a previous worker?" Yes/No radio maps to the
+  // previouslyEmployedHere preference (default "No") via the /previous worker/ rule.
+  assertMapping(document, A, p, "candidate is previous worker", { value: "No", kind: "yesno" });
 
   // Workday's phone-type / extension fields contain "phone" but must NOT receive
   // the phone number — the phone rule excludes them so only the real phone-number
@@ -369,9 +368,11 @@ test("page4: EEO fields and terms consent", () => {
     kind: "yesno",
   });
 
-  // TODO(#8/#9): Workday's gender question is labelled "Please select your sex."
-  // The eeo gender rule only matches /gender/, so "sex" does not map.
-  assertMapping(document, A, p, "please select your sex", null);
+  // Workday labels its gender question "Please select your sex"; the eeo gender
+  // rule matches /\bsex\b/. (EEO fields only fill when settings.fillEEO is on;
+  // the matcher maps regardless and the engine gates whether it is applied.)
+  p.eeo.gender = "Female";
+  assertMapping(document, A, p, "please select your sex", { value: "Female" });
 
   // "ethniCITY" contains the substring "city"; the /city/ rule now uses a word
   // boundary (/\bcity\b/) so the race/ethnicity question no longer grabs the
@@ -385,10 +386,10 @@ test("page5: disability self-ID form", () => {
   const { document, A } = loadFixture("workday-page5.html");
   const p = testProfile(A);
 
-  // TODO(#8/#9): a bare "Name*" field (signal "name* | name* | name | ...") does
-  // not match the full-name rule, which requires an anchored /^name$/ and so
-  // misses the padded signal. Documented gap.
-  assertMapping(document, A, p, "self identified disability data name", null);
+  // A standalone "Name" field (here on the disability self-ID form, signal
+  // "name* | name* | name | ...") maps to the full name: the full-name rule
+  // matches a standalone "name" token, not only an exact /^name$/ signal.
+  assertMapping(document, A, p, "self identified disability data name", { value: "Alex Rivera" });
 
   // Employee ID has no rule (expected: no mapping).
   assertMapping(document, A, p, "employee id", null);
