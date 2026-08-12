@@ -104,12 +104,12 @@
 
     // --- Contact ---
     { any: [/e-?mail/, /^email address$/], not: [/confirm|company/], get: (p) => p.personal.email },
-    { any: [/phone/, /mobile/, /telephone/, /contact number/], get: (p) => p.personal.phone },
+    { any: [/phone/, /mobile/, /telephone/, /contact number/], not: [/extension/, /device type/, /\bsms\b/, /opt.?in/, /phone code/, /country.*code/], get: (p) => p.personal.phone },
     { any: [/pronoun/], get: (p) => p.personal.pronouns },
 
     // --- Address ---
     { any: [/street address/, /address line ?1/, /^address$/, /mailing address/], not: [/email/], get: (p) => p.personal.address },
-    { any: [/city/, /town/], not: [/velocity|capacity/], get: (p) => p.personal.city },
+    { any: [/\bcity\b/, /\btown\b/], not: [/velocity|capacity|ethnic/], get: (p) => p.personal.city },
     { any: [/\bstate\b/, /\bprovince\b/, /\bregion\b/], not: [/statement|estate|united states|work/], expand: "usState", get: (p) => p.personal.state },
     { any: [/zip/, /postal code/, /post code/], get: (p) => p.personal.postalCode },
     { any: [/country/, /nationality/], not: [/authoriz/, /eligible to work/, /sponsor/, /work in the country/, /citizen/], get: (p) => p.personal.country },
@@ -132,7 +132,7 @@
     { any: [/graduation/, /grad(uation)? date/, /end date/, /expected graduation/], get: (p, h) => h.edu0().endDate },
 
     // --- Work authorization (yes/no) ---
-    { any: [/authoriz(ed|ation) to work/, /legally authorized/, /eligible to work/, /work authorization/], kind: "yesno", get: (p) => p.workAuth.authorizedToWork },
+    { any: [/authoriz(ed|ation) to work/, /legally authorized/, /eligible to work/, /work authorization/], not: [/temporary/, /\bopt\b/, /\bcpt\b/, /practical training/], kind: "yesno", get: (p) => p.workAuth.authorizedToWork },
     { any: [/require sponsor/, /need sponsor/, /visa sponsor/, /sponsorship( now| in the future)?/], kind: "yesno", get: (p) => p.workAuth.requireSponsorship },
 
     // --- Logistics ---

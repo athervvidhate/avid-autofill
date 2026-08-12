@@ -179,13 +179,14 @@ test("page1: personal, contact and address fields map correctly", () => {
   // patterns (/previously employed/, /previously worked/, /former employee/).
   assertMapping(document, A, p, "candidate is previous worker", null);
 
-  // TODO(#8/#9): Workday's phone-type / phone-code / extension / sms-opt-in fields
-  // all contain "phone" and greedily match the generic /phone/ rule, so they get
-  // stuffed with the phone number. Document the false positives so a future
-  // matcher fix (more specific phone-number rule) has a regression anchor.
-  assertMapping(document, A, p, "phone device type", { value: "5551230000" });
-  assertMapping(document, A, p, "phone extension", { value: "5551230000" });
-  assertMapping(document, A, p, "phone sms opt in", { value: "5551230000" });
+  // Workday's phone-type / extension fields contain "phone" but must NOT receive
+  // the phone number — the phone rule excludes them so only the real phone-number
+  // field (asserted above) maps.
+  assertMapping(document, A, p, "phone device type", null);
+  assertMapping(document, A, p, "phone extension", null);
+  // The SMS opt-in field no longer grabs the phone number; it correctly maps to
+  // the consent-to-contact yes/no preference via the /sms/ rule instead.
+  assertMapping(document, A, p, "phone sms opt in", { value: "Yes", kind: "yesno" });
 });
 
 // --- Page 2: work experience + links ---------------------------------------
@@ -350,10 +351,10 @@ test("page3: work authorization questions map to yes/no", () => {
     kind: "yesno",
   });
 
-  // TODO(#8/#9): the temporary-authorization (OPT/CPT) question contains the
-  // substring "work authorization" and so matches the authorizedToWork rule,
-  // answering it "Yes". It is a distinct question; current behavior asserted.
-  assertMapping(document, A, p, "temporary authorization", { value: "Yes", kind: "yesno" });
+  // The temporary-authorization (OPT/CPT) question contains "work authorization"
+  // but is a distinct question that must not be auto-answered "Yes" — the
+  // authorizedToWork rule excludes temporary/OPT/CPT phrasing, so it does not map.
+  assertMapping(document, A, p, "temporary authorization", null);
 });
 
 // --- Page 4: EEO + terms ----------------------------------------------------
@@ -372,10 +373,10 @@ test("page4: EEO fields and terms consent", () => {
   // The eeo gender rule only matches /gender/, so "sex" does not map.
   assertMapping(document, A, p, "please select your sex", null);
 
-  // TODO(#8/#9): FALSE POSITIVE — "ethniCITY" contains the substring "city", so
-  // the race/ethnicity question matches the /city/ rule and gets the profile
-  // city ("Portland"). The /city/ rule's `not` list should exclude ethnicity.
-  assertMapping(document, A, p, "ethnicity or race", { value: "Portland" });
+  // "ethniCITY" contains the substring "city"; the /city/ rule now uses a word
+  // boundary (/\bcity\b/) so the race/ethnicity question no longer grabs the
+  // profile city. With EEO fill off it does not map at all.
+  assertMapping(document, A, p, "ethnicity or race", null);
 });
 
 // --- Page 5: self-identify disability ---------------------------------------
