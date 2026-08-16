@@ -55,6 +55,26 @@ function chromeShim() {
   };
 }
 
+// Simulate Workday's date-section spinbuttons under jsdom. On a live page these
+// role="spinbutton" inputs commit typed digits to aria-valuenow (+ a display
+// node), NOT to `.value`, and jsdom implements no execCommand. Override
+// execCommand so setDateSpinner's insertText drives the spinbutton the way it
+// does live — letting tests assert the real committed value (aria-valuenow)
+// instead of the `.value` fiction. Returns false for anything that is not a
+// focused spinbutton, so setTextValue's normal native-setter path is untouched.
+function installDateSpinnerSim(win) {
+  const doc = win.document;
+  doc.execCommand = (cmd, _show, val) => {
+    if (cmd !== "insertText") return false;
+    const el = doc.activeElement;
+    if (!el || el.getAttribute("role") !== "spinbutton") return false;
+    const n = String(Number(val)); // "03" -> "3", "2021" -> "2021"
+    el.setAttribute("aria-valuenow", n);
+    el.setAttribute("aria-valuetext", n);
+    return true;
+  };
+}
+
 function loadFixture(name) {
   const html = fs.readFileSync(
     path.join(ROOT, "test/fixtures", name),
@@ -67,6 +87,7 @@ function loadFixture(name) {
   const win = dom.window;
   win.chrome = chromeShim();
   for (const src of SCRIPTS) win.eval(src);
+  installDateSpinnerSim(win);
   return { dom, document: win.document, A: win.AvidAutofill };
 }
 
@@ -78,6 +99,7 @@ function blankWindow() {
   });
   dom.window.chrome = chromeShim();
   for (const src of SCRIPTS) dom.window.eval(src);
+  installDateSpinnerSim(dom.window);
   return dom.window;
 }
 
@@ -259,13 +281,15 @@ test("page2: workExperiencePass fills a panel scoped to its own container", asyn
   const startYear = panel.querySelector(
     '[data-automation-id="formField-startDate"] input[data-automation-id="dateSectionYear-input"]'
   );
-  assert.equal(startMonth.value, "03");
-  assert.equal(startYear.value, "2021");
+  // Date sections are role="spinbutton": the committed value lives in
+  // aria-valuenow (Workday stores it un-padded), not `.value` (always empty).
+  assert.equal(startMonth.getAttribute("aria-valuenow"), "3");
+  assert.equal(startYear.getAttribute("aria-valuenow"), "2021");
 
   const endMonth = panel.querySelector(
     '[data-automation-id="formField-endDate"] input[data-automation-id="dateSectionMonth-input"]'
   );
-  assert.equal(endMonth.value, "06");
+  assert.equal(endMonth.getAttribute("aria-valuenow"), "6");
 
   // Every field workExperiencePass touched is marked handled so the generic
   // engine passes skip it (no double-fill / no collision).
@@ -289,7 +313,10 @@ test("page2: a currently-employed panel checks the box and leaves end date blank
   const endYear = panel.querySelector(
     '[data-automation-id="formField-endDate"] input[data-automation-id="dateSectionYear-input"]'
   );
-  assert.equal(endYear.value, "", "end date is left blank when currently employed");
+  // current === true means workExperiencePass must NOT touch the end date: the
+  // section keeps the fixture's captured value ("2020") and is never overwritten
+  // with the profile's end year ("2099").
+  assert.equal(endYear.getAttribute("aria-valuenow"), "2020", "end date is not filled when currently employed");
 });
 
 test("page2: datePass skips date sections workExperiencePass already filled", async () => {
@@ -312,7 +339,7 @@ test("page2: datePass skips date sections workExperiencePass already filled", as
   // Without the handled-skip in datePass, its generic /end date/ rule would
   // overwrite this with profile.education[0].endDate ("2020") — see the
   // "plain matcher.match" assertion above documenting that rule in isolation.
-  assert.equal(endYear.value, "2022", "work end date is not clobbered by the generic end-date rule");
+  assert.equal(endYear.getAttribute("aria-valuenow"), "2022", "work end date is not clobbered by the generic end-date rule");
 });
 
 test("page2: extra work entries beyond available panels do not throw (click-to-add is live-only)", async () => {
@@ -333,6 +360,74 @@ test("page2: extra work entries beyond available panels do not throw (click-to-a
   );
   const panel = document.querySelector('[aria-labelledby="Work-Experience-1-panel"]');
   assert.equal(panel.querySelector('[data-automation-id="formField-jobTitle"] input').value, "Engineer II");
+});
+
+test("work-panel job-title fields are owned by the repeater, not the generic matcher (title-bleed guard)", () => {
+  const win = blankWindow();
+  const A = win.AvidAutofill;
+  // Two work panels, each with its own "Job Title" input, plus a standalone
+  // current-title field (Greenhouse/Lever style) outside any panel.
+  win.document.body.innerHTML = `
+    <div role="group" aria-labelledby="Work-Experience-section">
+      <div role="group" aria-labelledby="Work-Experience-1-panel">
+        <div data-automation-id="formField-jobTitle"><label>Job Title</label><input name="jobTitle"></div>
+      </div>
+      <div role="group" aria-labelledby="Work-Experience-2-panel">
+        <div data-automation-id="formField-jobTitle"><label>Job Title</label><input name="jobTitle"></div>
+      </div>
+    </div>
+    <div data-automation-id="formField-currentTitle"><label>Current Title</label><input></div>
+  `;
+  const p = testProfile(A);
+  const helpers = A.matcher.makeHelpers(p);
+
+  const panelTitles = [
+    ...win.document.querySelectorAll(
+      '[aria-labelledby$="-panel"] [data-automation-id="formField-jobTitle"] input'
+    ),
+  ];
+  assert.equal(panelTitles.length, 2);
+
+  for (const inp of panelTitles) {
+    // The generic matcher WOULD map every panel title to work[0].title — that is
+    // the title-bleed bug. isWorkExperienceField is what makes the engine's
+    // generic passes skip these, leaving each panel to workExperiencePass.
+    assert.equal(
+      A.matcher.match(A.matcher.signalFor(inp), p, helpers).value,
+      "Software Engineer"
+    );
+    assert.ok(
+      A.workday.isWorkExperienceField(inp),
+      "panel title is a work-experience field the engine skips"
+    );
+  }
+
+  // A standalone current-title field is not in a panel, so the generic rule still
+  // fills it with the primary job title (unchanged behavior off Workday panels).
+  const standalone = win.document.querySelector(
+    '[data-automation-id="formField-currentTitle"] input'
+  );
+  assert.ok(!A.workday.isWorkExperienceField(standalone));
+  assert.equal(
+    A.matcher.match(A.matcher.signalFor(standalone), p, helpers).value,
+    "Software Engineer"
+  );
+});
+
+test("setDateSpinner commits to aria-valuenow (spinbutton), never to .value, and does not blur", () => {
+  const win = blankWindow();
+  const A = win.AvidAutofill;
+  win.document.body.innerHTML =
+    '<input role="spinbutton" aria-valuetext="MM" aria-valuemin="1" aria-valuemax="12">';
+  const el = win.document.querySelector("input");
+  let blurs = 0;
+  el.addEventListener("blur", () => blurs++);
+
+  A.fillers.setDateSpinner(el, "06");
+
+  assert.equal(el.getAttribute("aria-valuenow"), "6", "value commits to aria-valuenow");
+  assert.equal(el.value, "", "never assigns .value, which a spinbutton's handler ignores");
+  assert.equal(blurs, 0, "blur is the caller's job so a half-filled date is never validated");
 });
 
 // --- Page 3: work authorization (yes/no) -----------------------------------
