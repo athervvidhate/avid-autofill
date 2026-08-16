@@ -82,6 +82,29 @@
     flash(el);
   }
 
+  // Workday's date sections are role="spinbutton" inputs, NOT text inputs: the
+  // committed value lives in aria-valuenow + a display node, and `.value` stays
+  // empty/transient even when the field holds a value. setTextValue is wrong for
+  // them — its `.value`-based success check is unreliable, and its native-setter
+  // fallback assigns `.value` directly, which the spinbutton's React handler
+  // ignores, leaving a field that looks filled but validates as empty ("required").
+  // So type through execCommand (the real input pipeline Workday honors) and never
+  // touch `.value` or fall back to the native setter. Blur is intentionally NOT
+  // fired here: the caller enters a whole date (month/day/year) and blurs once, so
+  // validation never sees a half-filled MM//YYYY and errors on it.
+  function setDateSpinner(el, value) {
+    el.focus();
+    el.dispatchEvent(new Event("focus", { bubbles: true }));
+    try {
+      if (typeof el.setSelectionRange === "function") {
+        el.setSelectionRange(0, (el.value || "").length);
+      }
+    } catch (_) {}
+    document.execCommand("insertText", false, String(value));
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+    flash(el);
+  }
+
   function normalize(s) {
     return String(s == null ? "" : s)
       .toLowerCase()
@@ -263,6 +286,7 @@
 
   AvidAutofill.fillers = {
     setTextValue,
+    setDateSpinner,
     setNativeSelect,
     setRadio,
     setCheckbox,

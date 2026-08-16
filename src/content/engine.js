@@ -89,8 +89,13 @@
     const nodes = document.querySelectorAll(
       'input, textarea, select'
     );
+    const inWorkPanel = AvidAutofill.workday && AvidAutofill.workday.isWorkExperienceField;
     for (const el of nodes) {
       if (handled.has(el)) continue;
+      // Work-experience panel fields are owned by workExperiencePass/datePass;
+      // skip them so the generic "job title" rule can't stamp work[0].title onto
+      // every panel (see AvidAutofill.workday.isWorkExperienceField).
+      if (inWorkPanel && inWorkPanel(el)) continue;
       if (!isVisible(el)) continue;
       const type = (el.type || "").toLowerCase();
       if (["hidden", "submit", "button", "file", "password", "image", "reset"].includes(type))

@@ -38,6 +38,15 @@
     return { mm: pad(mm), dd: dd ? pad(dd) : "", yyyy };
   }
 
+  // Blur a date section once, after its whole MM/DD/YYYY has been entered, so
+  // Workday's on-blur validation sees a complete value instead of erroring on a
+  // half-filled date. Called on the last section filled.
+  function blurDate(el) {
+    if (!el) return;
+    el.dispatchEvent(new Event("blur", { bubbles: true }));
+    el.blur();
+  }
+
   // Fill every typeable date section on the page that maps to a profile value.
   // `handled` (optional) is the engine's shared WeakSet — sections whose month
   // input is already in it (e.g. filled per-panel by workExperiencePass) are
@@ -64,9 +73,10 @@
         record(signal, m.value, "date-unparsed");
         continue;
       }
-      fillers.setTextValue(month, d.mm);
-      if (day && d.dd) fillers.setTextValue(day, d.dd);
-      fillers.setTextValue(year, d.yyyy);
+      fillers.setDateSpinner(month, d.mm);
+      if (day && d.dd) fillers.setDateSpinner(day, d.dd);
+      fillers.setDateSpinner(year, d.yyyy);
+      blurDate(year);
       record(signal, `${d.mm}/${d.dd || "--"}/${d.yyyy}`, "filled");
     }
   }
@@ -88,6 +98,18 @@
   const WORK_SECTION_SELECTOR = '[role="group"][aria-labelledby="Work-Experience-section"]';
   const WORK_PANEL_SELECTOR =
     '[role="group"][aria-labelledby^="Work-Experience-"][aria-labelledby$="-panel"]';
+
+  // True when `el` lives inside a work-experience panel. workExperiencePass owns
+  // every field in those panels (title/company/location/description/dates/current),
+  // so the engine's generic passes must skip them: the generic matcher's
+  // "job title" rule maps to profile.work[0].title, which would otherwise stamp
+  // the first job's title onto every panel (each panel has its own "Job Title"
+  // input). Relying on the `handled` WeakSet alone is not enough — Workday
+  // re-renders panels during the add-loop, replacing the exact input nodes the
+  // set was keyed on — so ownership is enforced structurally here instead.
+  function isWorkExperienceField(el) {
+    return !!(el && el.closest && el.closest(WORK_PANEL_SELECTOR));
+  }
 
   function panelField(panel, fieldId) {
     const wrap = panel.querySelector(`[data-automation-id="formField-${fieldId}"]`);
@@ -118,9 +140,10 @@
       record(label, rawDate, "date-unparsed");
       return;
     }
-    fillers.setTextValue(month, d.mm);
-    if (day && d.dd) fillers.setTextValue(day, d.dd);
-    fillers.setTextValue(year, d.yyyy);
+    fillers.setDateSpinner(month, d.mm);
+    if (day && d.dd) fillers.setDateSpinner(day, d.dd);
+    fillers.setDateSpinner(year, d.yyyy);
+    blurDate(year);
     record(label, `${d.mm}/${d.dd || "--"}/${d.yyyy}`, "filled");
   }
 
@@ -176,5 +199,5 @@
     });
   }
 
-  AvidAutofill.workday = { parseDate, datePass, workExperiencePass };
+  AvidAutofill.workday = { parseDate, datePass, workExperiencePass, isWorkExperienceField };
 })();
