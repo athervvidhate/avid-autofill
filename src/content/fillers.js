@@ -82,6 +82,33 @@
     flash(el);
   }
 
+  // Type into a dropdown's filter without firing change/blur. Workday closes
+  // typeahead prompts on blur, so the option list must stay open until the
+  // matching option has been clicked.
+  function setSearchValue(el, value) {
+    el.focus();
+    try {
+      if (typeof el.setSelectionRange === "function") {
+        el.setSelectionRange(0, (el.value || "").length);
+      }
+    } catch (_) {}
+
+    let inserted = false;
+    try {
+      inserted = document.execCommand("insertText", false, value) && !!el.value;
+    } catch (_) {
+      inserted = false;
+    }
+    if (!inserted) {
+      nativeInputSetter.call(el, "");
+      nativeInputSetter.call(el, value);
+      el.dispatchEvent(
+        new InputEvent("input", { bubbles: true, inputType: "insertText", data: value })
+      );
+    }
+    flash(el);
+  }
+
   // Workday's date sections are role="spinbutton" inputs, NOT text inputs: the
   // committed value lives in aria-valuenow + a display node, and `.value` stays
   // empty/transient even when the field holds a value. setTextValue is wrong for
@@ -89,9 +116,9 @@
   // fallback assigns `.value` directly, which the spinbutton's React handler
   // ignores, leaving a field that looks filled but validates as empty ("required").
   // So type through execCommand (the real input pipeline Workday honors) and never
-  // touch `.value` or fall back to the native setter. Blur is intentionally NOT
-  // fired here: the caller enters a whole date (month/day/year) and blurs once, so
-  // validation never sees a half-filled MM//YYYY and errors on it.
+  // touch `.value` or fall back to the native setter. This function does not
+  // dispatch an extra blur. The caller finishes the date by blurring the final
+  // spinner once.
   function setDateSpinner(el, value) {
     el.focus();
     el.dispatchEvent(new Event("focus", { bubbles: true }));
@@ -100,9 +127,16 @@
         el.setSelectionRange(0, (el.value || "").length);
       }
     } catch (_) {}
-    document.execCommand("insertText", false, String(value));
+    try {
+      document.execCommand("insertText", false, String(value));
+    } catch (_) {}
     el.dispatchEvent(new Event("change", { bubbles: true }));
     flash(el);
+    const expected = String(Number(value));
+    return (
+      el.getAttribute("aria-valuenow") === expected ||
+      el.getAttribute("aria-valuetext") === expected
+    );
   }
 
   function normalize(s) {
@@ -186,15 +220,18 @@
   // button-listboxes. Open the control, optionally type to filter, then click the
   // matching option. Options render in a portal, so we search the whole document.
   // Returns a Promise<boolean>.
-  async function setReactSelect(control, values) {
+  async function setReactSelect(control, values, config) {
     const targets = toList(values);
     if (!targets.length) return false;
     const typed = targets[0];
-    control.scrollIntoView({ block: "center" });
+    if (typeof control.scrollIntoView === "function") {
+      control.scrollIntoView({ block: "center" });
+    }
 
     // The opener is an inner input/combobox, else the control itself (Workday
     // dropdowns are a bare <button>).
     const opener =
+      (control.matches("input") && control) ||
       control.querySelector("input") ||
       control.querySelector('[role="combobox"], [class*="control"]') ||
       control;
@@ -205,31 +242,39 @@
     // Type into a filter box if one exists (react-select inner input, or
     // Workday's separate searchBox rendered in the popup).
     const typeInput =
+      (control.matches("input") && control) ||
       control.querySelector("input") ||
       document.querySelector('input[data-automation-id="searchBox"]');
     if (typeInput) {
       typeInput.focus();
-      setTextValue(typeInput, typed);
+      setSearchValue(typeInput, typed);
       await sleep(240);
     }
 
     const optText = (o) =>
       normalize(o.getAttribute("data-automation-label") || o.textContent);
-    const options = Array.from(
-      document.querySelectorAll(
-        '[data-automation-id="promptOption"], [class*="option"], [role="option"], li[id*="option"]'
-      )
-    ).filter((o) => o.offsetParent !== null);
-
-    let pick =
-      options.find((o) => targets.some((t) => optText(o) === t)) ||
-      options.find((o) => targets.some((t) => optText(o).includes(t))) ||
-      (typeInput ? options[0] : null);
+    let pick = null;
+    for (let attempt = 0; attempt < 8 && !pick; attempt++) {
+      const available = Array.from(
+        document.querySelectorAll(
+          '[data-automation-id="promptOption"], [class*="option"], [role="option"], li[id*="option"]'
+        )
+      ).filter(
+        (o) => o.offsetParent !== null || o.getClientRects().length > 0
+      );
+      pick =
+        available.find((o) => targets.some((t) => optText(o) === t)) ||
+        available.find((o) => targets.some((t) => optText(o).includes(t)));
+      if (!pick && typeInput && attempt < 7) await sleep(150);
+    }
 
     if (!pick) {
-      if (typeInput) {
+      if (typeInput && config && config.allowCreate) {
         typeInput.dispatchEvent(
           new KeyboardEvent("keydown", { bubbles: true, key: "Enter", keyCode: 13 })
+        );
+        typeInput.dispatchEvent(
+          new KeyboardEvent("keyup", { bubbles: true, key: "Enter", keyCode: 13 })
         );
         return true;
       }

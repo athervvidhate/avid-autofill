@@ -1,8 +1,8 @@
 # Captured ATS fixtures
 
-Real, saved-from-a-live-session application forms, used by the Phase 4 regression
-suite. Auth-walled ATS (Workday, iCIMS, …) can only be captured from a logged-in
-session, so these come from the maintainer's own runs.
+Real application forms saved from live sessions and used by the regression
+suite. Auth-walled ATS forms can only be captured from a logged-in session, so
+these come from the maintainer's own runs.
 
 ## How to capture one
 

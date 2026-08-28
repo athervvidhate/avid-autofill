@@ -15,6 +15,7 @@
       preferredName: "",
       email: "",
       phone: "",
+      phoneDeviceType: "Mobile",
       address: "",
       city: "",
       state: "",
@@ -50,6 +51,7 @@
       requireSponsorship: "No",
     },
     misc: {
+      skills: "",
       salaryExpectation: "",
       noticePeriod: "",
       earliestStartDate: "",

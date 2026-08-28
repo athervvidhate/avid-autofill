@@ -3,9 +3,9 @@
 // ATS was detected, and (2) selectors for that ATS's *custom* (non-native)
 // dropdowns, which need the click-open-type-pick dance in fillers.setReactSelect.
 //
-// Phase 1 ships Greenhouse, Lever, Ashby (clean DOM). Workday / iCIMS / Taleo /
-// Workable are stubbed with detection only — their fill logic needs live-page
-// testing before it's trustworthy, so they currently fall through to generic.
+// Greenhouse, Lever, and Ashby add custom-dropdown selectors to the generic
+// engine. Workday is a beta adapter with its own date and repeater passes. iCIMS,
+// Taleo, and Workable are detection-only stubs that use generic fill behavior.
 (function () {
   const AvidAutofill = (globalThis.AvidAutofill = globalThis.AvidAutofill || {});
 
@@ -50,7 +50,7 @@
       // Typeable MM/DD/YYYY date sections handled by the workday date module.
       hasDateSections: true,
     },
-    // --- Detection-only stubs (phase 2 fill logic) ---
+    // --- Detection-only stubs ---
     {
       name: "iCIMS",
       stub: true,

@@ -32,21 +32,14 @@ function detectInFrame() {
 
 // Ask every frame what it sees (broadcast messaging can't enumerate frames, but
 // executeScript returns a result per frame), then pick the frame most worth
-// filling: a recognized ATS first, else the frame with the most fillable fields
-// (an empty wrapper frame embedding an iframe has none), else the top frame.
+// filling: the recognized ATS frame with the most fields, then any frame with
+// fields, then a recognized empty frame, then the first loaded frame.
 async function resolveTarget(tabId) {
   const injections = await chrome.scripting.executeScript({
     target: { tabId, allFrames: true },
     func: detectInFrame,
   });
-  const loaded = injections.filter((i) => i.result);
-  if (!loaded.length) return null;
-  const ats = loaded.find((i) => i.result.ats !== "Generic");
-  const mostFields = loaded
-    .filter((i) => i.result.fields > 0)
-    .sort((a, b) => b.result.fields - a.result.fields)[0];
-  const best = ats || mostFields || loaded[0];
-  return { frameId: best.frameId, ...best.result };
+  return AvidAutofill.popup.selectTarget(injections);
 }
 
 // Find the ATS across all frames. If our content script isn't in any of them,
@@ -125,6 +118,11 @@ async function persistSettings() {
 
 function renderReport(report) {
   $("summary").classList.remove("hidden");
+  if (report.blocked) {
+    $("summary").textContent = report.message;
+    $("results").innerHTML = "";
+    return;
+  }
   const label = report.stub
     ? `${report.ats} isn't fully supported yet — generic fill used.`
     : `Filled ${report.filledCount} field${report.filledCount === 1 ? "" : "s"} on ${report.ats}.`;

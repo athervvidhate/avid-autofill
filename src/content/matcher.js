@@ -104,6 +104,7 @@
 
     // --- Contact ---
     { any: [/e-?mail/, /^email address$/], not: [/confirm|company/], get: (p) => p.personal.email },
+    { any: [/phone device type/], kind: "select", get: (p) => p.personal.phoneDeviceType || "Mobile" },
     { any: [/phone/, /mobile/, /telephone/, /contact number/], not: [/extension/, /device type/, /\bsms\b/, /opt.?in/, /phone code/, /country.*code/], get: (p) => p.personal.phone },
     { any: [/pronoun/], get: (p) => p.personal.pronouns },
 

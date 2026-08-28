@@ -1,7 +1,7 @@
-// Workday-specific widgets that the generic engine can't handle: the typeable
-// MM/DD/YYYY date sections. (Workday text inputs and button-listbox dropdowns are
-// handled by the generic passes once signals are de-camelCased — see matcher.js
-// and fillers.setReactSelect.) Loaded before engine.js.
+// Workday-specific widgets that the generic engine can't handle: typeable date
+// sections and repeaters whose fields do not exist until their Add button is
+// clicked. Repeater panel fields stay under this module's ownership. Loaded
+// before engine.js.
 (function () {
   const AvidAutofill = (globalThis.AvidAutofill = globalThis.AvidAutofill || {});
 
@@ -38,13 +38,19 @@
     return { mm: pad(mm), dd: dd ? pad(dd) : "", yyyy };
   }
 
-  // Blur a date section once, after its whole MM/DD/YYYY has been entered, so
-  // Workday's on-blur validation sees a complete value instead of erroring on a
-  // half-filled date. Called on the last section filled.
+  // Finish a date by blurring its final spinner once. Moving focus between the
+  // earlier spinners still produces the browser's normal focus transitions.
   function blurDate(el) {
     if (!el) return;
-    el.dispatchEvent(new Event("blur", { bubbles: true }));
     el.blur();
+  }
+
+  function fillDateInputs(month, day, year, date, fillers) {
+    const monthOk = fillers.setDateSpinner(month, date.mm);
+    const dayOk = !day || !date.dd || fillers.setDateSpinner(day, date.dd);
+    const yearOk = fillers.setDateSpinner(year, date.yyyy);
+    blurDate(year);
+    return monthOk && dayOk && yearOk;
   }
 
   // Fill every typeable date section on the page that maps to a profile value.
@@ -62,6 +68,8 @@
       const year = sec.querySelector('input[data-automation-id="dateSectionYear-input"]');
       const day = sec.querySelector('input[data-automation-id="dateSectionDay-input"]');
       if (!month || !year || seen.has(month)) continue;
+      if (isWorkExperienceField(month)) continue;
+      if (isEducationField(month)) continue;
       if (handled && handled.has(month)) continue;
       seen.add(month);
 
@@ -73,11 +81,12 @@
         record(signal, m.value, "date-unparsed");
         continue;
       }
-      fillers.setDateSpinner(month, d.mm);
-      if (day && d.dd) fillers.setDateSpinner(day, d.dd);
-      fillers.setDateSpinner(year, d.yyyy);
-      blurDate(year);
-      record(signal, `${d.mm}/${d.dd || "--"}/${d.yyyy}`, "filled");
+      const filled = fillDateInputs(month, day, year, d, fillers);
+      record(
+        signal,
+        `${d.mm}/${d.dd || "--"}/${d.yyyy}`,
+        filled ? "filled" : "error"
+      );
     }
   }
 
@@ -98,6 +107,10 @@
   const WORK_SECTION_SELECTOR = '[role="group"][aria-labelledby="Work-Experience-section"]';
   const WORK_PANEL_SELECTOR =
     '[role="group"][aria-labelledby^="Work-Experience-"][aria-labelledby$="-panel"]';
+  const EDUCATION_SECTION_SELECTOR = '[role="group"][aria-labelledby="Education-section"]';
+  const EDUCATION_PANEL_SELECTOR =
+    '[role="group"][aria-labelledby^="Education-"][aria-labelledby$="-panel"]';
+  const SKILLS_SECTION_SELECTOR = '[role="group"][aria-labelledby="Skills-section"]';
 
   // True when `el` lives inside a work-experience panel. workExperiencePass owns
   // every field in those panels (title/company/location/description/dates/current),
@@ -109,6 +122,10 @@
   // set was keyed on — so ownership is enforced structurally here instead.
   function isWorkExperienceField(el) {
     return !!(el && el.closest && el.closest(WORK_PANEL_SELECTOR));
+  }
+
+  function isEducationField(el) {
+    return !!(el && el.closest && el.closest(EDUCATION_PANEL_SELECTOR));
   }
 
   function panelField(panel, fieldId) {
@@ -140,11 +157,12 @@
       record(label, rawDate, "date-unparsed");
       return;
     }
-    fillers.setDateSpinner(month, d.mm);
-    if (day && d.dd) fillers.setDateSpinner(day, d.dd);
-    fillers.setDateSpinner(year, d.yyyy);
-    blurDate(year);
-    record(label, `${d.mm}/${d.dd || "--"}/${d.yyyy}`, "filled");
+    const filled = fillDateInputs(month, day, year, d, fillers);
+    record(
+      label,
+      `${d.mm}/${d.dd || "--"}/${d.yyyy}`,
+      filled ? "filled" : "error"
+    );
   }
 
   // Click "Add Another" until there is one panel per profile.work[] entry, then
@@ -199,5 +217,149 @@
     });
   }
 
-  AvidAutofill.workday = { parseDate, datePass, workExperiencePass, isWorkExperienceField };
+  function educationControl(panel, fieldId) {
+    const wrap = panel.querySelector(`[data-automation-id="formField-${fieldId}"]`);
+    return wrap && wrap.querySelector('button[aria-haspopup="listbox"], input, [role="combobox"]');
+  }
+
+  function degreeTargets(degree) {
+    const normalized = String(degree || "").toLowerCase();
+    if (/bachelor|\bbs\b|\bb\.s\b/.test(normalized)) {
+      return ["Bachelor's Degree or Equivalent", degree, "Bachelor's Degree", "Bachelor"];
+    } else if (/master|\bms\b|\bm\.s\b/.test(normalized)) {
+      return ["Master's Degree or Equivalent", degree, "Master's Degree", "Master"];
+    } else if (/doctor|ph\.?d/.test(normalized)) {
+      return ["Doctorate Degree", degree, "Doctorate", "PhD"];
+    } else if (/associate/.test(normalized)) {
+      return ["Associate's Degree", degree, "Associate Degree"];
+    }
+    return [degree].filter(Boolean);
+  }
+
+  function schoolTargets(school) {
+    if (/^ucsd$/i.test(String(school || "").trim())) {
+      return ["University of California-San Diego", school];
+    }
+    return [school].filter(Boolean);
+  }
+
+  async function fillEducationSelect(
+    panel,
+    fieldId,
+    values,
+    fillers,
+    handled,
+    record,
+    label,
+    config
+  ) {
+    const control = educationControl(panel, fieldId);
+    if (!control || handled.has(control)) return;
+    handled.add(control);
+    control.querySelectorAll("input").forEach((input) => handled.add(input));
+    try {
+      const ok = await fillers.setReactSelect(control, values, config);
+      record(label, values[0], ok ? "filled" : "skipped");
+    } catch (_) {
+      record(label, values[0], "error");
+    }
+  }
+
+  function fillEducationYear(panel, fieldId, rawDate, fillers, handled, record, label) {
+    if (!rawDate) return;
+    const wrap = panel.querySelector(`[data-automation-id="formField-${fieldId}"]`);
+    const year = wrap && wrap.querySelector('input[data-automation-id="dateSectionYear-input"]');
+    if (!year || handled.has(year)) return;
+    handled.add(year);
+    const date = parseDate(rawDate);
+    if (!date) {
+      record(label, rawDate, "date-unparsed");
+      return;
+    }
+    const ok = fillers.setDateSpinner(year, date.yyyy);
+    blurDate(year);
+    record(label, date.yyyy, ok ? "filled" : "error");
+  }
+
+  // Workday renders no education fields until Add is clicked. Grow the repeater
+  // to the number of saved entries, then fill each panel using only controls in
+  // that panel. This tenant exposes attended dates as year-only spinbuttons, so
+  // month/year profile dates intentionally reduce to their year component here.
+  async function educationPass(profile, ctx) {
+    const { fillers, record, handled } = ctx;
+    const education = profile.education || [];
+    if (!education.length || !document.querySelector(EDUCATION_SECTION_SELECTOR)) return;
+
+    for (let guard = 0; guard < education.length + 2; guard++) {
+      const section = document.querySelector(EDUCATION_SECTION_SELECTOR);
+      if (!section) break;
+      if (section.querySelectorAll(EDUCATION_PANEL_SELECTOR).length >= education.length) break;
+      const addBtn = section.querySelector('button[data-automation-id="add-button"]');
+      if (!addBtn) break;
+      addBtn.click();
+      await fillers.sleep(400);
+    }
+
+    const section = document.querySelector(EDUCATION_SECTION_SELECTOR);
+    if (!section) return;
+    const panels = Array.from(section.querySelectorAll(EDUCATION_PANEL_SELECTOR));
+    for (let i = 0; i < panels.length; i++) {
+      const entry = education[i];
+      if (!entry) continue;
+      const panel = panels[i];
+      const tag = `Education ${i + 1}`;
+      if (entry.school) {
+        await fillEducationSelect(panel, "school", schoolTargets(entry.school), fillers, handled, record, `${tag} - School`, { allowCreate: true });
+      }
+      if (entry.degree) {
+        await fillEducationSelect(panel, "degree", degreeTargets(entry.degree), fillers, handled, record, `${tag} - Degree`);
+      }
+      if (entry.field) {
+        await fillEducationSelect(panel, "fieldOfStudy", [entry.field], fillers, handled, record, `${tag} - Field of Study`, { allowCreate: true });
+      }
+      fillPanelText(panel, "gradeAverage", entry.gpa, fillers, handled, record, `${tag} - GPA`);
+      fillEducationYear(panel, "firstYearAttended", entry.startDate, fillers, handled, record, `${tag} - Start Year`);
+      fillEducationYear(panel, "lastYearAttended", entry.endDate, fillers, handled, record, `${tag} - End Year`);
+    }
+  }
+
+  function skillList(raw) {
+    const values = Array.isArray(raw) ? raw : String(raw || "").split(/[,\n]/);
+    return values.map((value) => String(value).trim()).filter(Boolean);
+  }
+
+  async function skillsPass(profile, ctx) {
+    const { fillers, record, handled } = ctx;
+    const skills = skillList(profile.misc && profile.misc.skills);
+    if (!skills.length) return;
+    for (const skill of skills) {
+      const section = document.querySelector(SKILLS_SECTION_SELECTOR);
+      const control =
+        section &&
+        section.querySelector(
+          '[data-automation-id="formField-skills"] input, input[data-uxi-widget-type="selectinput"]'
+        );
+      if (!control) {
+        record("Skills", skill, "skipped");
+        continue;
+      }
+      handled.add(control);
+      try {
+        const ok = await fillers.setReactSelect(control, [skill], { allowCreate: true });
+        record("Skills", skill, ok ? "filled" : "skipped");
+      } catch (_) {
+        record("Skills", skill, "error");
+      }
+    }
+  }
+
+  AvidAutofill.workday = {
+    parseDate,
+    datePass,
+    workExperiencePass,
+    educationPass,
+    skillsPass,
+    isWorkExperienceField,
+    isEducationField,
+  };
 })();

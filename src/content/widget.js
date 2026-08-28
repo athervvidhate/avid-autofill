@@ -201,6 +201,11 @@
   function renderReport($, report) {
     const s = $(".summary");
     s.classList.remove("hidden");
+    if (report.blocked) {
+      s.textContent = report.message;
+      $(".results").innerHTML = "";
+      return;
+    }
     s.textContent = `Filled ${report.filledCount} field${report.filledCount === 1 ? "" : "s"} on ${report.ats}.`;
     const ul = $(".results");
     ul.innerHTML = "";

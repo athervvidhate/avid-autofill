@@ -7,7 +7,10 @@
   const M = () => AvidAutofill.matcher;
 
   const isVisible = (el) =>
-    el && el.offsetParent !== null && !el.disabled && el.type !== "hidden";
+    el &&
+    (el.offsetParent !== null || el.getClientRects().length > 0) &&
+    !el.disabled &&
+    el.type !== "hidden";
 
   const isAffirmative = (v) => /^(yes|y|true|1)$/i.test(String(v).trim());
 
@@ -19,6 +22,22 @@
     const adapter = AvidAutofill.adapters.detect();
     const handled = new WeakSet();
     const results = [];
+
+    if (
+      adapter.name === "Workday" &&
+      navigator.userActivation &&
+      navigator.userActivation.hasBeenActive === false
+    ) {
+      return {
+        ats: adapter.name,
+        stub: false,
+        beta: true,
+        blocked: "workday-needs-page-click",
+        message: "Click the application page once, then use the in-page Autofill button.",
+        filledCount: 0,
+        results,
+      };
+    }
 
     const record = (signal, value, status) =>
       results.push({ label: shorten(signal), value, status });
@@ -32,6 +51,12 @@
     if (adapter.hasDateSections && AvidAutofill.workday) {
       if (AvidAutofill.workday.workExperiencePass) {
         await AvidAutofill.workday.workExperiencePass(profile, { fillers, record, handled });
+      }
+      if (AvidAutofill.workday.educationPass) {
+        await AvidAutofill.workday.educationPass(profile, { fillers, record, handled });
+      }
+      if (AvidAutofill.workday.skillsPass) {
+        await AvidAutofill.workday.skillsPass(profile, { fillers, record, handled });
       }
       // Workday typeable date sections (MM/DD/YYYY spinbuttons).
       await AvidAutofill.workday.datePass(profile, { matcher, helpers, fillers, record, handled });
@@ -89,13 +114,21 @@
     const nodes = document.querySelectorAll(
       'input, textarea, select'
     );
-    const inWorkPanel = AvidAutofill.workday && AvidAutofill.workday.isWorkExperienceField;
+    const inWorkPanel =
+      adapter.name === "Workday" &&
+      AvidAutofill.workday &&
+      AvidAutofill.workday.isWorkExperienceField;
+    const inEducationPanel =
+      adapter.name === "Workday" &&
+      AvidAutofill.workday &&
+      AvidAutofill.workday.isEducationField;
     for (const el of nodes) {
       if (handled.has(el)) continue;
       // Work-experience panel fields are owned by workExperiencePass/datePass;
       // skip them so the generic "job title" rule can't stamp work[0].title onto
       // every panel (see AvidAutofill.workday.isWorkExperienceField).
       if (inWorkPanel && inWorkPanel(el)) continue;
+      if (inEducationPanel && inEducationPanel(el)) continue;
       if (!isVisible(el)) continue;
       const type = (el.type || "").toLowerCase();
       if (["hidden", "submit", "button", "file", "password", "image", "reset"].includes(type))
