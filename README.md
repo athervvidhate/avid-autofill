@@ -40,9 +40,9 @@ default.
   `aria-label`, and nearby text, de-camelCases identifier-style attributes, and
   maps them to your profile with an ordered rules table. No brittle per-site
   hardcoding for the common fields.
-- **Works with strict React forms** - fills through the real browser input
-  pipeline (`execCommand("insertText")`), so Workday and friends actually
-  register the value instead of failing validation on a visibly-filled field.
+- **Handles framework-controlled inputs** - uses browser input events and
+  `execCommand("insertText")` where a direct value assignment would be ignored.
+  Workday remains beta and needs a live check when its form widgets change.
 - **Resume upload** - injects your saved resume into the file input via
   `DataTransfer`, the only sanctioned way to set a file programmatically.
 - **Common questions** - default answers for the recurring yes/no and legal
@@ -57,11 +57,12 @@ default.
 
 | ATS | Status |
 | --- | --- |
-| Greenhouse | Full |
-| Lever | Full |
-| Ashby | Full |
-| Workday | Beta (de-camelCased ids, button-listbox dropdowns, typeable dates) |
-| iCIMS, Taleo, Workable, SmartRecruiters | Detected, generic fill |
+| Greenhouse | Beta; adapter present, live fixture hardening pending |
+| Lever | Beta; adapter present, live fixture hardening pending |
+| Ashby | Beta; adapter present, live fixture hardening pending |
+| Workday | Beta; typeable dates and work-history repeaters need live validation |
+| iCIMS, Taleo, Workable | Detected; generic fill only |
+| SmartRecruiters | Generic fill only; no named adapter yet |
 
 Company-embedded ATS on custom domains and more platforms are on the
 [roadmap](#roadmap). Open an issue with a posting URL if one you use is missing.
@@ -117,10 +118,10 @@ content script (supported sites only)
   widget      floating panel UI (rendered in a shadow root)
 ```
 
-The content script is only injected on recognized ATS domains, so the extension
-requests the narrowest host permissions it can and stays inert everywhere else.
-The widget renders inside a shadow root, so the host page's styles never touch
-it and its styles never leak out.
+The content script runs automatically on listed ATS domains. On another HTTP or
+file page, the user can grant temporary access by clicking **Enable on this
+page** in the popup. The widget renders inside a shadow root, so the host page's
+styles never touch it and its styles never leak out.
 
 ## Privacy
 
@@ -150,17 +151,20 @@ version.
   security). Drag-and-drop-only zones are best-effort.
 - **Open-ended questions** ("Why this company?") are left blank; an optional,
   local AI draft layer is on the roadmap.
-- **Workday** calendar-popover dates and multi-panel work-history repeaters are
-  not yet handled.
+- **Workday** calendar-popover-only dates are not handled. Multi-panel work
+  history is implemented and fixture-tested, but still needs a live pass with
+  multiple entries. Use the in-page widget; popup-triggered fill may not commit
+  on a Workday page that has not received a click.
 
 ## Roadmap
 
 - [x] Greenhouse / Lever / Ashby adapters
 - [x] Resume upload, common yes/no + legal-acknowledgment fields
 - [x] Workday beta: de-camelCased ids, button-listbox dropdowns, typeable dates
+- [x] Workday work-history repeaters (fixture-tested; live hardening pending)
 - [x] On-demand in-page widget with narrowed host permissions
 - [ ] iCIMS / Taleo / Workable / SmartRecruiters full adapters
-- [ ] Workday calendar dates + work-history repeaters
+- [ ] Workday calendar-popover-only dates
 - [ ] Optional local AI layer for open-ended questions
 - [ ] Per-site field-mapping overrides and multiple profiles
 - [ ] Chrome Web Store release

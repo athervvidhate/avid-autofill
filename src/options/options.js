@@ -7,6 +7,7 @@ const LAYOUT = {
     ["firstName", "First name"], ["lastName", "Last name"],
     ["fullName", "Full name"], ["preferredName", "Preferred name"],
     ["email", "Email"], ["phone", "Phone"],
+    ["phoneDeviceType", "Phone device type", "select:Mobile|Home|Other"],
     ["address", "Street address", "wide"], ["city", "City"], ["state", "State/Province"],
     ["postalCode", "Zip/Postal"], ["country", "Country"], ["pronouns", "Pronouns"],
   ],
@@ -19,6 +20,7 @@ const LAYOUT = {
     ["requireSponsorship", "Require sponsorship?", "select:No|Yes"],
   ],
   misc: [
+    ["skills", "Skills (comma-separated)", "wide"],
     ["salaryExpectation", "Salary expectation"], ["noticePeriod", "Notice period"],
     ["earliestStartDate", "Earliest start date"], ["graduationDate", "Graduation date"],
     ["willingToRelocate", "Willing to relocate?", "select:Yes|No"],

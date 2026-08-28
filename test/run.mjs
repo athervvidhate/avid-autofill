@@ -1,17 +1,16 @@
 // jsdom fixture regression suite (#12).
 //
 // Loads each captured real-DOM Workday fixture into a jsdom window, evaluates the
-// pure extension scripts (schema/fillers/matcher/adapters) against that window,
+// extension scripts against that window,
 // then asserts matcher.signalFor + matcher.match mapping on a curated set of
 // high-signal fields per page, plus unit cases for the native fillers.
 //
-// Scope note (from the ticket): jsdom cannot emulate Workday's React validation,
-// so we test ONLY the pure matcher/mapping and native-filler logic. The
-// react-select / contenteditable / execCommand fill paths need live pages.
+// jsdom cannot reproduce Workday's React runtime. The suite covers matcher and
+// native filler behavior plus fillPage orchestration against captured DOM. Live
+// pages are still required to verify framework validation and custom dropdowns.
 //
-// Where a real Workday field does NOT map (or mis-maps) under current rules we
-// assert the *current* behavior and tag it TODO(#8/#9) rather than silently
-// "fixing" the matcher — so the gaps are documented, not hidden.
+// Where a real Workday field does not map under current rules, the suite records
+// that behavior explicitly. Calendar-popover-only dates remain tracked in #8.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { JSDOM } from "jsdom";
@@ -21,16 +20,17 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-// The pure logic, in manifest load order. workday.js is pure DOM logic (no
-// chrome APIs) so it's included to cover the work-experience repeater and
-// typeable date sections; engine.js, widget.js and main.js stay excluded
-// (UI / chrome listeners / live-only fill).
+// The fill logic, in manifest load order. Widget and main stay excluded because
+// they mount UI and register Chrome listeners. engine.js is included so
+// integration tests can exercise the public fillPage seam.
 const SCRIPTS = [
   "src/shared/schema.js",
+  "src/popup/target.js",
   "src/content/fillers.js",
   "src/content/matcher.js",
   "src/content/adapters.js",
   "src/content/workday.js",
+  "src/content/engine.js",
 ].map((p) => fs.readFileSync(path.join(ROOT, p), "utf8"));
 
 // Minimal in-memory chrome shim. schema.js references chrome.storage.local at
@@ -55,6 +55,26 @@ function chromeShim() {
   };
 }
 
+// Simulate Workday's date-section spinbuttons under jsdom. On a live page these
+// role="spinbutton" inputs commit typed digits to aria-valuenow (+ a display
+// node), NOT to `.value`, and jsdom implements no execCommand. Override
+// execCommand so setDateSpinner's insertText drives the spinbutton the way it
+// does live — letting tests assert the real committed value (aria-valuenow)
+// instead of the `.value` fiction. Returns false for anything that is not a
+// focused spinbutton, so setTextValue's normal native-setter path is untouched.
+function installDateSpinnerSim(win) {
+  const doc = win.document;
+  doc.execCommand = (cmd, _show, val) => {
+    if (cmd !== "insertText") return false;
+    const el = doc.activeElement;
+    if (!el || el.getAttribute("role") !== "spinbutton") return false;
+    const n = String(Number(val)); // "03" -> "3", "2021" -> "2021"
+    el.setAttribute("aria-valuenow", n);
+    el.setAttribute("aria-valuetext", n);
+    return true;
+  };
+}
+
 function loadFixture(name) {
   const html = fs.readFileSync(
     path.join(ROOT, "test/fixtures", name),
@@ -67,6 +87,7 @@ function loadFixture(name) {
   const win = dom.window;
   win.chrome = chromeShim();
   for (const src of SCRIPTS) win.eval(src);
+  installDateSpinnerSim(win);
   return { dom, document: win.document, A: win.AvidAutofill };
 }
 
@@ -78,6 +99,7 @@ function blankWindow() {
   });
   dom.window.chrome = chromeShim();
   for (const src of SCRIPTS) dom.window.eval(src);
+  installDateSpinnerSim(dom.window);
   return dom.window;
 }
 
@@ -181,11 +203,78 @@ test("page1: personal, contact and address fields map correctly", () => {
   // Workday's phone-type / extension fields contain "phone" but must NOT receive
   // the phone number — the phone rule excludes them so only the real phone-number
   // field (asserted above) maps.
-  assertMapping(document, A, p, "phone device type", null);
+  assertMapping(document, A, p, "phone device type", { value: "Mobile" });
   assertMapping(document, A, p, "phone extension", null);
   // The SMS opt-in field no longer grabs the phone number; it correctly maps to
   // the consent-to-contact yes/no preference via the /sms/ rule instead.
   assertMapping(document, A, p, "phone sms opt in", { value: "Yes", kind: "yesno" });
+});
+
+test("fillPage selects Mobile for Workday Phone Device Type", async () => {
+  const win = blankWindow();
+  const { document, AvidAutofill: A } = win;
+  document.body.innerHTML = `
+    <div data-automation-id="applyFlowPage">
+      <div data-automation-id="formField-phoneDeviceType">
+        <label>Phone Device Type</label>
+        <button type="button" name="phoneDeviceType" aria-haspopup="listbox">Select One</button>
+      </div>
+    </div>
+  `;
+
+  const control = document.querySelector('button[name="phoneDeviceType"]');
+  Object.defineProperty(control, "offsetParent", {
+    configurable: true,
+    get: () => document.body,
+  });
+  control.addEventListener("click", () => {
+    if (document.querySelector('[data-automation-id="promptOption"]')) return;
+    const option = document.createElement("div");
+    option.dataset.automationId = "promptOption";
+    option.textContent = "Mobile";
+    Object.defineProperty(option, "offsetParent", {
+      configurable: true,
+      get: () => document.body,
+    });
+    option.addEventListener("click", () => {
+      control.dataset.selected = option.textContent;
+      option.remove();
+    });
+    document.body.append(option);
+  });
+  A.fillers.sleep = async () => {};
+
+  await A.engine.fillPage(
+    testProfile(A),
+    { overwriteFilled: false, fillEEO: false, highlightFilled: false },
+    null
+  );
+
+  assert.equal(control.dataset.selected, "Mobile");
+});
+
+test("fillPage treats a rendered Workday phone input as visible when offsetParent is null", async () => {
+  const win = blankWindow();
+  const { document, AvidAutofill: A } = win;
+  document.body.innerHTML = `
+    <div data-automation-id="applyFlowPage">
+      <div data-automation-id="formField-phoneNumber">
+        <label for="phone">Phone Number</label><input id="phone" name="phoneNumber">
+      </div>
+    </div>
+  `;
+  const phone = document.getElementById("phone");
+  Object.defineProperty(phone, "offsetParent", { configurable: true, value: null });
+  phone.getClientRects = () => [{ width: 200, height: 32 }];
+  A.fillers.sleep = async () => {};
+
+  await A.engine.fillPage(
+    testProfile(A),
+    { overwriteFilled: false, fillEEO: false, highlightFilled: false },
+    null
+  );
+
+  assert.equal(phone.value, "5551230000");
 });
 
 // --- Page 2: work experience + links ---------------------------------------
@@ -259,13 +348,15 @@ test("page2: workExperiencePass fills a panel scoped to its own container", asyn
   const startYear = panel.querySelector(
     '[data-automation-id="formField-startDate"] input[data-automation-id="dateSectionYear-input"]'
   );
-  assert.equal(startMonth.value, "03");
-  assert.equal(startYear.value, "2021");
+  // Date sections are role="spinbutton": the committed value lives in
+  // aria-valuenow (Workday stores it un-padded), not `.value` (always empty).
+  assert.equal(startMonth.getAttribute("aria-valuenow"), "3");
+  assert.equal(startYear.getAttribute("aria-valuenow"), "2021");
 
   const endMonth = panel.querySelector(
     '[data-automation-id="formField-endDate"] input[data-automation-id="dateSectionMonth-input"]'
   );
-  assert.equal(endMonth.value, "06");
+  assert.equal(endMonth.getAttribute("aria-valuenow"), "6");
 
   // Every field workExperiencePass touched is marked handled so the generic
   // engine passes skip it (no double-fill / no collision).
@@ -289,7 +380,149 @@ test("page2: a currently-employed panel checks the box and leaves end date blank
   const endYear = panel.querySelector(
     '[data-automation-id="formField-endDate"] input[data-automation-id="dateSectionYear-input"]'
   );
-  assert.equal(endYear.value, "", "end date is left blank when currently employed");
+  // current === true means workExperiencePass must NOT touch the end date: the
+  // section keeps the fixture's captured value ("2020") and is never overwritten
+  // with the profile's end year ("2099").
+  assert.equal(endYear.getAttribute("aria-valuenow"), "2020", "end date is not filled when currently employed");
+});
+
+test("fillPage adds and fills the first Workday education panel", async () => {
+  const win = blankWindow();
+  const { document, AvidAutofill: A } = win;
+  document.body.innerHTML = `
+    <div data-automation-id="applyFlowPage">
+      <div role="group" aria-labelledby="Education-section">
+        <h4 id="Education-section">Education</h4>
+        <button type="button" data-automation-id="add-button">Add</button>
+      </div>
+    </div>
+  `;
+
+  const section = document.querySelector('[aria-labelledby="Education-section"]');
+  const addButton = section.querySelector('button[data-automation-id="add-button"]');
+  addButton.addEventListener("click", () => {
+    if (section.querySelector('[aria-labelledby="Education-1-panel"]')) return;
+    const panel = document.createElement("div");
+    panel.setAttribute("role", "group");
+    panel.setAttribute("aria-labelledby", "Education-1-panel");
+    panel.innerHTML = `
+      <h5 id="Education-1-panel">Education 1</h5>
+      <div data-automation-id="formField-school"><label>School or University</label><input data-uxi-widget-type="selectinput"></div>
+      <div data-automation-id="formField-degree"><label>Degree</label><button type="button" name="degree" aria-haspopup="listbox">Select One</button></div>
+      <div data-automation-id="formField-fieldOfStudy"><label>Field of Study</label><input data-uxi-widget-type="selectinput"></div>
+      <div data-automation-id="formField-gradeAverage"><label>Overall Result (GPA)</label><input name="gradeAverage"></div>
+      <div data-automation-id="formField-firstYearAttended"><label>From</label><input role="spinbutton" data-automation-id="dateSectionYear-input"></div>
+      <div data-automation-id="formField-lastYearAttended"><label>To (Actual or Expected)</label><input role="spinbutton" data-automation-id="dateSectionYear-input"></div>
+    `;
+    section.insertBefore(panel, addButton);
+
+    const pickerOptions = new Map([
+      [panel.querySelector('[data-automation-id="formField-school"] input'), "UCSD"],
+      [panel.querySelector('[data-automation-id="formField-degree"] button'), "Bachelor's Degree or Equivalent"],
+      [panel.querySelector('[data-automation-id="formField-fieldOfStudy"] input'), "Data Science"],
+    ]);
+    for (const [control, text] of pickerOptions) {
+      control.addEventListener("click", () => {
+        document.querySelectorAll('[data-automation-id="promptOption"]').forEach((node) => node.remove());
+        const option = document.createElement("div");
+        option.dataset.automationId = "promptOption";
+        option.textContent = text;
+        Object.defineProperty(option, "offsetParent", {
+          configurable: true,
+          get: () => document.body,
+        });
+        option.addEventListener("click", () => {
+          control.dataset.selected = text;
+          option.remove();
+        });
+        document.body.append(option);
+      });
+    }
+  });
+  A.fillers.sleep = async () => {};
+
+  const p = testProfile(A);
+  p.education = [{
+    school: "UCSD",
+    degree: "Bachelor of Science",
+    field: "Data Science",
+    gpa: "3.91",
+    startDate: "Sep 2023",
+    endDate: "Mar 2027",
+  }];
+
+  await A.engine.fillPage(
+    p,
+    { overwriteFilled: false, fillEEO: false, highlightFilled: false },
+    null
+  );
+
+  const panel = section.querySelector('[aria-labelledby="Education-1-panel"]');
+  assert.ok(panel, "education panel was added");
+  assert.equal(panel.querySelector('[data-automation-id="formField-school"] input').dataset.selected, "UCSD");
+  assert.equal(
+    panel.querySelector('[data-automation-id="formField-degree"] button').dataset.selected,
+    "Bachelor's Degree or Equivalent"
+  );
+  assert.equal(panel.querySelector('[data-automation-id="formField-fieldOfStudy"] input').dataset.selected, "Data Science");
+  assert.equal(panel.querySelector('[data-automation-id="formField-gradeAverage"] input').value, "3.91");
+  assert.equal(
+    panel.querySelector('[data-automation-id="formField-firstYearAttended"] input').getAttribute("aria-valuenow"),
+    "2023"
+  );
+  assert.equal(
+    panel.querySelector('[data-automation-id="formField-lastYearAttended"] input').getAttribute("aria-valuenow"),
+    "2027"
+  );
+});
+
+test("fillPage adds saved skills through Workday's skills picker", async () => {
+  const win = blankWindow();
+  const { document, AvidAutofill: A } = win;
+  document.body.innerHTML = `
+    <div data-automation-id="applyFlowPage">
+      <div role="group" aria-labelledby="Skills-section">
+        <h4 id="Skills-section">Skills</h4>
+        <div data-automation-id="formField-skills">
+          <label>Type to Add Skills</label>
+          <input data-uxi-widget-type="selectinput" placeholder="Search">
+        </div>
+      </div>
+    </div>
+  `;
+
+  const input = document.querySelector('[data-automation-id="formField-skills"] input');
+  const selected = [];
+  input.addEventListener("click", () => {
+    document.querySelectorAll('[data-automation-id="promptOption"]').forEach((node) => node.remove());
+    const option = document.createElement("div");
+    option.dataset.automationId = "promptOption";
+    option.textContent = input.value || "Python";
+    Object.defineProperty(option, "offsetParent", {
+      configurable: true,
+      get: () => document.body,
+    });
+    option.addEventListener("click", () => {
+      selected.push(option.textContent);
+      option.remove();
+    });
+    document.body.append(option);
+  });
+  input.addEventListener("input", () => {
+    const option = document.querySelector('[data-automation-id="promptOption"]');
+    if (option) option.textContent = input.value;
+  });
+  A.fillers.sleep = async () => {};
+
+  const p = testProfile(A);
+  p.misc.skills = "Python, SQL";
+  await A.engine.fillPage(
+    p,
+    { overwriteFilled: false, fillEEO: false, highlightFilled: false },
+    null
+  );
+
+  assert.deepEqual(selected.map((value) => value.toLowerCase()), ["python", "sql"]);
 });
 
 test("page2: datePass skips date sections workExperiencePass already filled", async () => {
@@ -312,7 +545,104 @@ test("page2: datePass skips date sections workExperiencePass already filled", as
   // Without the handled-skip in datePass, its generic /end date/ rule would
   // overwrite this with profile.education[0].endDate ("2020") — see the
   // "plain matcher.match" assertion above documenting that rule in isolation.
-  assert.equal(endYear.value, "2022", "work end date is not clobbered by the generic end-date rule");
+  assert.equal(endYear.getAttribute("aria-valuenow"), "2022", "work end date is not clobbered by the generic end-date rule");
+});
+
+test("fillPage leaves a current role's blank end date untouched", async () => {
+  const { document, A } = loadFixture("workday-page2.html");
+  const p = testProfile(A);
+  p.work = [{ title: "Engineer", company: "Acme", startDate: "2022-01", current: true }];
+  p.education = [{ school: "State University", endDate: "2077-06" }];
+
+  const panel = document.querySelector('[aria-labelledby="Work-Experience-1-panel"]');
+  const endMonth = panel.querySelector(
+    '[data-automation-id="formField-endDate"] input[data-automation-id="dateSectionMonth-input"]'
+  );
+  const endYear = panel.querySelector(
+    '[data-automation-id="formField-endDate"] input[data-automation-id="dateSectionYear-input"]'
+  );
+  for (const el of [endMonth, endYear]) {
+    el.removeAttribute("aria-valuenow");
+    el.removeAttribute("aria-valuetext");
+  }
+
+  await A.engine.fillPage(p, { overwriteFilled: false, fillEEO: false, highlightFilled: false }, null);
+
+  assert.equal(endMonth.getAttribute("aria-valuenow"), null);
+  assert.equal(endYear.getAttribute("aria-valuenow"), null);
+});
+
+test("fillPage does not double-blur the final Workday date spinner", async () => {
+  const { document, A } = loadFixture("workday-page2.html");
+  const p = testProfile(A);
+  p.work = [{ title: "Engineer", company: "Acme", startDate: "2024-06", current: true }];
+
+  const year = document.querySelector(
+    '[aria-labelledby="Work-Experience-1-panel"] ' +
+      '[data-automation-id="formField-startDate"] ' +
+      'input[data-automation-id="dateSectionYear-input"]'
+  );
+  let blurCount = 0;
+  year.addEventListener("blur", () => blurCount++);
+
+  await A.engine.fillPage(p, { overwriteFilled: false, fillEEO: false, highlightFilled: false }, null);
+
+  assert.equal(blurCount, 1);
+});
+
+test("fillPage reports a Workday date error when the spinner rejects input", async () => {
+  const { dom, document, A } = loadFixture("workday-page2.html");
+  const p = testProfile(A);
+  p.work = [{ title: "Engineer", company: "Acme", startDate: "2024-06", current: true }];
+  document.execCommand = () => false;
+
+  const startDate = document.querySelector(
+    '[aria-labelledby="Work-Experience-1-panel"] [data-automation-id="formField-startDate"]'
+  );
+  for (const el of startDate.querySelectorAll('input[role="spinbutton"]')) {
+    el.removeAttribute("aria-valuenow");
+    el.removeAttribute("aria-valuetext");
+  }
+
+  const report = await A.engine.fillPage(
+    p,
+    { overwriteFilled: false, fillEEO: false, highlightFilled: false },
+    null
+  );
+
+  const result = report.results.find((r) => r.label === "Work 1 - Start Date");
+  assert.equal(result.status, "error");
+  assert.equal(
+    startDate.querySelector('input[data-automation-id="dateSectionYear-input"]').getAttribute(
+      "aria-valuenow"
+    ),
+    null
+  );
+  dom.window.close();
+});
+
+test("fillPage refuses untouched Workday pages that cannot commit synthetic input", async () => {
+  const win = blankWindow();
+  const { document, AvidAutofill: A } = win;
+  document.body.innerHTML = `
+    <div data-automation-id="applyFlowPage">
+      <label for="first">First Name</label><input id="first">
+    </div>
+  `;
+  Object.defineProperty(win.navigator, "userActivation", {
+    configurable: true,
+    value: { hasBeenActive: false },
+  });
+
+  const report = await A.engine.fillPage(
+    testProfile(A),
+    { overwriteFilled: false, fillEEO: false, highlightFilled: false },
+    null
+  );
+
+  assert.equal(report.blocked, "workday-needs-page-click");
+  assert.equal(report.filledCount, 0);
+  assert.equal(document.getElementById("first").value, "");
 });
 
 test("page2: extra work entries beyond available panels do not throw (click-to-add is live-only)", async () => {
@@ -333,6 +663,149 @@ test("page2: extra work entries beyond available panels do not throw (click-to-a
   );
   const panel = document.querySelector('[aria-labelledby="Work-Experience-1-panel"]');
   assert.equal(panel.querySelector('[data-automation-id="formField-jobTitle"] input').value, "Engineer II");
+});
+
+test("work-panel job-title fields are owned by the repeater, not the generic matcher (title-bleed guard)", () => {
+  const win = blankWindow();
+  const A = win.AvidAutofill;
+  // Two work panels, each with its own "Job Title" input, plus a standalone
+  // current-title field (Greenhouse/Lever style) outside any panel.
+  win.document.body.innerHTML = `
+    <div role="group" aria-labelledby="Work-Experience-section">
+      <div role="group" aria-labelledby="Work-Experience-1-panel">
+        <div data-automation-id="formField-jobTitle"><label>Job Title</label><input name="jobTitle"></div>
+      </div>
+      <div role="group" aria-labelledby="Work-Experience-2-panel">
+        <div data-automation-id="formField-jobTitle"><label>Job Title</label><input name="jobTitle"></div>
+      </div>
+    </div>
+    <div data-automation-id="formField-currentTitle"><label>Current Title</label><input></div>
+  `;
+  const p = testProfile(A);
+  const helpers = A.matcher.makeHelpers(p);
+
+  const panelTitles = [
+    ...win.document.querySelectorAll(
+      '[aria-labelledby$="-panel"] [data-automation-id="formField-jobTitle"] input'
+    ),
+  ];
+  assert.equal(panelTitles.length, 2);
+
+  for (const inp of panelTitles) {
+    // The generic matcher WOULD map every panel title to work[0].title — that is
+    // the title-bleed bug. isWorkExperienceField is what makes the engine's
+    // generic passes skip these, leaving each panel to workExperiencePass.
+    assert.equal(
+      A.matcher.match(A.matcher.signalFor(inp), p, helpers).value,
+      "Software Engineer"
+    );
+    assert.ok(
+      A.workday.isWorkExperienceField(inp),
+      "panel title is a work-experience field the engine skips"
+    );
+  }
+
+  // A standalone current-title field is not in a panel, so the generic rule still
+  // fills it with the primary job title (unchanged behavior off Workday panels).
+  const standalone = win.document.querySelector(
+    '[data-automation-id="formField-currentTitle"] input'
+  );
+  assert.ok(!A.workday.isWorkExperienceField(standalone));
+  assert.equal(
+    A.matcher.match(A.matcher.signalFor(standalone), p, helpers).value,
+    "Software Engineer"
+  );
+});
+
+test("fillPage preserves distinct Workday titles after panel inputs rerender", async () => {
+  const win = blankWindow();
+  const { document, AvidAutofill: A } = win;
+  document.body.innerHTML = `
+    <div data-automation-id="applyFlowPage"></div>
+    <div role="group" aria-labelledby="Work-Experience-section">
+      <div role="group" aria-labelledby="Work-Experience-1-panel">
+        <div data-automation-id="formField-jobTitle"><label>Job Title</label><input name="jobTitle"></div>
+      </div>
+      <div role="group" aria-labelledby="Work-Experience-2-panel">
+        <div data-automation-id="formField-jobTitle"><label>Job Title</label><input name="jobTitle"></div>
+      </div>
+    </div>
+  `;
+
+  for (const input of document.querySelectorAll('input[name="jobTitle"]')) {
+    input.addEventListener(
+      "input",
+      () => {
+        const replacement = input.cloneNode();
+        replacement.value = input.value;
+        Object.defineProperty(replacement, "offsetParent", {
+          configurable: true,
+          get: () => document.body,
+        });
+        input.replaceWith(replacement);
+      },
+      { once: true }
+    );
+  }
+
+  const p = testProfile(A);
+  p.work = [
+    { title: "Staff Engineer", company: "Acme" },
+    { title: "Senior Engineer", company: "Beta" },
+  ];
+
+  await A.engine.fillPage(
+    p,
+    { overwriteFilled: true, fillEEO: false, highlightFilled: false },
+    null
+  );
+
+  assert.deepEqual(
+    Array.from(document.querySelectorAll('input[name="jobTitle"]'), (input) => input.value),
+    ["Staff Engineer", "Senior Engineer"]
+  );
+});
+
+test("fillPage does not apply Workday panel ownership to a generic form", async () => {
+  const win = blankWindow();
+  const { document, AvidAutofill: A } = win;
+  document.body.innerHTML = `
+    <form>
+      <div role="group" aria-labelledby="Work-Experience-1-panel">
+        <label for="first">First Name</label><input id="first">
+      </div>
+    </form>
+  `;
+  const first = document.getElementById("first");
+  Object.defineProperty(first, "offsetParent", {
+    configurable: true,
+    get: () => document.body,
+  });
+
+  const report = await A.engine.fillPage(
+    testProfile(A),
+    { overwriteFilled: false, fillEEO: false, highlightFilled: false },
+    null
+  );
+
+  assert.equal(report.ats, "Generic");
+  assert.equal(first.value, "Alex");
+});
+
+test("setDateSpinner commits to aria-valuenow (spinbutton), never to .value, and does not blur", () => {
+  const win = blankWindow();
+  const A = win.AvidAutofill;
+  win.document.body.innerHTML =
+    '<input role="spinbutton" aria-valuetext="MM" aria-valuemin="1" aria-valuemax="12">';
+  const el = win.document.querySelector("input");
+  let blurs = 0;
+  el.addEventListener("blur", () => blurs++);
+
+  A.fillers.setDateSpinner(el, "06");
+
+  assert.equal(el.getAttribute("aria-valuenow"), "6", "value commits to aria-valuenow");
+  assert.equal(el.value, "", "never assigns .value, which a spinbutton's handler ignores");
+  assert.equal(blurs, 0, "blur is the caller's job so a half-filled date is never validated");
 });
 
 // --- Page 3: work authorization (yes/no) -----------------------------------
@@ -481,10 +954,86 @@ test("setTextValue sets an input's value (native-setter fallback under jsdom)", 
   assert.equal(area.value, "multi\nline");
 });
 
+test("setReactSelect never chooses an unrelated first option", async () => {
+  const win = blankWindow();
+  const { document, AvidAutofill: A } = win;
+  document.body.innerHTML = `
+    <input data-uxi-widget-type="selectinput">
+    <div data-automation-id="promptOption">Aarhus University</div>
+  `;
+  const control = document.querySelector("input");
+  const option = document.querySelector('[data-automation-id="promptOption"]');
+  let clicked = false;
+  option.addEventListener("click", () => { clicked = true; });
+  Object.defineProperty(option, "offsetParent", {
+    configurable: true,
+    get: () => document.body,
+  });
+
+  const ok = await A.fillers.setReactSelect(control, [
+    "University of California, San Diego",
+    "UCSD",
+  ]);
+
+  assert.equal(ok, false);
+  assert.equal(clicked, false);
+});
+
+test("setReactSelect keeps a typeahead focused until its matching option is chosen", async () => {
+  const win = blankWindow();
+  const { document, AvidAutofill: A } = win;
+  document.body.innerHTML = `
+    <input data-uxi-widget-type="selectinput">
+    <div data-automation-id="promptOption">University of California, San Diego</div>
+  `;
+  const control = document.querySelector("input");
+  const option = document.querySelector('[data-automation-id="promptOption"]');
+  let clicked = false;
+  option.addEventListener("click", () => { clicked = true; });
+  control.addEventListener("blur", () => { option.remove(); });
+  Object.defineProperty(option, "offsetParent", {
+    configurable: true,
+    get: () => document.body,
+  });
+
+  const ok = await A.fillers.setReactSelect(control, ["University of California, San Diego"]);
+
+  assert.equal(ok, true);
+  assert.equal(clicked, true);
+});
+
+test("setReactSelect can commit a Workday typeahead with Enter when allowed", async () => {
+  const win = blankWindow();
+  const { document, AvidAutofill: A } = win;
+  document.body.innerHTML = '<input data-uxi-widget-type="selectinput">';
+  const control = document.querySelector("input");
+  control.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") control.dataset.selected = control.value;
+  });
+
+  const ok = await A.fillers.setReactSelect(control, ["Data Science"], {
+    allowCreate: true,
+  });
+
+  assert.equal(ok, true);
+  assert.equal(control.dataset.selected, "data science");
+});
+
 // --- Adapter detection ------------------------------------------------------
 
 test("adapters.detect resolves an adapter without throwing", () => {
   const { A } = loadFixture("workday-page1.html");
   const adapter = A.adapters.detect();
   assert.ok(adapter && typeof adapter.name === "string");
+});
+
+test("popup chooses the recognized frame that contains the application fields", () => {
+  const win = blankWindow();
+  const selected = win.AvidAutofill.popup.selectTarget([
+    { frameId: 0, result: { ats: "Workday", beta: true, fields: 0 } },
+    { frameId: 7, result: { ats: "Workday", beta: true, fields: 12 } },
+  ]);
+
+  assert.equal(selected.frameId, 7);
+  assert.equal(selected.fields, 12);
 });
