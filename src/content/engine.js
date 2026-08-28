@@ -1,5 +1,5 @@
 // Orchestration: discover fillable fields, match each to the profile, fill it,
-// and return a per-field report the popup can display. Runs in the content-script
+// and return a per-field report the drawer can display. Runs in the content-script
 // world where chrome.storage and the DOM are both reachable.
 (function () {
   const AvidAutofill = (globalThis.AvidAutofill = globalThis.AvidAutofill || {});
