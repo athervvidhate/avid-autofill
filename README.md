@@ -33,9 +33,8 @@ default.
 
 ## Features
 
-- **In-page widget** - a floating panel appears on supported job sites; click
-  *Autofill this page* and watch each field populate, with a per-field report of
-  what was filled or skipped.
+- **Page drawer** - a right-edge drawer stays beside supported job sites; click
+  *Fill this application* and review each field that was filled or skipped.
 - **Smart field matching** - reads each field's label, name, id, placeholder,
   `aria-label`, and nearby text, de-camelCases identifier-style attributes, and
   maps them to your profile with an ordered rules table. No brittle per-site
@@ -79,15 +78,15 @@ cd avid-autofill
 1. Open `chrome://extensions`
 2. Toggle **Developer mode** (top right)
 3. **Load unpacked** and select the `avid-autofill` folder
-4. The options page opens - add your details, or import a profile (below)
+4. The My Info page opens - add your details, or import a profile (below)
 
 ## Usage
 
-1. Add your info on the options page (name, contact, links, work history,
+1. Add your info on the My Info page (name, contact, links, work history,
    education, resume, common answers). It is saved locally.
-2. Open a job application on a supported site. The **Autofill** pill appears in
-   the bottom-right.
-3. Click it, then **Autofill this page**. Review the result, attach anything the
+2. Open a job application on a supported site. The Avid drawer opens on the
+   right side of the page.
+3. Click **Fill this application**. Review the result, attach anything the
    extension could not (see limits), and submit yourself.
 
 Multi-step flows (Workday) fill one step at a time: click *Autofill* on each
@@ -103,7 +102,7 @@ npm install
 npm run import -- /path/to/your/data   # writes profile.json
 ```
 
-Then open the options page and **Import profile.json**.
+Then open the My Info page and **Import JSON**.
 
 ## How it works
 
@@ -115,13 +114,13 @@ content script (supported sites only)
   adapters    ATS detection + per-ATS dropdown selectors
   workday     Workday date-section handling
   engine      orchestration: detect, match, fill, report
-  widget      floating panel UI (rendered in a shadow root)
+  widget      page drawer UI (rendered in a shadow root)
 ```
 
 The content script runs automatically on listed ATS domains. On another HTTP or
-file page, the user can grant temporary access by clicking **Enable on this
-page** in the popup. The widget renders inside a shadow root, so the host page's
-styles never touch it and its styles never leak out.
+file page, clicking the toolbar icon grants temporary access and opens the
+drawer. The drawer renders inside a shadow root, so the host page's styles never
+touch it and its styles never leak out.
 
 ## Privacy
 
@@ -153,8 +152,8 @@ version.
   local AI draft layer is on the roadmap.
 - **Workday** calendar-popover-only dates are not handled. Multi-panel work
   history is implemented and fixture-tested, but still needs a live pass with
-  multiple entries. Use the in-page widget; popup-triggered fill may not commit
-  on a Workday page that has not received a click.
+  multiple entries. Use the page drawer; it keeps the fill action in the same
+  user-initiated page context as the form.
 
 ## Roadmap
 

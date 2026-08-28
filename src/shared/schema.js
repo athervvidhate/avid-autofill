@@ -1,5 +1,5 @@
 // Shared profile schema + storage helpers.
-// Loaded in BOTH the content-script world and the options/popup pages,
+  // Loaded in both the content-script world and the extension page,
 // so it must be plain script (no ES module import/export) and attach to globalThis.
 (function () {
   const g = globalThis;
