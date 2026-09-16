@@ -1,3 +1,5 @@
+importScripts("../shared/tracker-model.js", "google-config.js", "tracker.js");
+
 // Opens the options page on first install and whenever the page drawer asks.
 chrome.runtime.onInstalled.addListener((details) => {
   if (details.reason === "install") chrome.runtime.openOptionsPage();
@@ -34,6 +36,12 @@ chrome.action.onClicked.addListener(async (tab) => {
   }
 });
 
-chrome.runtime.onMessage.addListener((msg) => {
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg && msg.type === "AVID_OPEN_OPTIONS") chrome.runtime.openOptionsPage();
+  if (msg && msg.type === "AVID_FILL_ICIMS_FRAME" && sender.tab?.id != null && sender.frameId === 0) {
+    chrome.tabs.sendMessage(sender.tab.id, msg).then(sendResponse, (err) => {
+      sendResponse({ ok: false, error: String((err && err.message) || err) });
+    });
+    return true;
+  }
 });

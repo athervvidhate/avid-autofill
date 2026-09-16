@@ -10,9 +10,10 @@
   // Resolve the human-readable label associated with a form control.
   function labelTextFor(el) {
     const parts = [];
+    const root = el.getRootNode();
     // 1. <label for=id>
     if (el.id) {
-      const l = document.querySelector(`label[for="${cssEscape(el.id)}"]`);
+      const l = root.querySelector(`label[for="${cssEscape(el.id)}"]`);
       if (l) parts.push(l.textContent);
     }
     // 2. wrapping <label>
@@ -22,7 +23,7 @@
     const labelledby = el.getAttribute && el.getAttribute("aria-labelledby");
     if (labelledby) {
       for (const id of labelledby.split(/\s+/)) {
-        const n = document.getElementById(id);
+        const n = root.getElementById(id);
         if (n) parts.push(n.textContent);
       }
     }
@@ -103,6 +104,7 @@
     { any: [/legal name/, /full name/, /^name$/, /(^|\| )name(\*| \||$)/, /your name/, /candidate name/], not: [/company|user|file|first|last|middle|event|account|maiden|screen/], get: (p) => p.personal.fullName || `${p.personal.firstName} ${p.personal.lastName}`.trim() },
 
     // --- Contact ---
+    { any: [/confirm.*e-?mail/, /e-?mail.*confirm/], not: [/company/], get: (p) => p.personal.email },
     { any: [/e-?mail/, /^email address$/], not: [/confirm|company/], get: (p) => p.personal.email },
     { any: [/phone device type/], kind: "select", get: (p) => p.personal.phoneDeviceType || "Mobile" },
     { any: [/phone/, /mobile/, /telephone/, /contact number/], not: [/extension/, /device type/, /\bsms\b/, /opt.?in/, /phone code/, /country.*code/], get: (p) => p.personal.phone },

@@ -15,6 +15,14 @@
   // to mount on an unrecognized page so the user can see its status.
   function init() {
     const adapter = AvidAutofill.adapters.detect();
+    if (adapter.name === "iCIMS" && window.parent !== window) return;
+    if (adapter.name === "iCIMS" && document.querySelector("iframe#icims_content_iframe")) {
+      AvidAutofill.engine.fillPage = async () => {
+        const response = await chrome.runtime.sendMessage({ type: "AVID_FILL_ICIMS_FRAME" });
+        if (!response?.ok) throw new Error(response?.error || "Avid could not reach the iCIMS form.");
+        return response.report;
+      };
+    }
     const requested = !!g.__avidOpenDrawer;
     if (adapter.name !== "Generic" || document.querySelector("form") || requested) {
       AvidAutofill.widget.mount(adapter);
@@ -32,7 +40,7 @@
       AvidAutofill.widget.open();
       return false;
     }
-    if (msg && msg.type === "AVID_FILL") {
+    if (msg && (msg.type === "AVID_FILL" || (msg.type === "AVID_FILL_ICIMS_FRAME" && window.parent !== window))) {
       (async () => {
         try {
           const profile = await AvidAutofill.getProfile();

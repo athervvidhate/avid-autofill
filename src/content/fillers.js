@@ -6,6 +6,17 @@
 (function () {
   const AvidAutofill = (globalThis.AvidAutofill = globalThis.AvidAutofill || {});
 
+  // Native selectors stop at shadow boundaries. Keep extension UI out of fills.
+  function queryAll(selector, root = document) {
+    const matches = Array.from(root.querySelectorAll(selector));
+    for (const host of root.querySelectorAll("*")) {
+      if (host.shadowRoot && !["avid-autofill-root", "avid-tracker-root"].includes(host.id)) {
+        matches.push(...queryAll(selector, host.shadowRoot));
+      }
+    }
+    return matches;
+  }
+
   const nativeInputSetter = Object.getOwnPropertyDescriptor(
     window.HTMLInputElement.prototype,
     "value"
@@ -20,8 +31,8 @@
   ).set;
 
   function fireInput(el) {
-    el.dispatchEvent(new Event("input", { bubbles: true }));
-    el.dispatchEvent(new Event("change", { bubbles: true }));
+    el.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+    el.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
   }
 
   function flash(el) {
@@ -70,13 +81,13 @@
       setter.call(el, "");
       setter.call(el, value);
       el.dispatchEvent(
-        new InputEvent("input", { bubbles: true, inputType: "insertText", data: value })
+        new InputEvent("input", { bubbles: true, composed: true, inputType: "insertText", data: value })
       );
     }
 
     // Workday validates required fields on blur; fire change + blur to clear the
     // "field is required" error the same way tabbing out of the field would.
-    el.dispatchEvent(new Event("change", { bubbles: true }));
+    el.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
     el.dispatchEvent(new Event("blur", { bubbles: true }));
     el.blur();
     flash(el);
@@ -103,7 +114,7 @@
       nativeInputSetter.call(el, "");
       nativeInputSetter.call(el, value);
       el.dispatchEvent(
-        new InputEvent("input", { bubbles: true, inputType: "insertText", data: value })
+        new InputEvent("input", { bubbles: true, composed: true, inputType: "insertText", data: value })
       );
     }
     flash(el);
@@ -130,7 +141,7 @@
     try {
       document.execCommand("insertText", false, String(value));
     } catch (_) {}
-    el.dispatchEvent(new Event("change", { bubbles: true }));
+    el.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
     flash(el);
     const expected = String(Number(value));
     return (
@@ -212,7 +223,7 @@
     el.focus();
     el.click();
     // Some frameworks need the change event even after click.
-    el.dispatchEvent(new Event("change", { bubbles: true }));
+    el.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
     flash(el);
   }
 
@@ -256,7 +267,7 @@
     let pick = null;
     for (let attempt = 0; attempt < 8 && !pick; attempt++) {
       const available = Array.from(
-        document.querySelectorAll(
+        queryAll(
           '[data-automation-id="promptOption"], [class*="option"], [role="option"], li[id*="option"]'
         )
       ).filter(
@@ -307,8 +318,8 @@
     const dt = new DataTransfer();
     dt.items.add(file);
     input.files = dt.files;
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-    input.dispatchEvent(new Event("change", { bubbles: true }));
+    input.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
     flash(input);
     return true;
   }
@@ -330,6 +341,7 @@
   }
 
   AvidAutofill.fillers = {
+    queryAll,
     setTextValue,
     setDateSpinner,
     setNativeSelect,

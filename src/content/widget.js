@@ -2,6 +2,7 @@
 // It lives in a shadow root so employer page styles cannot affect it.
 (function () {
   const AvidAutofill = (globalThis.AvidAutofill = globalThis.AvidAutofill || {});
+  if (AvidAutofill.widget) return;
 
   const STYLE = `
     :host { all: initial; }
@@ -10,7 +11,7 @@
     .wrap { --paper: #f2f7f4; --surface: #f8fcf9; --ink: #1b1c19; --muted: #647269; --line: #d7e4dc;
       --accent: #3459c7; --accent-soft: #e5ebff; --accent-press: #2947a2; --mark: #c8e86a;
       --ok: #28765b; --ok-soft: #e6f2ec; --warn: #a36516; --warn-soft: #f8efdf; --error: #b34848;
-      position: fixed; inset: 0 0 0 auto; z-index: 2147483647; color: var(--ink); }
+      position: fixed; inset: 0 0 0 auto; z-index: 2147483646; color: var(--ink); }
     .panel { position: absolute; inset: 0 0 0 auto; display: grid; grid-template-rows: auto auto 1fr auto;
       width: min(380px, calc(100vw - 18px)); max-width: 100vw; background: var(--paper); color: var(--ink);
       border-left: 1px solid color-mix(in srgb, var(--ink) 12%, transparent);
@@ -45,6 +46,7 @@
     .primary:hover { filter: brightness(1.06); }
     .primary:active { transform: translateY(2px); box-shadow: 0 2px 0 var(--accent-press); }
     .primary:disabled { opacity: .58; cursor: wait; }
+    .track { width: 100%; margin-top: 12px; padding: 10px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); color: var(--accent); font-size: 12px; font-weight: 700; cursor: pointer; }
     details.preferences { margin-top: 10px; border: 1px solid var(--line); border-radius: 10px; background: color-mix(in srgb, var(--surface) 56%, transparent); }
     details.preferences summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; padding: 10px 12px;
       cursor: pointer; list-style: none; font-size: 12px; font-weight: 700; }
@@ -79,7 +81,8 @@
     .notice { padding: 11px 12px; border-radius: 10px; background: var(--warn-soft); color: var(--warn); font-size: 12px; line-height: 1.4; }
     .foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 57px; padding: 12px 18px;
       border-top: 1px solid var(--line); background: var(--surface); }
-    .foot a { color: var(--accent); cursor: pointer; font-size: 12.5px; font-weight: 750; text-decoration: none; }
+    .foot .opt { min-height: 32px; padding: 4px 0; border: 0; background: none; color: var(--accent); cursor: pointer;
+      font-size: 12.5px; font-weight: 750; }
     .review { color: var(--muted); font-size: 11px; text-align: right; }
     .launcher { position: fixed; top: 50%; right: 0; width: 44px; height: 112px; transform: translateY(-50%); border-radius: 14px 0 0 14px;
       background: var(--accent); color: white; box-shadow: -8px 12px 28px rgba(35,30,33,.18); writing-mode: vertical-rl;
@@ -112,7 +115,13 @@
     const host = document.createElement("div");
     host.id = "avid-autofill-root";
     const root = host.attachShadow({ mode: "open" });
-    (document.body || document.documentElement).appendChild(host);
+    const attach = () => {
+      if (!host.isConnected && document.documentElement) document.documentElement.appendChild(host);
+    };
+    attach();
+    // Watch the document as well as its root, since hydration can replace either.
+    const observer = new MutationObserver(attach);
+    observer.observe(document, { childList: true, subtree: true });
 
     const atsLabel = adapter.beta ? `${adapter.name} (beta)` : adapter.name;
     const fillLabel = adapter.name === "Generic" ? "Try filling this page" : "Fill this application";
@@ -131,6 +140,7 @@
           <h1>Ready to fill your application</h1>
           <p>Use your saved profile to fill matching fields. You review everything before submitting.</p>
           <button class="primary fill">Fill this application</button>
+          <button class="track" type="button">Track application</button>
           <details class="preferences">
             <summary>Fill preferences</summary>
             <div class="toggles">
@@ -143,7 +153,7 @@
           <div class="summary" hidden role="status" aria-live="polite"></div>
           <div class="results"></div>
         </section>
-        <footer class="foot"><a class="opt" role="button" tabindex="0">Edit profile</a><span class="review">Stored locally<br />Review before submitting</span></footer>
+        <footer class="foot"><button class="opt" type="button">Edit profile</button><span class="review">Stored locally<br />Review before submitting</span></footer>
       </section>
     `);
     wrap.append(panel, launcher);
@@ -157,7 +167,7 @@
       panel.setAttribute("aria-hidden", String(!value));
       if (value) syncToggles();
     };
-    openDrawer = () => { setOpen(true); return true; };
+    openDrawer = () => { attach(); setOpen(true); return host.isConnected; };
     setOpen(true);
 
     if (adapter.name === "Generic") {
@@ -168,13 +178,13 @@
       $(".fill").textContent = "Try filling this page";
     }
 
-    launcher.addEventListener("click", () => setOpen(true));
-    $(".collapse").addEventListener("click", () => setOpen(false));
+    launcher.addEventListener("click", () => { setOpen(true); $(".collapse").focus(); });
+    $(".collapse").addEventListener("click", () => { setOpen(false); launcher.focus(); });
     $(".opt").addEventListener("click", () => chrome.runtime.sendMessage({ type: "AVID_OPEN_OPTIONS" }));
-    $(".opt").addEventListener("keydown", (event) => {
-      if (event.key === "Enter" || event.key === " ") { event.preventDefault(); chrome.runtime.sendMessage({ type: "AVID_OPEN_OPTIONS" }); }
+    $(".track").addEventListener("click", () => AvidAutofill.tracker?.open());
+    panel.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !panel.hidden) { setOpen(false); launcher.focus(); }
     });
-    panel.addEventListener("keydown", (event) => { if (event.key === "Escape" && !panel.hidden) setOpen(false); });
 
     async function syncToggles() {
       const s = await AvidAutofill.getSettings();
@@ -242,6 +252,13 @@
     const summary = $(".summary");
     summary.hidden = false;
     summary.innerHTML = "";
+    if (!report.blocked && !report.results.length) {
+      $(".status").className = "status warn";
+      $(".status").textContent = "No matching fields";
+      summary.textContent = "Nothing was filled. Check that the application form is open and has finished loading.";
+      $(".results").innerHTML = "";
+      return;
+    }
     if (report.blocked) {
       $(".status").className = "status warn";
       $(".status").innerHTML = `<i class="status-dot"></i> Needs attention`;
@@ -277,10 +294,6 @@
 
     const results = $(".results");
     results.innerHTML = "";
-    if (!report.results.length) {
-      results.innerHTML = `<p class="empty">No matching fields found on this page.</p>`;
-      return;
-    }
     if (review.length) appendGroup(results, "Needs review", review);
     if (done.length) appendGroup(results, "Filled", done);
   }

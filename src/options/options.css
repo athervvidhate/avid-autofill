@@ -98,3 +98,18 @@ input[type="checkbox"] { width: 17px; height: 17px; padding: 0; accent-color: va
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
 }
+[hidden] { display: none !important; }
+.btn:disabled { opacity: .55; cursor: wait; }
+.connection-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.connection-head h3 { margin: 0; font-size: 16px; }
+.connection-head p { margin: 2px 0; color: var(--muted); }
+.connection-badge { padding: 5px 9px; border-radius: 16px; background: var(--ok-soft); color: var(--ok); font-size: 11px; white-space: nowrap; }
+#connections > p { color: var(--muted); font-size: 13px; }
+#connection-msg { min-height: 20px; }
+.tracker-toggle { display: flex; align-items: flex-start; gap: 10px; padding: 16px 0; border-top: 1px solid var(--line); }
+.tracker-toggle input { flex: none; margin-top: 3px; }
+.tracker-toggle small { display: block; color: var(--muted); margin-top: 3px; font-size: 12px; line-height: 1.5; }
+#google-setup { border-top: 1px solid var(--line); margin-top: 16px; padding-top: 16px; }
+#google-setup summary { cursor: pointer; color: var(--accent); font-size: 12px; font-weight: 700; }
+#google-setup p, #google-setup li { font-size: 12px; color: var(--muted); }
+#tracker-pending-list { padding-left: 18px; overflow-wrap: anywhere; }

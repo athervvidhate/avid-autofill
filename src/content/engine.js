@@ -68,11 +68,11 @@
     async function dropdownPass() {
       const controls = [];
       for (const sel of adapter.customSelectSelectors || []) {
-        document.querySelectorAll(sel).forEach((c) => controls.push(c));
+        F().queryAll(sel).forEach((c) => controls.push(c));
       }
       for (const control of dedupe(controls)) {
         if (handled.has(control) || !isVisible(control)) continue;
-        control.querySelectorAll("input").forEach((i) => handled.add(i));
+        F().queryAll("input", control).forEach((i) => handled.add(i));
         handled.add(control);
         const signal = matcher.signalFor(control);
         const m = matcher.match(signal, profile, helpers);
@@ -94,7 +94,7 @@
 
     // --- 2. Radio groups (grouped by name). ---
     const radioGroups = {};
-    document.querySelectorAll('input[type="radio"]').forEach((r) => {
+    F().queryAll('input[type="radio"]').forEach((r) => {
       if (!r.name) return;
       (radioGroups[r.name] = radioGroups[r.name] || []).push(r);
     });
@@ -111,7 +111,7 @@
     }
 
     // --- 3. Everything else: text inputs, textareas, native selects, checkboxes.
-    const nodes = document.querySelectorAll(
+    const nodes = F().queryAll(
       'input, textarea, select'
     );
     const inWorkPanel =
@@ -180,7 +180,7 @@
   // check here — we score every enabled file input by how resume-like it looks.
   async function uploadResume(resume, matcher, fillers, record) {
     const inputs = Array.from(
-      document.querySelectorAll('input[type="file"]')
+      F().queryAll('input[type="file"]')
     ).filter((i) => !i.disabled);
 
     const scored = inputs.map((i) => ({
@@ -198,7 +198,7 @@
     if (!target) {
       // Best-effort: a drag-drop zone labelled resume with no reachable input.
       const zone = Array.from(
-        document.querySelectorAll('[class*="dropzone"], [class*="drop-zone"], [class*="upload"]')
+        F().queryAll('[class*="dropzone"], [class*="drop-zone"], [class*="upload"]')
       ).find((z) => /resume|cv|drag/i.test(z.textContent || ""));
       if (zone) {
         try {

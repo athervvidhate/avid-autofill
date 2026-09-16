@@ -9,12 +9,13 @@
 Open a posting on Greenhouse, Lever, Ashby, Workday and more, and a small panel
 appears. Click once and your name, contact, links, work history, education,
 work authorization, resume, and the usual yes/no questions are filled in. You
-review, then submit. Your data lives in your browser, not on someone's server.
+review, then submit. Your profile lives in your browser. An optional Google Sheets
+connection tracks applications after you approve each entry.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Manifest V3](https://img.shields.io/badge/Manifest-V3-34a853.svg)](manifest.json)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-6b93ff.svg)](#contributing)
-![Privacy: local-only](https://img.shields.io/badge/data-local--only-12894a.svg)
+![Privacy: local profile](https://img.shields.io/badge/profile-local-12894a.svg)
 
 </div>
 
@@ -25,11 +26,10 @@ review, then submit. Your data lives in your browser, not on someone's server.
 Job seekers retype the same fifteen fields into a dozen different applicant
 tracking systems every week. Existing autofillers work, but they route your
 personal data through a third-party account. Avid Autofill does the same job
-with a different contract: **today it holds your profile locally and talks to no
-server.** It is open source so you can verify that, and hackable so you can bend
-the field matching to your own search. If cloud features arrive later (see
-[Privacy](#privacy)), they will be opt-in and local-first will remain the
-default.
+with a different contract: **your profile and resume stay in your browser.**
+The optional application tracker sends only the job details you approve directly
+to your Google spreadsheet. It is open source so you can verify that and change
+the field matching for your own search.
 
 ## Features
 
@@ -47,8 +47,14 @@ default.
 - **Common questions** - default answers for the recurring yes/no and legal
   acknowledgment questions (sponsorship, prior employment, student status, SMS
   consent, "consider me for other roles").
-- **Local and private** - today everything lives in `chrome.storage.local`. No
-  account, no network calls, no telemetry.
+- **Local profile** - your profile and resume live in `chrome.storage.local`.
+  Autofill needs no account. No telemetry.
+- **Application tracker** - connect Google Sheets through Connections to create
+  a formatted tracker. After confirmed submission, a small prompt lets you review
+  and save the job. Optional broader site access covers company career pages and
+  unfamiliar sites even when you never use autofill. Parsing and spreadsheet
+  operations are deterministic, with no AI. Approved entries stay local until
+  Google confirms the save.
 - **Review-first by design** - it fills, you submit. It never clicks the final
   button.
 
@@ -92,6 +98,37 @@ cd avid-autofill
 Multi-step flows (Workday) fill one step at a time: click *Autofill* on each
 step as you advance.
 
+### Track applications in Google Sheets
+
+Open **My Info → Connections**, connect Google, and create your tracker. Enable
+**Ask to track submitted applications** and grant page access for automatic
+detection beyond the listed job platforms. The sheet includes company, role,
+job URL, location, application date, status, follow-up date, and notes.
+
+Use **Track application** in the drawer when automatic detection misses a page.
+Duplicate prompts are suppressed; intentional reapplications have an explicit
+**Add another application** action. Failed saves remain visible in Connections
+and retry while connected.
+
+No Google Apps Script is needed. The extension writes to the spreadsheet through
+the Google Sheets and Drive APIs. To connect a source build:
+
+1. Create a project in [Google Cloud](https://console.cloud.google.com/) and
+   enable the **Google Sheets API** and **Google Drive API**.
+2. Configure the Google Auth Platform consent screen. Add your Google account as
+   a test user if the app is still in testing.
+3. In **My Info → Connections**, copy the redirect URL shown under Google
+   setup. Create an OAuth client of type **Web application** and add that exact
+   URL as an authorized redirect URI.
+4. Copy the OAuth client ID into Connections. Do not create or add a client
+   secret. Release builds can set the public client ID in
+   `src/background/google-config.js` instead.
+5. Click **Connect Google and create tracker**, approve access, then open the
+   generated sheet.
+
+See [tracker setup, behavior, and verification](docs/tracker.md) for the scopes,
+privacy model, retry behavior, and release checklist.
+
 ### Import a profile
 
 You can type everything into the options page, or import a `profile.json`. If you
@@ -124,11 +161,20 @@ touch it and its styles never leak out.
 
 ## Privacy
 
-**Today:** Avid Autofill stores your profile and resume in `chrome.storage.local`
-on your machine. It makes no network requests, has no analytics, has no account,
-and has no backend. The resume is held as bytes so it can be injected into a file
+**Autofill:** Avid Autofill stores your profile and resume in `chrome.storage.local`
+on your machine. Autofill makes no network requests and needs no account.
+The extension has no analytics or backend. The resume is held as bytes so it can be injected into a file
 input; browsers cannot read files off your disk during autofill, which is why it
 must be saved once in the extension first.
+
+**Optional tracker:** Google sign-in and Sheets/Drive requests go directly to
+Google. Approved tracker fields, including any notes you enter, are stored in
+your spreadsheet. Applicant form values and your saved profile are not sent.
+The account and sheet configuration, pending entries, and dismissal history are
+stored locally. Access tokens stay in extension session storage, unavailable to
+content scripts. Disconnecting stops syncing and keeps your sheet and pending
+entries. Automatic detection requires optional HTTP/HTTPS page access and can
+be turned off in Connections.
 
 **Going forward:** optional cloud features may be added later, such as syncing
 your profile across devices or drafting answers to open-ended questions with an

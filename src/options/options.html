@@ -18,8 +18,9 @@
           <a href="#education">Education</a>
           <a href="#work-auth">Application answers</a>
           <a href="#eeo-section">Voluntary self-ID</a>
+          <a href="#connections">Connections</a>
         </nav>
-        <div class="sidebar-note"><span class="local-dot"></span><b>Local only</b><span>Your profile stays in this browser.</span></div>
+        <div class="sidebar-note"><span class="local-dot"></span><b>Local profile</b><span>Your profile stays in this browser.</span></div>
       </aside>
 
       <main class="content" id="top">
@@ -50,11 +51,31 @@
 
         <section id="eeo-section" class="section-card"><div class="section-heading"><div><span class="section-kicker">07</span><h2>Voluntary self-ID</h2><p>These fields stay untouched unless you enable them in the drawer.</p></div><span class="section-icon" aria-hidden="true">◌</span></div><div class="notice"><b>Optional by design.</b> Avid never fills these fields unless you turn on "Fill voluntary self-ID questions" for an application.</div><div class="grid split-top" id="eeo"></div></section>
 
-        <div class="save-bar"><div><b>Save your changes</b><span id="save-msg" class="io-msg" role="status" aria-live="polite"></span></div><button class="btn primary" id="save">Save changes</button></div>
+        <section id="connections" class="section-card">
+          <div class="section-heading"><div><span class="section-kicker">08</span><h2>Connections</h2><p>Connect Google Sheets to keep your application tracker up to date.</p></div></div>
+          <div class="connection-head"><div><h3>Google Sheets</h3><p id="google-account">Not connected</p></div><span class="connection-badge" id="google-badge">Not connected</span></div>
+          <p>First setup creates a formatted Job applications spreadsheet. Avid remembers it for every save. Your profile and resume stay in this browser; only the application details you approve go to Google. No AI is used.</p>
+          <div class="io-actions"><button class="btn primary" id="google-connect">Connect Google and create tracker</button><a class="btn secondary" id="tracker-sheet" target="_blank" rel="noopener noreferrer" hidden>Open tracker</a><button class="btn danger-quiet" id="google-disconnect" hidden>Disconnect</button></div>
+          <p id="connection-msg" role="status" aria-live="polite"></p>
+          <label class="tracker-toggle"><input type="checkbox" id="tracker-enabled"><span><b>Ask to track submitted applications</b><small>Detect applications on company career pages and unfamiliar sites, even without autofill. Enabling this asks for access to HTTP and HTTPS pages. You approve each entry before Avid adds it.</small></span></label>
+          <div id="tracker-pending" class="notice" hidden><b id="tracker-pending-count"></b><ul id="tracker-pending-list"></ul><button class="btn secondary" id="tracker-retry">Retry saved entries</button></div>
+          <details id="google-setup" hidden>
+            <summary>Google connection setup for this unpacked build</summary>
+            <p>The extension needs a Google OAuth web client ID before sign-in can work. This is a one-time developer setup, not a client secret.</p>
+            <ol><li>In <a href="https://console.cloud.google.com/apis/library" target="_blank" rel="noopener noreferrer">Google Cloud</a>, enable the Google Sheets API and Google Drive API.</li><li>Configure Google Auth Platform branding and audience. While the app is in testing, add the Google account you will use as a test user.</li><li>Create a Web application OAuth client and add the exact authorized redirect URI below. Allow the drive.file, openid, and email scopes.</li></ol>
+            <label class="field">Authorized redirect URI<input id="google-redirect" readonly></label>
+            <label class="field split-top">OAuth web client ID<input id="google-client-id" placeholder="...apps.googleusercontent.com" autocomplete="off"></label>
+            <button class="btn secondary split-top" id="google-client-save">Save client ID</button>
+          </details>
+        </section>
+
+        <div class="save-bar"><div><b>Save your profile changes</b><span id="save-msg" class="io-msg" role="status" aria-live="polite"></span></div><button class="btn primary" id="save">Save changes</button></div>
       </main>
     </div>
 
     <script src="../shared/schema.js"></script>
+    <script src="../shared/tracker-model.js"></script>
     <script src="options.js"></script>
+    <script src="connections.js"></script>
   </body>
 </html>

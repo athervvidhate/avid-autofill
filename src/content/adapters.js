@@ -11,6 +11,11 @@
 
   const ADAPTERS = [
     {
+      name: "SmartRecruiters",
+      detect: () => /(^|\.)smartrecruiters\.com$/.test(location.hostname) || !!document.querySelector("oc-app-root"),
+      customSelectSelectors: ['[role="combobox"]'],
+    },
+    {
       name: "Greenhouse",
       detect: () =>
         /greenhouse\.io|grnh\.se/.test(location.host) ||

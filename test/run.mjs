@@ -20,6 +20,40 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
+test("SmartRecruiters shadow fields are filled and notify the component host", async () => {
+  const dom = new JSDOM('<oc-app-root><spl-input></spl-input><spl-phone-field></spl-phone-field></oc-app-root><div id="avid-autofill-root"></div>', {
+    runScripts: "outside-only", pretendToBeVisual: true, url: "https://jobs.smartrecruiters.com/oneclick-ui/",
+  });
+  try {
+    const win = dom.window;
+    win.chrome = chromeShim();
+    for (const src of SCRIPTS) win.eval(src);
+    const host = win.document.querySelector("spl-input");
+    host.attachShadow({ mode: "open" }).innerHTML = '<label for="field">First name</label><div><input id="field"></div>';
+    const phone = win.document.querySelector("spl-phone-field");
+    phone.attachShadow({ mode: "open" }).innerHTML = '<spl-input></spl-input>';
+    phone.shadowRoot.querySelector("spl-input").attachShadow({ mode: "open" }).innerHTML = '<span id="label">Phone number</span><input aria-labelledby="label">';
+    const inputs = [host.shadowRoot.querySelector("input"), phone.shadowRoot.querySelector("spl-input").shadowRoot.querySelector("input")];
+    const ignored = win.document.getElementById("avid-autofill-root").attachShadow({ mode: "open" });
+    ignored.innerHTML = '<input aria-label="First name">';
+    for (const input of [...inputs, ignored.querySelector("input")]) input.getClientRects = () => [{}];
+    let notified = false;
+    host.addEventListener("input", () => { notified = true; });
+    const A = win.AvidAutofill;
+    const profile = structuredClone(A.DEFAULT_PROFILE);
+    Object.assign(profile.personal, { firstName: "Test", phone: "2025550123" });
+    const report = await A.engine.fillPage(profile, A.DEFAULT_SETTINGS, null);
+    assert.equal(inputs[0].value, "Test", "visible shadow input must be filled");
+    assert.equal(inputs[1].value, "2025550123", "nested shadow input must be filled");
+    assert.equal(notified, true, "input event must cross the shadow boundary");
+    assert.equal(ignored.querySelector("input").value, "");
+    assert.equal(report.filledCount, 2);
+    assert.equal(report.ats, "SmartRecruiters");
+    profile.personal.email = "test@example.com";
+    assert.equal(A.matcher.match("Confirm your email", profile, A.matcher.makeHelpers(profile)).value, profile.personal.email);
+  } finally { dom.window.close(); }
+});
+
 // The fill logic, in manifest load order. Widget and main stay excluded because
 // they mount UI and register Chrome listeners. engine.js is included so
 // integration tests can exercise the public fillPage seam.
