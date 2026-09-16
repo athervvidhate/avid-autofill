@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <body>
+    <!-- Reduced from the AccorHotel SmartRecruiters one-click application on 2026-08-28. -->
+    <form>
+      <div>
+        <label for="first-name-input">First name</label>
+        <input id="first-name-input" autocomplete="given-name" required>
+      </div>
+
+      <div>
+        <label for="last-name-input">Last name</label>
+        <input id="last-name-input" autocomplete="family-name" required>
+      </div>
+
+      <div>
+        <label for="email-input">Email</label>
+        <input id="email-input" type="email" autocomplete="email" required>
+      </div>
+
+      <div>
+        <label for="confirm-email-input">Confirm your email</label>
+        <input id="confirm-email-input" type="email" autocomplete="email" required>
+      </div>
+
+      <label id="city-label" for="city-input">City</label>
+      <input id="city-input" role="combobox" aria-labelledby="city-label"
+             aria-haspopup="listbox" autocomplete="off">
+      <div role="option">Portland, Oregon, United States</div>
+
+      <button type="button" role="combobox" aria-label="Country code" aria-haspopup="listbox">+974</button>
+      <div role="option">United States +1</div>
+      <input id="phone-input" type="tel" aria-label="Phone number">
+
+      <label for="linkedin-input">LinkedIn</label>
+      <input id="linkedin-input">
+
+      <label id="privacy-label" for="privacy-input">
+        You declare that you have read and understand the privacy notice.
+      </label>
+      <input id="privacy-input" type="checkbox" aria-labelledby="privacy-label" required>
+    </form>
+  </body>
+</html>

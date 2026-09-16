@@ -167,6 +167,28 @@ test("reinjection preserves the mounted drawer's open handler", () => {
   }
 });
 
+test("SmartRecruiters mounts a named drawer on a current application URL", () => {
+  const dom = new JSDOM("<!doctype html><body><form></form></body>", {
+    runScripts: "outside-only",
+    pretendToBeVisual: true,
+    url: "https://jobs.smartrecruiters.com/oneclick-ui/company/example/publication/example",
+  });
+  dom.window.chrome = chromeShim();
+  for (const file of ["src/shared/schema.js", "src/content/adapters.js", "src/content/widget.js"]) {
+    dom.window.eval(fs.readFileSync(path.join(ROOT, file), "utf8"));
+  }
+
+  const A = dom.window.AvidAutofill;
+  const adapter = A.adapters.detect();
+  A.widget.mount(adapter);
+
+  const shadow = dom.window.document.querySelector("#avid-autofill-root").shadowRoot;
+  assert.equal(adapter.name, "SmartRecruiters");
+  assert.equal(shadow.querySelector(".eyebrow").textContent, "SmartRecruiters");
+  assert.equal(shadow.querySelector(".status").textContent, "");
+  dom.window.close();
+});
+
 test("iCIMS keeps one outer drawer and delegates filling to its candidate iframe", async () => {
   const report = { ats: "iCIMS", stub: true, filledCount: 1, results: [] };
   const sent = [];

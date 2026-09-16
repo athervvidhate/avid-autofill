@@ -3,9 +3,9 @@
 // ATS was detected, and (2) selectors for that ATS's *custom* (non-native)
 // dropdowns, which need the click-open-type-pick dance in fillers.setReactSelect.
 //
-// Greenhouse, Lever, and Ashby add custom-dropdown selectors to the generic
-// engine. Workday is a beta adapter with its own date and repeater passes. iCIMS,
-// Taleo, and Workable are detection-only stubs that use generic fill behavior.
+// Greenhouse, Lever, Ashby, and SmartRecruiters add custom-dropdown selectors to
+// the generic engine. Workday is a beta adapter with its own date and repeater
+// passes. iCIMS, Taleo, and Workable are detection-only stubs.
 (function () {
   const AvidAutofill = (globalThis.AvidAutofill = globalThis.AvidAutofill || {});
 
@@ -74,7 +74,7 @@
       detect: () =>
         /workable\.com|apply\.workable/.test(location.host) ||
         !!document.querySelector('[data-ui="application-form"]'),
-      customSelectSelectors: ['[class*="styles__select"]'],
+      customSelectSelectors: ['[class*="styles__select"]', '[role="combobox"]'],
     },
   ];
 

@@ -10,6 +10,7 @@
     el &&
     (el.offsetParent !== null || el.getClientRects().length > 0) &&
     !el.disabled &&
+    el.getAttribute("aria-hidden") !== "true" &&
     el.type !== "hidden";
 
   const isAffirmative = (v) => /^(yes|y|true|1)$/i.test(String(v).trim());

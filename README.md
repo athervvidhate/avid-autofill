@@ -66,8 +66,8 @@ the field matching for your own search.
 | Lever | Beta; adapter present, live fixture hardening pending |
 | Ashby | Beta; adapter present, live fixture hardening pending |
 | Workday | Beta; typeable dates and work-history repeaters need live validation |
-| iCIMS, Taleo, Workable | Detected; generic fill only |
-| SmartRecruiters | Generic fill only; no named adapter yet |
+| iCIMS, Taleo | Detected; generic fill only |
+| Workable, SmartRecruiters | Detected; generic fill with ARIA dropdown support |
 
 Company-embedded ATS on custom domains and more platforms are on the
 [roadmap](#roadmap). Open an issue with a posting URL if one you use is missing.
