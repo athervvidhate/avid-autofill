@@ -59,8 +59,9 @@
       if (AvidAutofill.workday.skillsPass) {
         await AvidAutofill.workday.skillsPass(profile, { fillers, record, handled });
       }
-      // Workday typeable date sections (MM/DD/YYYY spinbuttons).
+      // Workday typeable and calendar-popover date widgets.
       await AvidAutofill.workday.datePass(profile, { matcher, helpers, fillers, record, handled });
+      await AvidAutofill.workday.popoverDatePass(profile, { matcher, helpers, fillers, record });
     }
 
     // --- 1. Custom (react-select / combobox / Workday) dropdowns first, so their

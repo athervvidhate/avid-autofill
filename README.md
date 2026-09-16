@@ -65,7 +65,7 @@ the field matching for your own search.
 | Greenhouse | Beta; adapter present, live fixture hardening pending |
 | Lever | Beta; adapter present, live fixture hardening pending |
 | Ashby | Beta; adapter present, live fixture hardening pending |
-| Workday | Beta; typeable dates and work-history repeaters need live validation |
+| Workday | Beta; date widgets and work-history repeaters need live validation |
 | iCIMS, Taleo | Detected; generic fill only |
 | Workable, SmartRecruiters | Detected; generic fill with ARIA dropdown support |
 
@@ -196,10 +196,10 @@ version.
   security). Drag-and-drop-only zones are best-effort.
 - **Open-ended questions** ("Why this company?") are left blank; an optional,
   local AI draft layer is on the roadmap.
-- **Workday** calendar-popover-only dates are not handled. Multi-panel work
-  history is implemented and fixture-tested, but still needs a live pass with
-  multiple entries. Use the page drawer; it keeps the fill action in the same
-  user-initiated page context as the form.
+- **Workday** calendar-popover dates and multi-panel work history are
+  implemented, but still need live passes against those widget variants. Use the
+  page drawer; it keeps the fill action in the same user-initiated page context
+  as the form.
 
 ## Roadmap
 
@@ -209,7 +209,7 @@ version.
 - [x] Workday work-history repeaters (fixture-tested; live hardening pending)
 - [x] On-demand in-page widget with narrowed host permissions
 - [ ] iCIMS / Taleo / Workable / SmartRecruiters full adapters
-- [ ] Workday calendar-popover-only dates
+- [x] Workday calendar-popover-only dates (live validation pending)
 - [ ] Optional local AI layer for open-ended questions
 - [ ] Per-site field-mapping overrides and multiple profiles
 - [ ] Chrome Web Store release

@@ -1130,3 +1130,33 @@ test("popup chooses the recognized frame that contains the application fields", 
   assert.equal(selected.frameId, 7);
   assert.equal(selected.fields, 12);
 });
+
+// --- Workday date helpers (#8) -----------------------------------------------
+// parseDate and yearSpinPlan are the pure pieces of the calendar-icon popover
+// date picker; the actual click-open-spin DOM interaction (popoverDatePass)
+// needs a live Workday page that renders the popover and is not covered here.
+
+test("workday.parseDate handles the date formats a Workday posting emits", () => {
+  const win = blankWindow();
+  const { parseDate } = win.AvidAutofill.workday;
+
+  assert.deepEqual({ ...parseDate("March 2027") }, { mm: "03", dd: "", yyyy: "2027" });
+  assert.deepEqual({ ...parseDate("August 11, 2026") }, { mm: "08", dd: "11", yyyy: "2026" });
+  assert.deepEqual({ ...parseDate("03/2027") }, { mm: "03", dd: "", yyyy: "2027" });
+  assert.deepEqual({ ...parseDate("2027-03-01") }, { mm: "03", dd: "01", yyyy: "2027" });
+  assert.deepEqual({ ...parseDate("Jun 2025") }, { mm: "06", dd: "", yyyy: "2025" });
+  assert.equal(parseDate(""), null);
+  assert.equal(parseDate("not a date"), null);
+});
+
+test("workday.yearSpinPlan computes the monthPicker spinner clicks to reach the target year", () => {
+  const win = blankWindow();
+  const { yearSpinPlan } = win.AvidAutofill.workday;
+
+  // Target year is later -> spin the right (forward) spinner.
+  assert.deepEqual({ ...yearSpinPlan(2024, 2027) }, { direction: "right", clicks: 3 });
+  // Target year is earlier -> spin the left (back) spinner.
+  assert.deepEqual({ ...yearSpinPlan(2027, 2020) }, { direction: "left", clicks: 7 });
+  // Already on the target year -> no clicks (direction is a no-op either way).
+  assert.deepEqual({ ...yearSpinPlan(2025, 2025) }, { direction: "right", clicks: 0 });
+});
