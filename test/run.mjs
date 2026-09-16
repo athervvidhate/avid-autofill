@@ -75,7 +75,7 @@ function installDateSpinnerSim(win) {
   };
 }
 
-function loadFixture(name) {
+function loadFixture(name, url = "https://example.test/") {
   const html = fs.readFileSync(
     path.join(ROOT, "test/fixtures", name),
     "utf8"
@@ -83,6 +83,7 @@ function loadFixture(name) {
   const dom = new JSDOM(html, {
     runScripts: "outside-only",
     pretendToBeVisual: true,
+    url,
   });
   const win = dom.window;
   win.chrome = chromeShim();
@@ -1025,6 +1026,64 @@ test("adapters.detect resolves an adapter without throwing", () => {
   const { A } = loadFixture("workday-page1.html");
   const adapter = A.adapters.detect();
   assert.ok(adapter && typeof adapter.name === "string");
+});
+
+test("current Workable controls use the shared ARIA dropdown path and skip hidden address inputs", async () => {
+  const { document, A } = loadFixture(
+    "workable-application.html",
+    "https://apply.workable.com/goglobal/j/8E35097D4B/apply/"
+  );
+  const adapter = A.adapters.detect();
+  assert.equal(adapter.name, "Workable");
+  assert.ok(adapter.customSelectSelectors.includes('[role="combobox"]'));
+
+  const visible = document.querySelectorAll("input, [role=combobox], [role=option]");
+  for (const el of visible) el.getClientRects = () => [{ width: 200, height: 32 }];
+  const code = document.querySelector('[aria-label="Telephone country code"]');
+  const countryOption = document.querySelector('[role="option"]');
+  countryOption.addEventListener("click", () => {
+    code.dataset.selected = countryOption.textContent.trim();
+  });
+  A.fillers.sleep = async () => {};
+
+  const report = await A.engine.fillPage(
+    testProfile(A),
+    { overwriteFilled: false, fillEEO: false, highlightFilled: false },
+    null
+  );
+
+  assert.equal(report.ats, "Workable");
+  assert.equal(document.getElementById("firstname").value, "Alex");
+  assert.equal(code.dataset.selected, "United States +1");
+  for (const id of ["city", "postcode", "country"]) {
+    assert.equal(document.getElementById(id).value, "", `${id} stays untouched`);
+  }
+});
+
+test("current SmartRecruiters application is named and fills required email confirmation", async () => {
+  const { document, A } = loadFixture(
+    "smartrecruiters-application.html",
+    "https://jobs.smartrecruiters.com/oneclick-ui/company/AccorHotel/publication/example"
+  );
+  const adapter = A.adapters.detect();
+  assert.equal(adapter.name, "SmartRecruiters");
+  assert.ok(adapter.customSelectSelectors.includes('[role="combobox"]'));
+
+  for (const el of document.querySelectorAll("input, button, [role=option]")) {
+    el.getClientRects = () => [{ width: 200, height: 32 }];
+  }
+  A.fillers.sleep = async () => {};
+
+  const report = await A.engine.fillPage(
+    testProfile(A),
+    { overwriteFilled: false, fillEEO: false, highlightFilled: false },
+    null
+  );
+
+  assert.equal(report.ats, "SmartRecruiters");
+  assert.equal(document.getElementById("first-name-input").value, "Alex");
+  assert.equal(document.getElementById("email-input").value, "alex.rivera@example.com");
+  assert.equal(document.getElementById("confirm-email-input").value, "alex.rivera@example.com");
 });
 
 test("popup chooses the recognized frame that contains the application fields", () => {

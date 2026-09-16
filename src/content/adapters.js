@@ -5,7 +5,8 @@
 //
 // Greenhouse, Lever, and Ashby add custom-dropdown selectors to the generic
 // engine. Workday is a beta adapter with its own date and repeater passes. iCIMS,
-// Taleo, and Workable are detection-only stubs that use generic fill behavior.
+// Taleo, Workable, and SmartRecruiters are detection-only stubs that use generic
+// fill behavior.
 (function () {
   const AvidAutofill = (globalThis.AvidAutofill = globalThis.AvidAutofill || {});
 
@@ -69,7 +70,13 @@
       detect: () =>
         /workable\.com|apply\.workable/.test(location.host) ||
         !!document.querySelector('[data-ui="application-form"]'),
-      customSelectSelectors: ['[class*="styles__select"]'],
+      customSelectSelectors: ['[class*="styles__select"]', '[role="combobox"]'],
+    },
+    {
+      name: "SmartRecruiters",
+      stub: true,
+      detect: () => /smartrecruiters\.com/.test(location.host),
+      customSelectSelectors: ['[role="combobox"]'],
     },
   ];
 
