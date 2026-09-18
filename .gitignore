@@ -1,4 +1,5 @@
 node_modules/
-.claude/
+.claude/*
+!.claude/settings.json
 # Contains your personal data — never commit
 profile.json
