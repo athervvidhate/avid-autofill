@@ -89,6 +89,57 @@ test("page drawer keeps keyboard focus when it opens and collapses", () => {
   dom.window.close();
 });
 
+test("Copy info shows every saved section and copies full work descriptions", async () => {
+  const dom = new JSDOM("<!doctype html><body></body>", { runScripts: "outside-only", pretendToBeVisual: true });
+  try {
+    dom.window.chrome = chromeShim();
+    dom.window.eval(fs.readFileSync(path.join(ROOT, "src/shared/schema.js"), "utf8"));
+    dom.window.eval(fs.readFileSync(path.join(ROOT, "src/content/widget.js"), "utf8"));
+    const A = dom.window.AvidAutofill;
+    const profile = await A.getProfile();
+    const description = "Built the search page.\nReduced load time by 40%.";
+    profile.personal.fullName = "Ada Example";
+    profile.links.portfolio = "https://example.com/work";
+    profile.work = [{ title: "Engineer", company: "Acme", description, current: true }];
+    profile.education = [{ school: "Example University", degree: "BS" }];
+    profile.misc.customAnswers = { "Why this role?": "I like building search." };
+    profile.eeo.gender = "Prefer not to say";
+    await A.saveProfile(profile);
+    const copied = [];
+    Object.defineProperty(dom.window.navigator, "clipboard", {
+      configurable: true,
+      value: { writeText: async (value) => { copied.push(value); } },
+    });
+    A.widget.mount({ name: "Greenhouse" });
+    const panel = dom.window.document.querySelector("#avid-autofill-root").shadowRoot.querySelector(".panel");
+    panel.querySelector(".copy-tab").click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    assert.equal(panel.querySelector(".fill-view").hidden, true);
+    assert.equal(panel.querySelector(".copy-view").hidden, false);
+    for (const value of ["Ada Example", "https://example.com/work", description, "Example University", "I like building search.", "Prefer not to say"]) {
+      assert.ok([...panel.querySelectorAll(".copy-field p")].some((node) => node.textContent === value), value);
+    }
+    const workGroup = [...panel.querySelectorAll(".copy-group")].find((node) => node.querySelector("h2")?.textContent === "Experience");
+    assert.equal(workGroup.querySelector("h3").textContent, "Engineer at Acme");
+    const descriptionField = [...workGroup.querySelectorAll(".copy-field")].find((node) => node.querySelector("b").textContent === "Description");
+    descriptionField.querySelector("button").click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.deepEqual(copied, [description]);
+    assert.equal(panel.querySelector(".copy-status").textContent, "Copied Description");
+
+    Object.defineProperty(dom.window.navigator, "clipboard", { value: undefined });
+    dom.window.document.execCommand = (command) => {
+      assert.equal(command, "copy");
+      copied.push(dom.window.document.querySelector("#avid-autofill-root").shadowRoot.querySelector("textarea").value);
+      return true;
+    };
+    descriptionField.querySelector("button").click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.deepEqual(copied, [description, description]);
+  } finally { dom.window.close(); }
+});
+
 test("page drawer survives ATS hydration replacing the body and removing its host", async () => {
   const dom = new JSDOM("<!doctype html><body></body>", { runScripts: "outside-only", pretendToBeVisual: true });
   dom.window.chrome = chromeShim();

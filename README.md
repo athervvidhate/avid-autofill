@@ -95,6 +95,10 @@ cd avid-autofill
 3. Click **Fill this application**. Review the result, attach anything the
    extension could not (see limits), and submit yourself.
 
+If a field is missed, open **Copy info** in the Avid drawer. It shows the values
+from your profile, including each work description and portfolio link, with a
+copy button beside every field. Paste the value into the application yourself.
+
 Multi-step flows (Workday) fill one step at a time: click *Autofill* on each
 step as you advance.
 

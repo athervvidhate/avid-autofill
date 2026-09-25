@@ -12,7 +12,7 @@
       --accent: #3459c7; --accent-soft: #e5ebff; --accent-press: #2947a2; --mark: #c8e86a;
       --ok: #28765b; --ok-soft: #e6f2ec; --warn: #a36516; --warn-soft: #f8efdf; --error: #b34848;
       position: fixed; inset: 0 0 0 auto; z-index: 2147483646; color: var(--ink); }
-    .panel { position: absolute; inset: 0 0 0 auto; display: grid; grid-template-rows: auto auto 1fr auto;
+    .panel { position: absolute; inset: 0 0 0 auto; display: flex; flex-direction: column;
       width: min(380px, calc(100vw - 18px)); max-width: 100vw; background: var(--paper); color: var(--ink);
       border-left: 1px solid color-mix(in srgb, var(--ink) 12%, transparent);
       box-shadow: -16px 0 44px rgba(35,30,33,.16); overflow: hidden; }
@@ -32,6 +32,11 @@
     .icon-button { width: 38px; height: 38px; border-radius: 10px; background: var(--surface); color: var(--ink); font-size: 21px; line-height: 1; }
     .icon-button:hover { background: var(--accent-soft); }
     .icon-button:focus-visible, .launcher:focus-visible, button:focus-visible, summary:focus-visible, a:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 35%, transparent); outline-offset: 2px; }
+    .tabs { display: flex; padding: 8px 18px 0; gap: 6px; border-bottom: 1px solid var(--line); background: var(--surface); }
+    .tab { padding: 9px 12px; border: 0; border-bottom: 3px solid transparent; background: none; color: var(--muted); cursor: pointer; font-size: 12px; font-weight: 700; }
+    .tab[aria-selected="true"] { border-bottom-color: var(--accent); color: var(--accent); }
+    .fill-view { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+    .fill-view[hidden], .copy-view[hidden] { display: none; }
     .intro { padding: 22px 18px 17px; }
     .status { display: inline-flex; align-items: center; gap: 7px; padding: 5px 8px; border-radius: 999px;
       color: var(--ok); background: var(--ok-soft); font-size: 10px; font-weight: 750; line-height: 1.1; letter-spacing: .04em; text-transform: uppercase; }
@@ -56,7 +61,21 @@
     .toggles { display: grid; gap: 10px; padding: 0 12px 12px; }
     .toggles label { display: flex; align-items: flex-start; gap: 9px; color: var(--muted); cursor: pointer; font-size: 12px; line-height: 1.35; }
     .toggles input { width: 16px; height: 16px; flex: none; margin: 0; accent-color: var(--accent); }
-    .ledger { min-height: 0; overflow: auto; padding: 0 18px 24px; }
+    .ledger { min-height: 0; flex: 1; overflow: auto; padding: 0 18px 24px; }
+    .copy-view { min-height: 0; flex: 1; overflow: auto; padding: 18px; }
+    .copy-view h1 { margin: 0 0 4px; font-size: 20px; line-height: 1.15; }
+    .copy-help { margin: 0; color: var(--muted); font-size: 12px; }
+    .copy-status { min-height: 20px; margin: 8px 0 0; color: var(--ok); font-size: 12px; }
+    .copy-group { margin-top: 22px; }
+    .copy-group h2 { margin: 0 0 6px; font-size: 13px; }
+    .copy-item { margin-top: 10px; padding: 11px 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); }
+    .copy-item h3 { margin: 0 0 4px; font-size: 12px; }
+    .copy-field { padding: 9px 0; border-top: 1px solid var(--line); }
+    .copy-field:first-child { border-top: 0; }
+    .copy-field-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .copy-field b { min-width: 0; overflow-wrap: anywhere; font-size: 12px; }
+    .copy-field button { flex: none; padding: 5px 9px; border: 1px solid var(--line); border-radius: 7px; background: var(--accent-soft); color: var(--accent); cursor: pointer; font-size: 11px; font-weight: 700; }
+    .copy-field p { margin: 5px 0 0; color: var(--muted); font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
     .summary { margin: 0 0 17px; }
     .summary[hidden] { display: none; }
     .summary-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
@@ -79,7 +98,7 @@
     .result-value { max-width: 150px; overflow: hidden; color: var(--muted); text-align: right; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 700; }
     .empty { padding: 14px 0; color: var(--muted); font-size: 13px; }
     .notice { padding: 11px 12px; border-radius: 10px; background: var(--warn-soft); color: var(--warn); font-size: 12px; line-height: 1.4; }
-    .foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 57px; padding: 12px 18px;
+    .foot { display: flex; flex: none; align-items: center; justify-content: space-between; gap: 12px; min-height: 57px; padding: 12px 18px;
       border-top: 1px solid var(--line); background: var(--surface); }
     .foot .opt { min-height: 32px; padding: 4px 0; border: 0; background: none; color: var(--accent); cursor: pointer;
       font-size: 12.5px; font-weight: 750; }
@@ -134,24 +153,36 @@
           <div class="brand"><span class="mark" aria-hidden="true">A</span><div class="titles"><b>Avid Autofill</b><span class="eyebrow">${atsLabel}</span></div></div>
           <button class="icon-button collapse" aria-label="Collapse Avid Autofill">›</button>
         </header>
-        <section class="intro">
-          <span class="eyebrow">Use your saved profile</span>
-          <span class="status" aria-live="polite"></span>
-          <h1>Ready to fill your application</h1>
-          <p>Use your saved profile to fill matching fields. You review everything before submitting.</p>
-          <button class="primary fill">Fill this application</button>
-          <button class="track" type="button">Track application</button>
-          <details class="preferences">
-            <summary>Fill preferences</summary>
-            <div class="toggles">
-              <label><input type="checkbox" class="ov" /> <span>Replace fields that already have a value</span></label>
-              <label><input type="checkbox" class="eeo" /> <span>Fill voluntary self-ID questions</span></label>
-            </div>
-          </details>
-        </section>
-        <section class="ledger">
-          <div class="summary" hidden role="status" aria-live="polite"></div>
-          <div class="results"></div>
+        <div class="tabs" role="tablist" aria-label="Avid tools">
+          <button class="tab fill-tab" id="avid-fill-tab" type="button" role="tab" aria-controls="avid-fill-view" aria-selected="true">Autofill</button>
+          <button class="tab copy-tab" id="avid-copy-tab" type="button" role="tab" aria-controls="avid-copy-view" aria-selected="false">Copy info</button>
+        </div>
+        <div class="fill-view" id="avid-fill-view" role="tabpanel" aria-labelledby="avid-fill-tab">
+          <section class="intro">
+            <span class="eyebrow">Use your saved profile</span>
+            <span class="status" aria-live="polite"></span>
+            <h1>Ready to fill your application</h1>
+            <p>Use your saved profile to fill matching fields. You review everything before submitting.</p>
+            <button class="primary fill">Fill this application</button>
+            <button class="track" type="button">Track application</button>
+            <details class="preferences">
+              <summary>Fill preferences</summary>
+              <div class="toggles">
+                <label><input type="checkbox" class="ov" /> <span>Replace fields that already have a value</span></label>
+                <label><input type="checkbox" class="eeo" /> <span>Fill voluntary self-ID questions</span></label>
+              </div>
+            </details>
+          </section>
+          <section class="ledger">
+            <div class="summary" hidden role="status" aria-live="polite"></div>
+            <div class="results"></div>
+          </section>
+        </div>
+        <section class="copy-view" id="avid-copy-view" role="tabpanel" aria-labelledby="avid-copy-tab" hidden>
+          <h1>Copy your saved info</h1>
+          <p class="copy-help">Copy a field, then paste it into the application. These are the values Avid uses to fill forms.</p>
+          <p class="copy-status" role="status" aria-live="polite"></p>
+          <div class="copy-groups"></div>
         </section>
         <footer class="foot"><button class="opt" type="button">Edit profile</button><span class="review">Stored locally<br />Review before submitting</span></footer>
       </section>
@@ -160,12 +191,123 @@
     root.appendChild(wrap);
 
     const $ = (selector) => panel.querySelector(selector);
+    const sectionNames = {
+      personal: "Personal", links: "Links and portfolio", work: "Experience",
+      education: "Education", workAuth: "Work authorization", misc: "Other details",
+      questions: "Application answers", eeo: "Voluntary self-ID",
+    };
+    const fieldNames = { linkedin: "LinkedIn", github: "GitHub", gpa: "GPA", phoneDeviceType: "Phone device type", howHeard: "How did you hear about us?" };
+    const fieldName = (key) => fieldNames[key] || key.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/^./, (c) => c.toUpperCase());
+    const fieldValue = (value) => typeof value === "boolean" ? (value ? "Yes" : "No") : String(value ?? "");
+
+    function makeCopyField(label, value) {
+      const field = document.createElement("div");
+      field.className = "copy-field";
+      const head = document.createElement("div");
+      head.className = "copy-field-head";
+      const name = document.createElement("b");
+      name.textContent = label;
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = "Copy";
+      button.setAttribute("aria-label", `Copy ${label}`);
+      button.addEventListener("click", async () => {
+        try {
+          try {
+            if (!navigator.clipboard?.writeText) throw new Error("Clipboard API unavailable");
+            await navigator.clipboard.writeText(value);
+          } catch (_) {
+            const input = document.createElement("textarea");
+            input.value = value;
+            input.style.cssText = "position:fixed;left:-9999px";
+            root.append(input);
+            input.select();
+            let copied;
+            try { copied = document.execCommand("copy"); }
+            finally { input.remove(); button.focus(); }
+            if (!copied) throw new Error("Copy failed");
+          }
+          $(".copy-status").textContent = `Copied ${label}`;
+        } catch (_) {
+          $(".copy-status").textContent = `Could not copy ${label}. Select the text below and copy it manually.`;
+        }
+      });
+      const text = document.createElement("p");
+      text.textContent = value;
+      head.append(name, button);
+      field.append(head, text);
+      return field;
+    }
+
+    async function renderCopy() {
+      const profile = await AvidAutofill.getProfile();
+      const groups = $(".copy-groups");
+      groups.replaceChildren();
+      for (const [section, title] of Object.entries(sectionNames)) {
+        const data = profile[section];
+        const group = document.createElement("div");
+        group.className = "copy-group";
+        const heading = document.createElement("h2");
+        heading.textContent = title;
+        group.append(heading);
+        const entries = Array.isArray(data) ? data : [data];
+        entries.forEach((entry, index) => {
+          if (!entry || typeof entry !== "object") return;
+          const item = document.createElement("div");
+          item.className = "copy-item";
+          if (Array.isArray(data)) {
+            const itemHeading = document.createElement("h3");
+            itemHeading.textContent = section === "work"
+              ? [entry.title, entry.company].filter(Boolean).join(" at ") || `Role ${index + 1}`
+              : [entry.degree, entry.school].filter(Boolean).join(" at ") || `School ${index + 1}`;
+            item.append(itemHeading);
+          }
+          for (const [key, raw] of Object.entries(entry)) {
+            if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+              for (const [question, answer] of Object.entries(raw)) {
+                if (answer !== "" && answer != null) item.append(makeCopyField(question, fieldValue(answer)));
+              }
+            } else if (raw !== "" && raw != null && (!Array.isArray(raw) || raw.length)) {
+              item.append(makeCopyField(fieldName(key), Array.isArray(raw) ? raw.join(", ") : fieldValue(raw)));
+            }
+          }
+          if (item.querySelector(".copy-field")) group.append(item);
+        });
+        if (group.querySelector(".copy-item")) groups.append(group);
+      }
+      if (!groups.children.length) groups.textContent = "No saved details yet. Use Edit profile to add them.";
+    }
+
+    function showView(view) {
+      const copying = view === "copy";
+      $(".fill-view").hidden = copying;
+      $(".copy-view").hidden = !copying;
+      $(".fill-tab").setAttribute("aria-selected", String(!copying));
+      $(".copy-tab").setAttribute("aria-selected", String(copying));
+      $(".fill-tab").tabIndex = copying ? -1 : 0;
+      $(".copy-tab").tabIndex = copying ? 0 : -1;
+      if (copying) renderCopy();
+    }
+    $(".copy-tab").tabIndex = -1;
+    $(".fill-tab").addEventListener("click", () => showView("fill"));
+    $(".copy-tab").addEventListener("click", () => showView("copy"));
+    $(".tabs").addEventListener("keydown", (event) => {
+      if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+      event.preventDefault();
+      const next = event.key === "Home" ? "fill" : event.key === "End" ? "copy"
+        : $(".fill-tab").getAttribute("aria-selected") === "true" ? "copy" : "fill";
+      showView(next);
+      $(next === "copy" ? ".copy-tab" : ".fill-tab").focus();
+    });
     const setOpen = (value) => {
       panel.hidden = !value;
       launcher.hidden = value;
       launcher.setAttribute("aria-expanded", String(value));
       panel.setAttribute("aria-hidden", String(!value));
-      if (value) syncToggles();
+      if (value) {
+        syncToggles();
+        if (!$(".copy-view").hidden) renderCopy();
+      }
     };
     openDrawer = () => { attach(); setOpen(true); return host.isConnected; };
     setOpen(true);
