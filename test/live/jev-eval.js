@@ -28,8 +28,9 @@
   async function runCase(c, key) {
     const sources = J.sourcesFor(c.profile || globalThis.JEV_PROFILE, c.pageUrl), fields = J.cleanFields(c.fields), stages = [{}, {}];
     const usage = { input_tokens: 0, output_tokens: 0, calls: 0 };
-    let call = 0;
-    const post = async (request, stage) => {
+    // Stage two requests carry approved_fact; exact saved questions skip stage one.
+    const stageOf = request => Object.values(request.state.fields).some(f => f.approved_fact) ? 1 : 0;
+    const post = async (request, stage = stageOf(request)) => {
       const reply = await J.post(request, key);
       usage.input_tokens += reply.usage.input_tokens; usage.output_tokens += reply.usage.output_tokens; usage.calls++;
       for (const [question, answer] of Object.entries(reply.answers)) stages[stage][question.replace(/^answer_/, "")] = trace(answer);
@@ -37,11 +38,11 @@
     };
     const started = performance.now();
     try {
-      const { results } = await J.match(fields, sources, request => post(request, call++));
+      const { results } = await J.match(fields, sources, request => post(request));
       const ms = Math.round(performance.now() - started);
       // Calibration probe: map options for choice fields that stage one picked
       // but the production threshold stopped. Does not affect grading.
-      const probe = fields.filter(f => f.options && !stages[1][f.id] && stages[0][f.id].choice !== "NEEDS_USER");
+      const probe = fields.filter(f => f.options && !stages[1][f.id] && stages[0][f.id] && stages[0][f.id].choice !== "NEEDS_USER");
       if (probe.length) await post(J.requestFor(probe, sources, Object.fromEntries(probe.map(f => [f.id, stages[0][f.id].choice]))), 1);
       return {
         id: c.id, ms, usage,

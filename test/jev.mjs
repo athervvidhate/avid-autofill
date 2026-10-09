@@ -455,3 +455,30 @@ test("the drawer reads and saves the applicant's answer for a field Jev left", a
     assert.deepEqual({ ...sent.at(-1) }, { type: "AVID_JEV_SAVE_ANSWER", question: "Are you subject to any employment agreements?", answer: "No", anySite: false });
   } finally { p.close(); }
 });
+
+test("a field asking a saved question word for word uses that answer without a source call", async () => {
+  const requests = [];
+  const w = worker(async (_, init) => { const request = JSON.parse(init.body); requests.push(request); return { ok: true, json: async () => reply(request, { answer_f1: "o1" }) }; });
+  const profile = clone(w.A.DEFAULT_PROFILE);
+  profile.questionBank = [
+    { id: "agreements", question: "Are you subject to any employment agreements?", answer: "No", approved: true, anySite: true, scopeUrl: "" },
+    { id: "username", question: "What is your GitLab username?", answer: "octo", approved: true, anySite: true, scopeUrl: "" },
+  ];
+  await w.A.saveProfile(profile);
+  assert.equal((await w.send({ type: "AVID_JEV_SAVE", enabled: true, key: "synthetic-test-key" })).ok, true);
+  const fields = [
+    { id: "f0", label: "what is your gitlab username?* | username", type: "text" },
+    { id: "f1", label: "are you subject to any employment agreements?*", type: "select", options: { o0: "Yes", o1: "No" } },
+  ];
+  const result = await w.send({ type: "AVID_JEV_FILL", fields }, content);
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.results.map(r => [r.status, r.value, r.optionId]), [["fill", "octo", undefined], ["fill", "No", "o1"]]);
+  assert.equal(requests.length, 1, "only the option mapping reaches Jev");
+  assert.deepEqual(Object.keys(requests[0].state.fields), ["f1"]);
+  // Two saved answers to the same question disagree: leave it to Jev's normal path.
+  profile.questionBank.push({ id: "username2", question: "What is your GitLab username", answer: "other", approved: true, anySite: true, scopeUrl: "" });
+  await w.A.saveProfile(profile);
+  requests.length = 0;
+  await w.send({ type: "AVID_JEV_FILL", fields: [fields[0]] }, content);
+  assert.equal(requests.length, 1);
+});

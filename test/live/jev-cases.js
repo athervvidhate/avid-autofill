@@ -172,3 +172,25 @@ globalThis.JEV_CASES = [
     { id: "f5", label: "Personal pronouns", type: "text", expect: "personal_pronouns", tag: "profile-fact" },
   ] },
 ];
+
+// Answers saved from the review drawer get UUID IDs; the same entries with word
+// IDs isolate whether the ID shape matters. Labels as captured on GitLab's form.
+{
+  const entries = [
+    ["agreements", "Are you subject to any employment agreements and/or post-employment restrictions with your current employer or a past employer?", "No", true, ""],
+    ["adjustments", "It is important to us to create an accessible and inclusive interview experience. Please let us know if there are any adjustments we can make to assist you during the hiring and interview process.", "N/A", true, ""],
+    ["gitlab_user", "What is your GitLab username?", "robin-example", false, "https://job-boards.greenhouse.io/gitlab/"],
+  ];
+  const bank = uuid => entries.map(([id, question, answer, anySite, scopeUrl], i) => ({ id: uuid ? `3f2a91c${i}-5b7e-4d2a-9c1e-8a6f0b2d4e1${i}` : id, question, answer, approved: true, anySite, scopeUrl }));
+  const fields = prefix => [
+    { id: "f0", label: "are you subject to any employment agreements and/or post-employment restrictions with your current employer or a past employer?*", type: "select", options: { o0: "Yes", o1: "No" }, expect: { option: "o1" }, tag: "drawer-save" },
+    { id: "f1", label: "it is important to us to create an accessible and inclusive interview experience. please let us know if there are any adjustments we can make to assist you during the hiring and interview process.", type: "textarea", expect: `${prefix}1`, tag: "drawer-save" },
+    { id: "f2", label: "what is your gitlab username?", type: "text", expect: `${prefix}2`, tag: "drawer-save" },
+  ];
+  const page = "https://job-boards.greenhouse.io/gitlab/jobs/8698314002";
+  const words = { ...globalThis.JEV_PROFILE, questionBank: bank(false) }, uuids = { ...globalThis.JEV_PROFILE, questionBank: bank(true) };
+  globalThis.JEV_CASES.push(
+    { id: "drawer-words", set: "bankreuse", pageUrl: page, profile: words, fields: fields("bank_").map(f => f.expect && typeof f.expect === "string" ? { ...f, expect: f.id === "f1" ? "bank_adjustments" : "bank_gitlab_user" } : f) },
+    { id: "drawer-uuids", set: "bankreuse", pageUrl: page, profile: uuids, fields: fields("").map(f => f.expect && typeof f.expect === "string" ? { ...f, expect: `bank_${uuids.questionBank[f.id === "f1" ? 1 : 2].id}` } : f) },
+  );
+}

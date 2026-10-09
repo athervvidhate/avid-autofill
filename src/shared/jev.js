@@ -127,6 +127,15 @@
       throw error;
     } finally { clearTimeout(timer); }
   }
+  // The saved question-bank source asking exactly this field's question, or
+  // null. Case, spacing, punctuation and required markers do not count; saved
+  // answers to the same question that disagree leave it to Jev.
+  const plain = text => String(text).toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+  function exactSource(field, sources) {
+    const asks = field.label.split(" | ").map(plain).filter(Boolean);
+    const ids = Object.keys(sources).filter(id => id.startsWith("bank_") && asks.includes(plain(sources[id].description)));
+    return ids.length && new Set(ids.map(id => sources[id].value.trim())).size === 1 ? ids[0] : null;
+  }
   // Two-stage match: pick a saved source per field, then map native choices to
   // a real option. `send(request)` performs one validated call; `fresh()` throws
   // when the profile or connection changed while a request was pending.
@@ -137,7 +146,16 @@
       usage.input_tokens += reply.usage.input_tokens; usage.output_tokens += reply.usage.output_tokens; usage.calls++;
       return reply.answers;
     };
-    const answers = await meter(requestFor(fields, sources)), selections = {};
+    // A field asking a saved question word for word takes that saved answer:
+    // Jev sees questions, not answers, and hesitates even on exact repeats.
+    const answers = {}, exact = fields.filter(field => {
+      const id = exactSource(field, sources);
+      if (id) answers[`answer_${field.id}`] = { choice: id, probabilities: { [id]: 1 } };
+      return id;
+    });
+    const asked = fields.filter(field => !exact.includes(field));
+    if (asked.length) Object.assign(answers, await meter(requestFor(asked, sources)));
+    const selections = {};
     const optionFields = fields.filter(field => {
       const answer = answers[`answer_${field.id}`];
       if (accepted(answer)) selections[field.id] = answer.choice;
