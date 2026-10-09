@@ -94,7 +94,7 @@
     .rail { width: 3px; height: 23px; border-radius: 99px; background: var(--ok); }
     .result.review .rail { background: var(--warn); }
     .result.error .rail { background: var(--error); }
-    .result-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .result-label { min-width: 0; padding: 8px 0; line-height: 1.35; overflow-wrap: anywhere; cursor: help; }
     .result.saveable { grid-template-columns: 5px minmax(0, 1fr) auto auto; }
     .save-answer, .save-choices button { padding: 4px 8px; border: 1px solid var(--line); border-radius: 7px; background: var(--accent-soft); color: var(--accent); cursor: pointer; font-size: 11px; font-weight: 700; }
     .save-panel { grid-column: 2 / -1; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 0 0 10px; color: var(--muted); font-size: 12px; }
@@ -477,12 +477,13 @@
       const label = document.createElement("span");
       label.className = "result-label";
       label.textContent = r.label;
+      label.title = r.label;
       const value = document.createElement("span");
       value.className = "result-value";
-      value.textContent = completed ? r.value : statusLabel(r.status);
+      value.textContent = completed ? r.value : r.status === "assumed" ? `Assumed: ${r.value}` : statusLabel(r.status);
       value.title = `${r.value || ""} · ${statusLabel(r.status)}${r.method === "jev" ? ` · Jev: ${r.reason || "saved answer"}` : ""}`;
       li.append(rail, label, value);
-      if (r.field && AvidAutofill.jevContent && AvidAutofill.jevContent.answerFor(r.field)) addSave(li, r.field);
+      if (r.field && AvidAutofill.jevContent && AvidAutofill.jevContent.answerFor(r.field)) addSave(li, r.field, r.label);
       list.append(li);
     }
     group.append(list);
@@ -492,7 +493,7 @@
   // Save the answer the applicant gave on the page to the question bank, so
   // Jev can reuse it. Only real clicks count: the page can reach this open
   // shadow root and must not plant answers.
-  function addSave(li, fieldId) {
+  function addSave(li, fieldId, label) {
     const jev = AvidAutofill.jevContent;
     const button = el(`<button class="save-answer" type="button">Save</button>`);
     const panel = el(`<div class="save-panel" hidden></div>`);
@@ -505,7 +506,7 @@
       if (!current || !current.answer) return show("Answer this on the page, then save it.");
       panel.hidden = false;
       panel.innerHTML = `<span class="save-prompt"></span><span class="save-choices"><button type="button" class="scope-company">This company</button><button type="button" class="scope-any">Any application</button></span>`;
-      panel.querySelector(".save-prompt").textContent = `Save “${current.answer}” for:`;
+      panel.querySelector(".save-prompt").textContent = `Save “${current.answer}” for “${label}”:`;
       for (const [selector, anySite] of [[".scope-company", false], [".scope-any", true]]) {
         panel.querySelector(selector).addEventListener("click", async (choice) => {
           if (!choice.isTrusted) return;
@@ -521,7 +522,7 @@
   }
 
   function statusLabel(status) {
-    return ({ "kept-existing": "Kept existing", skipped: "Skipped", "no-option-match": "No match", error: "Error", "ai-needs-answer": "Needs your answer", "ai-incompatible": "Value does not fit", "ai-unavailable": "Jev unavailable", "ai-stale": "Page or profile changed", "ai-limit": "Fill again for more" })[status] || status;
+    return ({ "kept-existing": "Kept existing", skipped: "Skipped", "no-option-match": "No match", error: "Error", assumed: "Assumed answer", "ai-needs-answer": "Needs your answer", "ai-incompatible": "Value does not fit", "ai-unavailable": "Jev unavailable", "ai-stale": "Page or profile changed", "ai-limit": "Fill again for more" })[status] || status;
   }
 
   // --- Dev-only fixture capture -------------------------------------------

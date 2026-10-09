@@ -67,6 +67,7 @@
     // the options page. Blank = leave the field untouched.
     questions: {
       previouslyEmployedHere: "No",
+      relativesAtCompany: "No", // relatives or close personal relationships employed by the company
       formerContractorOrIntern: "No",
       currentStudent: "",
       consentToContact: "Yes",
