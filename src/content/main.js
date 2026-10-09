@@ -23,6 +23,7 @@
         return response.report;
       };
     }
+    if (AvidAutofill.workday && AvidAutofill.workday.captureDescription) AvidAutofill.workday.captureDescription().catch(() => {});
     const requested = !!g.__avidOpenDrawer;
     if (adapter.name !== "Generic" || document.querySelector("form") || requested) {
       AvidAutofill.widget.mount(adapter);

@@ -59,7 +59,7 @@
         await AvidAutofill.workday.educationPass(profile, { fillers, record, handled });
       }
       if (AvidAutofill.workday.skillsPass) {
-        await AvidAutofill.workday.skillsPass(profile, { fillers, record, handled });
+        await AvidAutofill.workday.skillsPass(profile, { fillers, record, handled, enabled: settings.fillSkills !== false });
       }
       // Workday typeable and calendar-popover date widgets.
       await AvidAutofill.workday.datePass(profile, { matcher, helpers, fillers, record, handled });

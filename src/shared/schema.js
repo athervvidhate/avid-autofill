@@ -86,6 +86,7 @@
   AvidAutofill.DEFAULT_SETTINGS = {
     overwriteFilled: false, // if true, replace values already present in a field
     fillEEO: false, // opt-in: only fill voluntary self-ID when explicitly enabled
+    fillSkills: true, // add skills to Workday skills sections
     highlightFilled: true, // briefly outline fields we touched
     jevEnabled: false, // optional matching of approved saved answers
   };

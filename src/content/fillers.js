@@ -296,15 +296,20 @@
       }
       if (!pick && typeInput && attempt < 7) await sleep(150);
     }
+    // Workday's search prompts (skills, field of study) list matches only after
+    // Enter runs the search.
+    if (!pick && typeInput && config && config.searchOnEnter) {
+      pressEnter(typeInput);
+      for (let attempt = 0; attempt < 12 && !pick; attempt++) {
+        await sleep(200);
+        pick = findOption();
+      }
+      if (!pick) return false;
+    }
 
     if (!pick) {
       if (typeInput && config && config.allowCreate) {
-        typeInput.dispatchEvent(
-          new KeyboardEvent("keydown", { bubbles: true, key: "Enter", keyCode: 13 })
-        );
-        typeInput.dispatchEvent(
-          new KeyboardEvent("keyup", { bubbles: true, key: "Enter", keyCode: 13 })
-        );
+        pressEnter(typeInput);
         return true;
       }
       return false;
@@ -382,6 +387,11 @@
     input.blur();
     await sleep(100);
     return [...new Set(labels)];
+  }
+
+  function pressEnter(el) {
+    el.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Enter", keyCode: 13 }));
+    el.dispatchEvent(new KeyboardEvent("keyup", { bubbles: true, key: "Enter", keyCode: 13 }));
   }
 
   // Workday button-listboxes have no inner input: the popup is a portal listbox,

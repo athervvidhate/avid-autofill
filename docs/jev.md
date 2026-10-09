@@ -142,6 +142,14 @@ stage discards the AI batch while preserving prior rule fills.
   evaluation below. `NEEDS_USER` and lower probabilities leave fields for review.
   Runtime checks cannot prove that the model selected the semantically correct
   saved answer.
+- Workday skills sections: the posting description (remembered from the posting
+  page, last 20 postings), your saved skills, and your work titles, work
+  descriptions and education degree/field/school are sent to Jev in one request
+  with up to 40 candidate skills (saved skills plus well-known skills the posting
+  names). Jev chooses INCLUDE or SKIP for each, INCLUDE needs probability 0.60 or
+  more, and at most 15 are added, most-mentioned in the posting first. With Jev
+  off or failing, saved skills are ranked by posting mentions locally and no page
+  or profile text leaves the browser.
 - Sources include saved personal/contact details and pronouns, links, skills,
   the free-text profile facts that have no default (salary expectation, notice
   period, earliest start date, graduation date, how you heard), and approved
