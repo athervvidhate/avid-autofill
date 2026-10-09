@@ -110,7 +110,7 @@
       const group = radioGroups[name].filter(isVisible);
       if (!group.length) continue;
       group.forEach((r) => handled.add(r));
-      const signal = groupSignal(group[0]);
+      const signal = M().groupSignal(group);
       const m = matcher.match(signal, profile, helpers);
       if (!m) { unmatched.push({ el: group[0], group, signal }); continue; }
       if (m.eeo && !settings.fillEEO) continue;
@@ -235,15 +235,6 @@
   }
 
   // Signal for a radio/checkbox group: prefer a fieldset legend, else nearby text.
-  function groupSignal(el) {
-    const fs = el.closest("fieldset");
-    if (fs) {
-      const legend = fs.querySelector("legend");
-      if (legend) return M().norm(legend.textContent);
-    }
-    return M().signalFor(el);
-  }
-
   function dedupe(arr) {
     return Array.from(new Set(arr));
   }

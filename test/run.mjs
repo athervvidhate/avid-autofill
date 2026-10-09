@@ -1236,3 +1236,14 @@ test("Scale AI Greenhouse form: sponsorship is No and destination relocation is 
     assert.ok(!report.results.some(r => /relocation to the/.test(r.label)), "destination relocation questions are not answered from general willingness");
   } finally { dom.window.close(); }
 });
+
+test("Lever card radio groups are matched by their question text", async () => {
+  const { A, dom } = loadFixture("lever-application.html", "https://jobs.lever.co/palantir/10dfc8bc-99ad-4ca2-ab76-853cb90a92c2/apply");
+  dom.window.HTMLElement.prototype.getClientRects = () => [{ width: 100, height: 20 }];
+  try {
+    const radios = Array.from(dom.window.document.querySelectorAll('input[name="cards[1c719ca9-5069-4afe-9e82-39ca420e0edb][field1]"]'));
+    assert.match(A.matcher.groupSignal(radios), /require sponsorship for employment visa status/);
+    await A.engine.fillPage(testProfile(A), A.DEFAULT_SETTINGS, null);
+    assert.equal(radios.find(r => r.checked)?.value, "No");
+  } finally { dom.window.close(); }
+});

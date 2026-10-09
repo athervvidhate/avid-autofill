@@ -60,7 +60,7 @@
       const { field, el, group, custom } = candidate, result = response.results.find(result => result.id === field.id);
       const record = (status, value = "") => report.results.push({ label: field.label, value, status, method: "jev", reason: result.sourceQuestion || "" });
       if (!fresh || location.href !== url || document.documentElement !== root || A._fillRun !== run) { record("ai-stale"); continue; }
-      const live = describe({ ...candidate, signal: group ? groupSignal(group[0]) : A.matcher.signalFor(custom ? inner(el) : el) }, field.id);
+      const live = describe({ ...candidate, signal: group ? A.matcher.groupSignal(group) : A.matcher.signalFor(custom ? inner(el) : el) }, field.id);
       if (!live) { record(answered(candidate) ? "kept-existing" : "ai-stale"); continue; }
       if (JSON.stringify(live) !== JSON.stringify(field) || fingerprint(candidate) !== candidate.fingerprint) { record("ai-stale"); continue; }
       if (result.status !== "fill") { record(result.status === "ai-incompatible" ? result.status : "ai-needs-answer"); continue; }
@@ -97,6 +97,5 @@
     return report;
   }
   const inner = el => el.matches("input") ? el : el.querySelector("input") || el;
-  function groupSignal(el) { return A.matcher.norm(el.closest("fieldset")?.querySelector("legend")?.textContent || A.matcher.signalFor(el)); }
   A.jevContent = { fill };
 })();

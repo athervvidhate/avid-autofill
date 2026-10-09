@@ -51,6 +51,24 @@
     return "";
   }
 
+  // Question text for a radio group: its fieldset legend, else the text beside
+  // the smallest element holding every radio (Lever puts the question in a
+  // sibling block), else the first radio's own signal.
+  function groupSignal(radios) {
+    const legend = radios[0].closest("fieldset")?.querySelector("legend");
+    if (legend && legend.textContent.trim()) return norm(legend.textContent);
+    let node = radios[0].parentElement;
+    while (node && !radios.every((r) => node.contains(r))) node = node.parentElement;
+    for (let i = 0; i < 4 && node && node.parentElement; i++, node = node.parentElement) {
+      const text = Array.from(node.parentElement.childNodes)
+        .filter((child) => child !== node)
+        .map((child) => child.textContent)
+        .join(" ");
+      if (norm(text).length > 2) return norm(text).slice(0, 300);
+    }
+    return signalFor(radios[0]);
+  }
+
   // Turn camelCase / snake_case / kebab-case identifiers into spaced words so
   // attribute-based ids (Workday's data-automation-id="legalNameSection_firstName",
   // React name="urls[LinkedIn]") match the same rules as human labels.
@@ -221,5 +239,5 @@
   }
 
   AvidAutofill.labelTextFor = labelTextFor;
-  AvidAutofill.matcher = { signalFor, match, makeHelpers: P, norm, deCamel };
+  AvidAutofill.matcher = { signalFor, groupSignal, match, makeHelpers: P, norm, deCamel };
 })();
