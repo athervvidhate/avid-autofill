@@ -84,7 +84,6 @@ const profile = {
     currentStudent: isStudent ? "Yes" : "",
     consentToContact: "Yes",
     consentToOtherRoles: "Yes",
-    agreeToTerms: "Yes",
     over18: "Yes",
   },
   meta: { importedAt: new Date().toISOString(), source: "career-ops" },

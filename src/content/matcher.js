@@ -175,7 +175,6 @@
     { any: [/text message/, /sms/, /consent to receiv/, /receive.*(notification|message)/], kind: "yesno", get: (p) => p.questions.consentToContact },
     { any: [/consider me for other/, /other (job )?opportunities/, /other (roles|positions)/, /additional (roles|positions|opportunities)/], kind: "yesno", get: (p) => p.questions.consentToOtherRoles },
     { any: [/at least 18/, /over 18/, /\b18 (years|or older)/, /age of majority/, /legally an adult/], kind: "yesno", get: (p) => p.questions.over18 },
-    { any: [/i have read/, /read and understand/, /i certify/, /i acknowledge/, /i agree/, /accept.*(terms|conditions|agreement)/, /conditions of employment/], kind: "yesno", get: (p) => p.questions.agreeToTerms },
 
     // --- Voluntary self-ID (only fired when settings.fillEEO) ---
     { eeo: true, any: [/gender/, /gender identity/, /\bsex\b/], get: (p) => p.eeo.gender },

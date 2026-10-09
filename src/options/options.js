@@ -33,7 +33,6 @@ const LAYOUT = {
     ["currentStudent", "Currently a student?", "select:|Yes|No"],
     ["consentToContact", "Consent to text/email updates?", "select:Yes|No"],
     ["consentToOtherRoles", "Consider me for other roles?", "select:Yes|No"],
-    ["agreeToTerms", "Agree to legal acknowledgments?", "select:Yes|No"],
     ["over18", "Are you 18 or older?", "select:Yes|No"],
   ],
   eeo: [

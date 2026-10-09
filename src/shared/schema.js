@@ -71,7 +71,6 @@
       currentStudent: "",
       consentToContact: "Yes",
       consentToOtherRoles: "Yes",
-      agreeToTerms: "Yes",
       over18: "Yes",
     },
     meta: {

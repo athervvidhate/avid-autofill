@@ -160,7 +160,6 @@ function testProfile(A) {
       { school: "State University", degree: "BS", field: "Computer Science", gpa: "3.8", endDate: "2020" },
     ],
     workAuth: { authorizedToWork: "Yes", requireSponsorship: "No" },
-    questions: { agreeToTerms: "Yes" },
   });
 }
 
@@ -866,15 +865,12 @@ test("page3: work authorization questions map to yes/no", () => {
 
 // --- Page 4: EEO + terms ----------------------------------------------------
 
-test("page4: EEO fields and terms consent", () => {
+test("page4: EEO fields; terms consent is left for the applicant", () => {
   const { document, A } = loadFixture("workday-page4.html");
   const p = testProfile(A);
 
-  // Terms-and-conditions consent checkbox maps to agreeToTerms (yes/no).
-  assertMapping(document, A, p, "consent to the terms and conditions", {
-    value: "Yes",
-    kind: "yesno",
-  });
+  // Consent and attestation checkboxes are the applicant's to tick.
+  assertMapping(document, A, p, "consent to the terms and conditions", null);
 
   // Workday labels its gender question "Please select your sex"; the eeo gender
   // rule matches /\bsex\b/. (EEO fields only fill when settings.fillEEO is on;
@@ -1292,4 +1288,16 @@ test("location questions naming countries are answered from the profile country"
   profile.personal.country = "Canada";
   assert.equal(answer("are you currently location in either canada, uk or poland?*"), "Yes");
   assert.equal(answer("are you located in the united states?"), "No");
+});
+
+test("consent and attestation checkboxes are left for the applicant", async () => {
+  const { document, AvidAutofill: A } = blankWindow();
+  const profile = testProfile(A), helpers = A.matcher.makeHelpers(profile);
+  for (const signal of ["i agree", "i certify that the information provided is true", "i acknowledge the privacy notice", "i have read and understand the terms", "accept terms and conditions"]) {
+    assert.equal(A.matcher.match(signal, profile, helpers), null, signal);
+  }
+  document.body.innerHTML = '<form><label><input type="checkbox" id="agree"> I agree to the processing of my data</label></form>';
+  document.getElementById("agree").getClientRects = () => [{}];
+  await A.engine.fillPage(profile, A.DEFAULT_SETTINGS, null);
+  assert.equal(document.getElementById("agree").checked, false);
 });
