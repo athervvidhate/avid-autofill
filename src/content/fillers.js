@@ -316,6 +316,9 @@
     const listbox = document.getElementById(input.getAttribute("aria-controls") || "");
     const labels = listbox ? queryAll('[role="option"]', listbox).map((o) => o.textContent.trim()).filter(Boolean) : [];
     input.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, cancelable: true, key: "Escape" }));
+    // While the browser window is unfocused, blur() fires nothing and
+    // react-select ignores Escape. React's onBlur listens to focusout.
+    input.dispatchEvent(new FocusEvent("focusout", { bubbles: true, composed: true }));
     input.blur();
     await sleep(100);
     return [...new Set(labels)];

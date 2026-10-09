@@ -385,3 +385,24 @@ test("saved free-text facts are sources; default-backed answers are not", () => 
   for (const id of ["misc_salaryExpectation", "misc_earliestStartDate", "misc_graduationDate", "misc_noticePeriod", "misc_howHeard", "personal_pronouns"]) assert.ok(Object.hasOwn(sources, id), id);
   for (const id of ["misc_willingToRelocate", "personal_country", "workAuth_requireSponsorship", "workAuth_authorizedToWork"]) assert.ok(!Object.hasOwn(sources, id), id);
 });
+
+test("reading a custom dropdown's options closes it even when Escape does not", async () => {
+  // Greenhouse's react-select in an unfocused window ignores Escape and
+  // closes only on React's blur, which is focusout.
+  const p = await page('<form><label for="restrict">Are you subject to any employment agreements?</label><input id="restrict" role="combobox" aria-controls="restrict-list"></form>', async msg => (
+    { ok: true, results: msg.fields.map(f => ({ id: f.id, status: "ai-needs-answer" })) }
+  ));
+  try {
+    const doc = p.dom.window.document, input = doc.getElementById("restrict");
+    input.focus = input.blur = () => {}; // an unfocused page fires no focus events
+    input.addEventListener("click", () => {
+      if (doc.getElementById("restrict-list")) return;
+      const list = doc.createElement("div"); list.id = "restrict-list";
+      for (const text of ["Yes", "No"]) { const option = doc.createElement("div"); option.setAttribute("role", "option"); option.textContent = text; list.append(option); }
+      doc.body.append(list);
+    });
+    input.addEventListener("focusout", () => doc.getElementById("restrict-list")?.remove());
+    await p.A.engine.fillPage(p.profile, p.settings, null);
+    assert.equal(doc.getElementById("restrict-list"), null, "menu left open");
+  } finally { p.close(); }
+});

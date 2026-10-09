@@ -61,21 +61,29 @@ for (const [n, url] of urls.entries()) {
       catch (error) { if (attempt === 3) throw error; await page.waitForTimeout(3000); }
     }
     await page.waitForTimeout(6000); // SPA forms render after load
+    // Fill with the page unfocused, as when the user switches apps mid-fill:
+    // Chromium then sends it no focus events. Playwright emulates focus; undo that.
+    await (await ctx.newCDPSession(page)).send("Emulation.setFocusEmulationEnabled", { enabled: false });
+    const elsewhere = await ctx.newPage(); await elsewhere.bringToFront();
     await sw.evaluate(() => { globalThis.__jev.length = 0; });
     record.fill = await sw.evaluate(async url => {
       const [tab] = await chrome.tabs.query({ url: url.split("#")[0] + "*" });
       return chrome.tabs.sendMessage(tab.id, { type: "AVID_FILL" }, { frameId: 0 });
     }, page.url());
     await page.waitForTimeout(1500);
+    await elsewhere.close();
     record.jevRequests = await sw.evaluate(() => globalThis.__jev);
     record.controls = await page.evaluate(visibleControls);
     record.dropdowns = await page.evaluate(() => [...document.querySelectorAll('[class*="select__control"]')]
       .map(c => ({ id: c.querySelector("input")?.id || "", shown: (c.querySelector('[class*="single-value"], [class*="singleValue"]')?.textContent || "").trim() })));
+    // Dropdowns Avid left open.
+    record.openMenus = await page.evaluate(() => [...document.querySelectorAll('[role="listbox"], [class*="select__menu"]')]
+      .filter(el => el.offsetParent !== null).map(el => el.id || el.className));
     await page.screenshot({ path: path.join(out, `${n}.png`), fullPage: true });
   } catch (error) { record.error = String(error.message || error).slice(0, 300); }
   await fs.writeFile(path.join(out, `${n}.json`), JSON.stringify(record, null, 2));
   const report = record.fill?.report;
-  console.log(n, url, record.error || `${report?.ats}: ${report?.filledCount} filled, ${record.jevRequests.flatMap(r => Object.keys(r.state.fields)).length} field(s) for Jev`);
+  console.log(n, url, record.error || `${report?.ats}: ${report?.filledCount} filled, ${record.jevRequests.flatMap(r => Object.keys(r.state.fields)).length} field(s) for Jev, ${record.openMenus.length} menu(s) left open`);
   await Promise.race([page.close(), new Promise(r => setTimeout(r, 5000))]);
 }
 await Promise.race([ctx.close(), new Promise(r => setTimeout(r, 5000))]);
