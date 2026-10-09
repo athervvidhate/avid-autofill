@@ -135,13 +135,16 @@
     { any: [/graduation/, /grad(uation)? date/, /end date/, /expected graduation/], get: (p, h) => h.edu0().endDate },
 
     // --- Work authorization (yes/no) ---
+    // Sponsorship before authorization: sponsorship questions often say "work
+    // authorization", while "authorized ... without sponsorship" asks about authorization.
+    { any: [/require sponsor/, /need sponsor/, /visa sponsor/, /sponsorship( now| in the future)?/], not: [/without (\w+ )?sponsor/], kind: "yesno", get: (p) => p.workAuth.requireSponsorship },
     { any: [/authoriz(ed|ation) to work/, /legally authorized/, /eligible to work/, /work authorization/], not: [/temporary/, /\bopt\b/, /\bcpt\b/, /practical training/], kind: "yesno", get: (p) => p.workAuth.authorizedToWork },
-    { any: [/require sponsor/, /need sponsor/, /visa sponsor/, /sponsorship( now| in the future)?/], kind: "yesno", get: (p) => p.workAuth.requireSponsorship },
 
     // --- Logistics ---
     { any: [/salary/, /compensation expectation/, /desired (pay|salary|compensation)/, /expected salary/], get: (p) => p.misc.salaryExpectation },
     { any: [/notice period/, /availability to start/, /when can you start/, /earliest start/, /start date/], get: (p) => p.misc.earliestStartDate || p.misc.noticePeriod },
-    { any: [/willing to relocate/, /open to relocat/, /relocat/], kind: "yesno", get: (p) => p.misc.willingToRelocate },
+    // General willingness only: a named destination or relocation assistance is a different question.
+    { any: [/willing to relocate/, /open to relocat/, /relocat/], not: [/relocat\w* to \w/, /assistance|package|stipend|support/], kind: "yesno", get: (p) => p.misc.willingToRelocate },
     { any: [/how did you (hear|find)/, /referral source/, /source/], not: [/open ?source/], get: (p) => p.misc.howHeard },
     { any: [/cover letter/], get: (p) => p.misc.coverLetter },
     { any: [/graduation date/, /anticipated graduation/, /expected graduation/, /grad(uation)? date/], get: (p, h) => p.misc.graduationDate || h.edu0().endDate },

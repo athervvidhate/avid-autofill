@@ -1211,3 +1211,28 @@ test("location autocomplete prefers the suggestion in the profile's state", asyn
   assert.equal(typed, "portland, california"); // setReactSelect types the normalized target
   assert.equal(control.dataset.selected, "Portland, California, United States");
 });
+
+test("sponsorship and relocation questions get the answer they actually ask for", () => {
+  const A = blankWindow().AvidAutofill, profile = testProfile(A), helpers = A.matcher.makeHelpers(profile);
+  profile.misc.willingToRelocate = "Yes";
+  const answer = signal => A.matcher.match(signal, profile, helpers)?.value ?? null;
+  assert.equal(answer("will you now or in the future require company sponsorship to retain or extend your work authorization in the country where the job is located?*"), "No");
+  assert.equal(answer("do you require visa sponsorship?"), "No");
+  assert.equal(answer("are you authorized to work in the us without sponsorship?"), "Yes");
+  assert.equal(answer("are you legally authorized to work in the country where this job is located?"), "Yes");
+  assert.equal(answer("are you willing to relocate?"), "Yes");
+  assert.equal(answer("are you open to relocation to the uk?*"), null);
+  assert.equal(answer("are you open to relocation to the middle east? *"), null);
+  assert.equal(answer("will you require relocation assistance?"), null);
+});
+
+test("Scale AI Greenhouse form: sponsorship is No and destination relocation is left for review", async () => {
+  const { A, dom } = loadFixture("greenhouse-remix-scaleai.html", "https://job-boards.greenhouse.io/scaleai/jobs/4413992005");
+  dom.window.HTMLElement.prototype.getClientRects = () => [{ width: 100, height: 20 }];
+  try {
+    const profile = testProfile(A); profile.misc.willingToRelocate = "Yes";
+    const report = await A.engine.fillPage(profile, A.DEFAULT_SETTINGS, null);
+    assert.equal(report.results.find(r => /require company sponsorship/.test(r.label))?.value, "No");
+    assert.ok(!report.results.some(r => /relocation to the/.test(r.label)), "destination relocation questions are not answered from general willingness");
+  } finally { dom.window.close(); }
+});
