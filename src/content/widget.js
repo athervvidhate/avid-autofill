@@ -174,6 +174,7 @@
               <div class="toggles">
                 <label><input type="checkbox" class="ov" /> <span>Replace fields that already have a value</span></label>
                 <label><input type="checkbox" class="eeo" /> <span>Fill voluntary self-ID questions</span></label>
+                <label><input type="checkbox" class="skills" /> <span>Add skills to skills sections</span></label>
               </div>
             </details>
           </section>
@@ -336,15 +337,18 @@
       const s = await AvidAutofill.getSettings();
       $(".ov").checked = s.overwriteFilled;
       $(".eeo").checked = s.fillEEO;
+      $(".skills").checked = s.fillSkills !== false;
     }
     async function persistToggles() {
       const s = await AvidAutofill.getSettings();
       s.overwriteFilled = $(".ov").checked;
       s.fillEEO = $(".eeo").checked;
+      s.fillSkills = $(".skills").checked;
       await AvidAutofill.saveSettings(s);
     }
     $(".ov").addEventListener("change", persistToggles);
     $(".eeo").addEventListener("change", persistToggles);
+    $(".skills").addEventListener("change", persistToggles);
 
     if (isDevBuild()) mountDevTools(panel, adapter);
 

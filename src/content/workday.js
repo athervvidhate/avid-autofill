@@ -396,7 +396,13 @@
 
   async function skillsPass(profile, ctx) {
     const { fillers, record, handled } = ctx;
-    if (!document.querySelector(SKILLS_SECTION_SELECTOR)) return;
+    const skillsSection = document.querySelector(SKILLS_SECTION_SELECTOR);
+    if (!skillsSection) return;
+    // Turned off in Fill preferences: claim the section so no later pass fills it.
+    if (ctx.enabled === false) {
+      skillsSection.querySelectorAll('input, [data-automation-id="multiSelectContainer"]').forEach((el) => handled.add(el));
+      return;
+    }
     const skills = await chooseSkills(profile);
     if (!skills.length) {
       record("Skills", "none saved or matching this job", "skipped");

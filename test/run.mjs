@@ -616,6 +616,31 @@ test("Workday skills search runs on Enter, then the matching result is clicked",
   assert.deepEqual(selected, ["Python (Programming Language)"]);
 });
 
+test("Workday skills section is left alone when skills filling is turned off", async () => {
+  const win = blankWindow();
+  const { document, AvidAutofill: A } = win;
+  document.body.innerHTML = `
+    <div data-automation-id="applyFlowPage">
+      <div role="group" aria-labelledby="Skills-section">
+        <h4 id="Skills-section">Skills</h4>
+        <div data-automation-id="formField-skills"><label>Type to Add Skills</label>
+          <input data-uxi-widget-type="selectinput" placeholder="Search"></div>
+      </div>
+    </div>`;
+  const input = document.querySelector('[data-automation-id="formField-skills"] input');
+  let touched = false;
+  input.addEventListener("click", () => { touched = true; });
+  input.addEventListener("input", () => { touched = true; });
+  A.fillers.sleep = async () => {};
+  assert.equal(A.DEFAULT_SETTINGS.fillSkills, true);
+  const p = testProfile(A);
+  p.misc.skills = "Python";
+  const report = await A.engine.fillPage(p, { overwriteFilled: false, fillEEO: false, highlightFilled: false, fillSkills: false }, null);
+  assert.equal(touched, false);
+  assert.equal(input.value, "");
+  assert.ok(!report.results.some((r) => /skill/i.test(r.label)));
+});
+
 test("fillPage adds saved skills through Workday's skills picker", async () => {
   const win = blankWindow();
   const { document, AvidAutofill: A } = win;
