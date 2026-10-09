@@ -366,12 +366,18 @@
         const report = await AvidAutofill.engine.fillPage(profile, settings, resume);
         renderReport($, report);
       } catch (err) {
-        renderError($, String((err && err.message) || err));
+        renderError($, explain(err));
       } finally {
         btn.disabled = false;
         btn.textContent = fillLabel;
       }
     });
+  }
+
+  // After the extension reloads, this page's copy of Avid can no longer reach it.
+  function explain(error) {
+    const message = String((error && error.message) || error);
+    return /context invalidated/i.test(message) ? "Avid was updated. Refresh this page to use it; answers you typed here are not saved." : message;
   }
 
   function renderEmpty($) {
@@ -504,7 +510,7 @@
             button.remove();
             li.querySelector(".result-value").textContent = "Saved to bank";
             show(anySite ? "Saved. Jev can reuse it on any application." : "Saved. Jev can reuse it on this company's applications.");
-          } catch (error) { show(error.message); }
+          } catch (error) { show(explain(error)); }
         });
       }
     });

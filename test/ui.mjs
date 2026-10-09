@@ -347,3 +347,18 @@ test("only a real click saves a review answer to the question bank", async () =>
     assert.equal(saved.length, 0);
   } finally { dom.window.close(); }
 });
+
+test("a page left from before an extension reload says to refresh it", async () => {
+  const dom = new JSDOM("<body></body>", { runScripts: "outside-only", pretendToBeVisual: true });
+  try {
+    dom.window.chrome = chromeShim();
+    for (const file of ["src/shared/schema.js", "src/content/widget.js"]) dom.window.eval(fs.readFileSync(path.join(ROOT, file), "utf8"));
+    const A = dom.window.AvidAutofill;
+    A.getProfile = async () => { throw new Error("Extension context invalidated."); };
+    A.widget.mount({ name: "Greenhouse" });
+    const root = dom.window.document.getElementById("avid-autofill-root").shadowRoot;
+    root.querySelector(".fill").click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.match(root.querySelector(".summary").textContent, /Avid was updated. Refresh this page/);
+  } finally { dom.window.close(); }
+});

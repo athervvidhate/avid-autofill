@@ -40,8 +40,7 @@ await sw.evaluate(async synthetic => {
   profile.misc.skills = synthetic.misc.skills;
   profile.questionBank = synthetic.questionBank.map(e => ({ ...e, anySite: e.anySite || e.approved }));
   await chrome.storage.local.set({ avidProfile: profile, avidSettings: { ...A.DEFAULT_SETTINGS, jevEnabled: true } });
-  await chrome.storage.session.setAccessLevel({ accessLevel: "TRUSTED_CONTEXTS" });
-  await chrome.storage.session.set({ avidJevKey: "walkthrough-dummy-key" });
+  await chrome.storage.local.set({ avidJevKey: "walkthrough-dummy-key" });
   globalThis.__jev = [];
   const send = globalThis.fetch;
   globalThis.fetch = async (url, init) => {

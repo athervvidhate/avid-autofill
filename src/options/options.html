@@ -83,7 +83,7 @@
           <p>When you click Fill this application, Jev receives unmatched field labels, available options, and descriptions of saved answers directly at TypeSafe AI. Mapping a dropdown or radio option also sends the selected saved answer. Your resume and complete profile are not sent.</p>
           <p>This first version handles text fields, native dropdowns, and radio groups. It chooses saved answers and does not write new responses. Review every filled answer before submitting.</p>
           <label class="field">TypeSafe AI API key<input id="jev-key" type="password" autocomplete="off" spellcheck="false" placeholder="Enter your own Jev key" aria-describedby="jev-key-note"></label>
-          <p id="jev-key-note">Your key is held for this browser session in extension-only storage. Re-enter it after restarting the browser or reloading the extension. It is never included in a profile export.</p>
+          <p id="jev-key-note">Your key is saved in this browser's extension storage, apart from your profile, so it stays after restarts and extension reloads. It is never shown again or included in a profile export. Remove key and turn off deletes it.</p>
           <label class="tracker-toggle"><input id="jev-enabled" type="checkbox"><span><b>Use Jev for unmatched fields</b><small>Off by default. Uses your TypeSafe AI account and API credits.</small></span></label>
           <div class="io-actions"><button class="btn primary" id="jev-save">Save Jev connection</button><button class="btn danger-quiet" id="jev-clear">Remove key and turn off</button><a href="https://typesafe.ai" target="_blank" rel="noopener noreferrer">TypeSafe AI</a></div>
           <p id="jev-status" role="status" aria-live="polite"></p>

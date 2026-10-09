@@ -3,16 +3,15 @@
   const active = new Set();
   const optionsSender = sender => sender.id === chrome.runtime.id && sender.url?.split(/[?#]/)[0] === chrome.runtime.getURL("src/options/options.html");
   async function state() {
-    const settings = await A.getSettings(), session = await chrome.storage.session.get(J.KEY);
-    return { enabled: settings.jevEnabled === true, hasKey: !!session[J.KEY], hasAccess: await chrome.permissions.contains({ origins: [J.ORIGIN] }) };
+    const settings = await A.getSettings(), stored = await chrome.storage.local.get(J.KEY);
+    return { enabled: settings.jevEnabled === true, hasKey: !!stored[J.KEY], hasAccess: await chrome.permissions.contains({ origins: [J.ORIGIN] }) };
   }
   async function save(msg) {
     if (typeof msg.enabled !== "boolean" || (msg.key !== undefined && (typeof msg.key !== "string" || !msg.key.trim() || msg.key.length > 512 || /\s/.test(msg.key)))) throw new Error("Enter a valid Jev API key.");
     if (msg.enabled && !await chrome.permissions.contains({ origins: [J.ORIGIN] })) throw new Error("Allow access to TypeSafe AI before enabling Jev.");
-    const key = msg.key || (await chrome.storage.session.get(J.KEY))[J.KEY];
+    const key = msg.key || (await chrome.storage.local.get(J.KEY))[J.KEY];
     if (msg.enabled && !key) throw new Error("Enter your Jev API key to enable matching.");
-    await chrome.storage.session.setAccessLevel({ accessLevel: "TRUSTED_CONTEXTS" });
-    if (msg.key) await chrome.storage.session.set({ [J.KEY]: msg.key });
+    if (msg.key) await chrome.storage.local.set({ [J.KEY]: msg.key });
     await A.saveSettings({ ...await A.getSettings(), jevEnabled: msg.enabled });
     return state();
   }
@@ -25,12 +24,12 @@
       const fields = J.cleanFields(msg.fields), settings = await A.getSettings();
       if (!settings.jevEnabled) throw new Error("Jev is off. Enable it in My Info.");
       if (!await chrome.permissions.contains({ origins: [J.ORIGIN] })) throw new Error("TypeSafe page access is missing. Re-enable Jev in My Info.");
-      const key = (await chrome.storage.session.get(J.KEY))[J.KEY];
-      if (!key) throw new Error("Re-enter your Jev API key in My Info for this browser session.");
+      const key = (await chrome.storage.local.get(J.KEY))[J.KEY];
+      if (!key) throw new Error("Enter your Jev API key in My Info.");
       const profile = await A.getProfile(), sources = J.sourcesFor(profile, sender.url);
       if (!Object.keys(sources).length) throw new Error("Save profile details or approved question-bank answers before using Jev.");
       async function fresh() {
-        if (JSON.stringify(await A.getProfile()) !== JSON.stringify(profile) || !(await A.getSettings()).jevEnabled || (await chrome.storage.session.get(J.KEY))[J.KEY] !== key || !await chrome.permissions.contains({ origins: [J.ORIGIN] })) throw new Error("Profile or Jev connection changed. Fill the page again.");
+        if (JSON.stringify(await A.getProfile()) !== JSON.stringify(profile) || !(await A.getSettings()).jevEnabled || (await chrome.storage.local.get(J.KEY))[J.KEY] !== key || !await chrome.permissions.contains({ origins: [J.ORIGIN] })) throw new Error("Profile or Jev connection changed. Fill the page again.");
       }
       const { results } = await J.match(fields, sources, request => J.post(request, key), fresh);
       return { results };
@@ -51,7 +50,7 @@
     if (msg.type === "AVID_JEV_SAVE") return save(msg);
     if (msg.type === "AVID_JEV_CLEAR") {
       await A.saveSettings({ ...await A.getSettings(), jevEnabled: false });
-      await chrome.storage.session.remove(J.KEY);
+      await chrome.storage.local.remove(J.KEY);
       return state();
     }
     throw new Error("Unknown Jev action.");

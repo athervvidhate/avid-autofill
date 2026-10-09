@@ -20,19 +20,20 @@ extension worker to the hosted TypeSafe AI service. It does not generate prose.
 4. Click **Fill this application** and review every answer. The drawer shows
    extra Jev fills and fields needing your answer. It never submits.
 
-No Avid backend, SDK, new dependency, or Google connection is required. Keys use
-`chrome.storage.session` with `TRUSTED_CONTEXTS` access. They are not returned to
-content scripts or included in profile exports. Browser restart, extension reload,
-disable, or update clears session storage. Re-enter the key when needed.
-**Remove key and turn off** disconnects Jev; the enable preference otherwise
-persists, so a missing session key produces an actionable error.
+No Avid backend, SDK, new dependency, or Google connection is required. The key
+is stored in `chrome.storage.local` under its own entry, apart from the profile,
+so it survives browser restarts and extension reloads and is never part of a
+profile export. The worker never returns it to pages or content scripts, though
+content scripts share `chrome.storage.local` with the profile; this is the same
+protection the saved profile has. **Remove key and turn off** deletes it and
+disconnects Jev.
 
 ## Integration map
 
 | File | Responsibility |
 | --- | --- |
 | `src/shared/jev.js` | Eligible sources, field contract, requests, validation, company scope and saving drawer answers |
-| `src/background/jev.js` | Trusted configuration, session key, fetch, two stages, freshness, drawer answer saves |
+| `src/background/jev.js` | Trusted configuration, stored key, fetch, two stages, freshness, drawer answer saves |
 | `src/background/service-worker.js` | Imports the Jev worker |
 | `src/content/engine.js` | Collects unmatched native controls after rule matching |
 | `src/content/jev.js` | Captures/rechecks controls, applies approved results with existing fillers, reads the applicant's answer for fields left to them |
@@ -60,7 +61,7 @@ Both stages use pinned `jev-1.13.0`:
 
 ```http
 POST https://api.typesafe.ai/v1/systemone
-Authorization: Bearer <session key>
+Authorization: Bearer <stored key>
 Content-Type: application/json
 ```
 
@@ -169,7 +170,7 @@ cases. Each field carries an expected source, an expected option, or `null` for
 2. Save a key in My Info. In the same browser, open
    `chrome-extension://<extension-id>/test/live/jev-eval.html?set=dev`.
    `set` takes `smoke`, `dev`, `holdout` or case IDs, comma-separated. The page
-   reads the session key itself; new or edited files under `test/live/` and
+   reads the saved key itself; new or edited files under `test/live/` and
    `src/shared/jev.js` take effect on page reload, without an extension reload.
 3. `node test/live/sweep.mjs <dir>/*.json` replays reports under candidate
    thresholds and lists every wrong pick.

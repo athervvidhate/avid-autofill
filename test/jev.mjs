@@ -16,10 +16,10 @@ function reply(request, choices = {}) {
 }
 function worker(fetcher = async (_, init) => ({ ok: true, json: async () => reply(JSON.parse(init.body)) })) {
   const local = {}, session = {}, calls = [];
-  let listener, permission = true, accessLevel;
+  let listener, permission = true;
   const area = store => ({ async get(key) { return clone({ [key]: store[key] }); }, async set(values) { Object.assign(store, clone(values)); }, async remove(key) { delete store[key]; } });
   const chrome = {
-    storage: { local: area(local), session: { ...area(session), async setAccessLevel(value) { accessLevel = value.accessLevel; } } },
+    storage: { local: area(local), session: area(session) },
     permissions: { async contains() { return permission; } },
     runtime: { id: "avid-test", getURL: path => `chrome-extension://avid-test/${path}`, onMessage: { addListener(fn) { listener = fn; } } },
   };
@@ -27,7 +27,7 @@ function worker(fetcher = async (_, init) => ({ ok: true, json: async () => repl
   for (const file of ["src/shared/schema.js", "src/shared/jev.js", "src/background/jev.js"]) vm.runInContext(read(file), context);
   const A = context.AvidAutofill;
   const send = (message, sender = admin) => new Promise(resolve => listener(message, sender, resolve));
-  return { A, local, session, calls, send, set permission(value) { permission = value; }, get accessLevel() { return accessLevel; } };
+  return { A, local, session, calls, send, set permission(value) { permission = value; } };
 }
 async function connected(fetcher) {
   const w = worker(fetcher), profile = clone(w.A.DEFAULT_PROFILE);
@@ -45,11 +45,11 @@ test("Jev is off by default and cannot call the provider", async () => {
   const result = await w.send({ type: "AVID_JEV_FILL", fields: [field] }, content);
   assert.equal(result.ok, false); assert.match(result.error, /off/); assert.equal(w.calls.length, 0);
 });
-test("key stays in trusted session storage and configuration accepts only My Info", async () => {
+test("key persists in local storage apart from the profile and configuration accepts only My Info", async () => {
   const w = await connected();
-  assert.equal(w.accessLevel, "TRUSTED_CONTEXTS");
-  assert.equal(w.session.avidJevKey, "synthetic-test-key");
-  assert.equal(JSON.stringify(w.local).includes("synthetic-test-key"), false);
+  assert.equal(w.local.avidJevKey, "synthetic-test-key");
+  assert.equal(JSON.stringify(w.local.avidProfile).includes("synthetic-test-key"), false);
+  assert.equal(JSON.stringify(w.session), "{}");
   const state = await w.send({ type: "AVID_JEV_STATE" });
   assert.equal(state.hasKey, true); assert.equal(JSON.stringify(state).includes("synthetic-test-key"), false);
   assert.equal((await w.send({ type: "AVID_JEV_CLEAR" }, content)).ok, false);
@@ -135,8 +135,8 @@ test("uncertain responses and missing keys leave answers for manual review", asy
     return { ok: true, json: async () => response };
   });
   assert.equal((await w.send({ type: "AVID_JEV_FILL", fields: [field] }, content)).results[0].status, "ai-needs-answer");
-  delete w.session.avidJevKey;
-  assert.match((await w.send({ type: "AVID_JEV_FILL", fields: [field] }, content)).error, /browser session/);
+  delete w.local.avidJevKey;
+  assert.match((await w.send({ type: "AVID_JEV_FILL", fields: [field] }, content)).error, /Enter your Jev API key/);
 });
 for (const status of [401, 422, 429, 529]) test(`HTTP ${status} returns a useful error without provider details or keys`, async () => {
   const w = await connected(async () => ({ ok: false, status, json: async () => ({ error: "synthetic-test-key" }) }));

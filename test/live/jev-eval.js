@@ -74,8 +74,8 @@
   async function main() {
     const out = document.getElementById("out");
     const sets = (new URLSearchParams(location.search).get("set") || "smoke").split(",");
-    const key = (await chrome.storage.session.get(J.KEY))[J.KEY];
-    if (!key) { out.textContent = "No Jev key in this browser session. Save one in My Info, then reload this page."; return; }
+    const key = (await chrome.storage.local.get(J.KEY))[J.KEY];
+    if (!key) { out.textContent = "No Jev key saved. Save one in My Info, then reload this page."; return; }
     const report = { sets, model: J.MODEL, startedAt: new Date().toISOString(), cases: [] };
     for (const c of globalThis.JEV_CASES.filter(c => sets.includes(c.set) || sets.includes(c.id))) {
       report.cases.push(await runCase(c, key));

@@ -113,7 +113,7 @@ step as you advance.
 Reload the extension and application tabs, then open **My Info → Question bank**
 to save approved answers, or answer a field Jev left on a form and click **Save**
 beside it in the drawer. In **Jev matching**, enter your TypeSafe AI key, enable
-matching, and save the connection. Keys last for the browser session and are not
+matching, and save the connection. The key is kept across restarts and reloads and is not
 part of profile exports. See [setup, requests, validation, and limits](docs/jev.md).
 
 ### Track applications in Google Sheets
@@ -188,8 +188,8 @@ must be saved once in the extension first.
 **Optional Jev:** when enabled, clicking Fill sends unmatched field labels,
 available options, and descriptions of eligible saved answers directly to
 TypeSafe AI. Mapping a dropdown or radio choice also sends the selected saved
-fact. Your resume and complete profile are not sent. The key stays in trusted
-extension session storage and is cleared by browser restart or extension reload.
+fact. Your resume and complete profile are not sent. The key is stored in local
+extension storage apart from your profile and is never exported.
 This uses your TypeSafe account and API credits. Remove the key and turn off Jev
 in My Info to return to local-only filling.
 
