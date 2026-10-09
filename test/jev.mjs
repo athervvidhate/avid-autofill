@@ -307,7 +307,7 @@ test("live evaluation cases have a consistent oracle and grading", () => {
   const J = context.AvidAutofill.jev, grade = context.JEV_GRADE, ids = new Set();
   for (const c of context.JEV_CASES) {
     assert.ok(!ids.has(c.id), `duplicate case ${c.id}`); ids.add(c.id);
-    const sources = J.sourcesFor(context.JEV_PROFILE, c.pageUrl);
+    const sources = J.sourcesFor(c.profile || context.JEV_PROFILE, c.pageUrl);
     J.cleanFields(c.fields);
     for (const field of c.fields) {
       if (field.expect === null) continue;
@@ -373,4 +373,15 @@ test("labels sent to Jev drop generated field identifiers", async () => {
     await p.A.engine.fillPage(p.profile, p.settings, null);
     assert.equal(sent[0].label, "why us? | why"); // the element id remains; the generated name is gone
   } finally { p.close(); }
+});
+
+test("saved free-text facts are sources; default-backed answers are not", () => {
+  const context = vm.createContext({ URL, TextEncoder });
+  for (const file of ["src/shared/schema.js", "src/shared/jev.js"]) vm.runInContext(read(file), context);
+  const A = context.AvidAutofill, profile = clone(A.DEFAULT_PROFILE);
+  Object.assign(profile.misc, { salaryExpectation: "$150,000", earliestStartDate: "June 2027", graduationDate: "May 2027", noticePeriod: "Two weeks", howHeard: "Careers page" });
+  profile.personal.pronouns = "they/them";
+  const sources = A.jev.sourcesFor(profile, "https://jobs.example.test/apply");
+  for (const id of ["misc_salaryExpectation", "misc_earliestStartDate", "misc_graduationDate", "misc_noticePeriod", "misc_howHeard", "personal_pronouns"]) assert.ok(Object.hasOwn(sources, id), id);
+  for (const id of ["misc_willingToRelocate", "personal_country", "workAuth_requireSponsorship", "workAuth_authorizedToWork"]) assert.ok(!Object.hasOwn(sources, id), id);
 });

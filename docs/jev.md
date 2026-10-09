@@ -126,10 +126,12 @@ stage discards the AI batch while preserving prior rule fills.
   evaluation below. `NEEDS_USER` and lower probabilities leave fields for review.
   Runtime checks cannot prove that the model selected the semantically correct
   saved answer.
-- Sources include saved personal/contact details, links, skills, and approved
-  applicable bank entries. Default work-authorization/yes-no answers, EEO, and
-  entire work/education histories are not model sources. Explicitly approved bank
-  facts can add relevant context.
+- Sources include saved personal/contact details and pronouns, links, skills,
+  the free-text profile facts that have no default (salary expectation, notice
+  period, earliest start date, graduation date, how you heard), and approved
+  applicable bank entries. Default-backed answers (work authorization,
+  relocation, country, the yes/no questions), EEO, and entire work/education
+  histories are not model sources: a default is not the applicant's answer.
 - Company scope compares actual sender URL origin and path boundaries. For a
   shared ATS host use the company path, such as `https://jobs.ashbyhq.com/acme/`.
   Queries/fragments are ignored. A forged page URL in a message has no effect.
@@ -201,6 +203,10 @@ picks it made below the gate (in-person London work from a hybrid preference,
 named-destination relocation from general willingness) peaked at stage-one
 p=0.62. Expect Jev to add a few safe answers on top of the rules, not to answer
 most custom questions.
+
+The same facts saved as profile fields instead of bank answers (dev
+`misc-sources`, holdout `holdout-misc`) filled 92% and 100% of fillable fields
+with no wrong fills; an unsatisfiable "MM/DD/YYYY" start date peaked at p=0.71.
 
 Next: validate the opt-in flow on real ATS pages with a real profile. Custom dropdown discovery and
 generated writing are follow-up work.

@@ -26,7 +26,7 @@
   }
 
   async function runCase(c, key) {
-    const sources = J.sourcesFor(globalThis.JEV_PROFILE, c.pageUrl), fields = J.cleanFields(c.fields), stages = [{}, {}];
+    const sources = J.sourcesFor(c.profile || globalThis.JEV_PROFILE, c.pageUrl), fields = J.cleanFields(c.fields), stages = [{}, {}];
     const usage = { input_tokens: 0, output_tokens: 0, calls: 0 };
     let call = 0;
     const post = async (request, stage) => {

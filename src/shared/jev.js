@@ -8,9 +8,11 @@
   const object = value => value !== null && typeof value === "object" && !Array.isArray(value);
   const sameKeys = (a, b) => Object.keys(a).length === Object.keys(b).length && Object.keys(a).every(k => Object.hasOwn(b, k));
   const PROFILE_SOURCES = {
-    personal: { firstName: "First or given name", lastName: "Last or family name", fullName: "Full legal name", preferredName: "Preferred name or nickname", email: "Personal email address", phone: "Personal telephone number", address: "Street address", city: "Home city", state: "Home state or province", postalCode: "Home postal code" },
+    personal: { firstName: "First or given name", lastName: "Last or family name", fullName: "Full legal name", preferredName: "Preferred name or nickname", email: "Personal email address", phone: "Personal telephone number", address: "Street address", city: "Home city", state: "Home state or province", postalCode: "Home postal code", pronouns: "Pronouns" },
     links: { linkedin: "LinkedIn profile URL", github: "GitHub profile URL", portfolio: "Portfolio URL", website: "Personal website URL", twitter: "Twitter or X profile URL" },
-    misc: { skills: "Saved list of professional skills" },
+    // Free-text facts with no default value. Default-backed yes/no answers
+    // (relocation, work authorization, country) are not sources.
+    misc: { skills: "Saved list of professional skills", salaryExpectation: "Salary expectation", noticePeriod: "Notice period at current employer", earliestStartDate: "Earliest available start date", graduationDate: "Graduation date, expected or completed", howHeard: "How the applicant heard about the position" },
   };
   function scopeMatches(scopeUrl, pageUrl) {
     try {
