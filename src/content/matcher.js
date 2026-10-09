@@ -112,7 +112,7 @@
 
     // --- Address ---
     { any: [/street address/, /address line ?1/, /^address$/, /mailing address/], not: [/email/], get: (p) => p.personal.address },
-    { any: [/\bcity\b/, /\btown\b/], not: [/velocity|capacity|ethnic/], get: (p) => p.personal.city },
+    { any: [/\bcity\b/, /\btown\b/], not: [/velocity|capacity|ethnic/], expand: "place", get: (p) => p.personal.city },
     { any: [/\bstate\b/, /\bprovince\b/, /\bregion\b/], not: [/statement|estate|united states|work/], expand: "usState", get: (p) => p.personal.state },
     { any: [/zip/, /postal code/, /post code/], get: (p) => p.personal.postalCode },
     { any: [/country/, /nationality/], not: [/authoriz/, /eligible to work/, /sponsor/, /work in the country/, /citizen/], get: (p) => p.personal.country },
@@ -194,15 +194,24 @@
     return ab ? [ab] : [];
   }
 
-  // Return { value, alts, kind, eeo } for a signal, or null if no rule matches.
+  // "City, State" spellings for location autocompletes, full state name first,
+  // so a search for the city does not settle on a same-named city elsewhere.
+  function placeAlternates(city, profile) {
+    const state = String(profile.personal.state || "").trim();
+    if (!state) return [];
+    const names = [state, ...stateAlternates(state)].sort((a, b) => b.length - a.length);
+    return names.map((name) => `${city}, ${name}`);
+  }
+
+  // Return { value, alts, kind, eeo, place } for a signal, or null if no rule matches.
   function match(signal, profile, helpers) {
     for (const rule of RULES) {
       if (rule.not && rule.not.some((re) => re.test(signal))) continue;
       if (rule.any.some((re) => re.test(signal))) {
         const value = rule.get(profile, helpers);
         if (value == null || value === "") return null;
-        const alts = rule.expand === "usState" ? stateAlternates(value) : [];
-        return { value: String(value), alts, kind: rule.kind || "text", eeo: !!rule.eeo };
+        const alts = rule.expand === "usState" ? stateAlternates(value) : rule.expand === "place" ? placeAlternates(value, profile) : [];
+        return { value: String(value), alts, kind: rule.kind || "text", eeo: !!rule.eeo, place: rule.expand === "place" };
       }
     }
     return null;

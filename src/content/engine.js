@@ -85,7 +85,9 @@
         if (!m) continue;
         if (m.eeo && !settings.fillEEO) continue;
         try {
-          const ok = await fillers.setReactSelect(control, [m.value, ...(m.alts || [])]);
+          // Location autocompletes search as you type: lead with "City, State".
+          const values = m.place ? [...m.alts, m.value] : [m.value, ...(m.alts || [])];
+          const ok = await fillers.setReactSelect(control, values);
           record(signal, m.value, ok ? "filled" : "skipped");
         } catch (_) {
           record(signal, m.value, "error");

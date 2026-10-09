@@ -1184,3 +1184,30 @@ test("Greenhouse Remix react-select questions are matched by their visible label
     assert.ok(!report.results.some(r => /employment agreements/.test(r.label)), "an agreements question is not the current employer");
   } finally { dom.window.close(); }
 });
+
+test("location autocomplete prefers the suggestion in the profile's state", async () => {
+  const win = blankWindow();
+  const { document, AvidAutofill: A } = win;
+  const profile = testProfile(A), helpers = A.matcher.makeHelpers(profile);
+  assert.deepEqual(Array.from(A.matcher.match("location (city)*", profile, helpers).alts), ["Portland, California", "Portland, CA"]);
+  document.body.innerHTML = `<label for="loc">Location (City)</label><div class="select__control"><input id="loc" role="combobox" aria-controls="loc-listbox"></div>`;
+  const control = document.querySelector(".select__control"), input = document.getElementById("loc");
+  let typed = "";
+  input.addEventListener("input", () => { typed = input.value; });
+  control.addEventListener("click", () => {
+    if (document.getElementById("loc-listbox")) return;
+    const box = document.createElement("div"); box.id = "loc-listbox";
+    for (const text of ["Portland, Maine, United States", "Portland, California, United States"]) {
+      const option = document.createElement("div"); option.setAttribute("role", "option"); option.textContent = text;
+      option.getClientRects = () => [{}];
+      option.addEventListener("click", () => { control.dataset.selected = text; box.remove(); });
+      box.append(option);
+    }
+    document.body.append(box);
+  });
+  control.getClientRects = () => [{}];
+  A.fillers.sleep = async () => {};
+  await A.engine.fillPage(profile, { overwriteFilled: false, fillEEO: false, highlightFilled: false }, null);
+  assert.equal(typed, "portland, california"); // setReactSelect types the normalized target
+  assert.equal(control.dataset.selected, "Portland, California, United States");
+});

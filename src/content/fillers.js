@@ -272,9 +272,11 @@
       ).filter(
         (o) => o.offsetParent !== null || o.getClientRects().length > 0
       );
+      // Exact text for any target first; otherwise the earliest (most specific)
+      // target that some option contains.
       pick =
         available.find((o) => targets.some((t) => optText(o) === t)) ||
-        available.find((o) => targets.some((t) => optText(o).includes(t)));
+        targets.map((t) => available.find((o) => optText(o).includes(t))).find(Boolean);
       if (!pick && typeInput && attempt < 7) await sleep(150);
     }
 
