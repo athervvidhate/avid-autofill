@@ -82,7 +82,7 @@
         // itself only exposes the "Select..." placeholder.
         const signal = matcher.signalFor(control.matches("input") ? control : control.querySelector("input") || control);
         const m = matcher.match(signal, profile, helpers);
-        if (!m) continue;
+        if (!m) { unmatched.push({ el: control, custom: true, signal }); continue; }
         if (m.eeo && !settings.fillEEO) continue;
         try {
           // Location autocompletes search as you type: lead with "City, State".

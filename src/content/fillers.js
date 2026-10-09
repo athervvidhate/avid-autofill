@@ -276,7 +276,7 @@
       // target that some option contains.
       pick =
         available.find((o) => targets.some((t) => optText(o) === t)) ||
-        targets.map((t) => available.find((o) => optText(o).includes(t))).find(Boolean);
+        (config && config.exact ? null : targets.map((t) => available.find((o) => optText(o).includes(t))).find(Boolean));
       if (!pick && typeInput && attempt < 7) await sleep(150);
     }
 
@@ -296,6 +296,29 @@
     pick.click();
     flash(control);
     return true;
+  }
+
+  // The selection a custom dropdown shows, or "" when it has none.
+  function customValue(control) {
+    const shown = control.querySelector('[class*="single-value"], [class*="singleValue"], [class*="multi-value"], [class*="multiValue"]');
+    if (shown) return shown.textContent.trim();
+    const input = control.matches("input") ? control : control.querySelector("input");
+    return input ? input.value.trim() : "";
+  }
+
+  // Open a custom dropdown, read the option labels from the listbox its input
+  // controls, and close it. Returns [] when it names no listbox of its own.
+  async function customOptions(control) {
+    const input = control.matches("input") ? control : control.querySelector("input");
+    if (!input) return [];
+    press(control);
+    await sleep(250);
+    const listbox = document.getElementById(input.getAttribute("aria-controls") || "");
+    const labels = listbox ? queryAll('[role="option"]', listbox).map((o) => o.textContent.trim()).filter(Boolean) : [];
+    input.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, cancelable: true, key: "Escape" }));
+    input.blur();
+    await sleep(100);
+    return [...new Set(labels)];
   }
 
   function press(el) {
@@ -353,6 +376,8 @@
 
   AvidAutofill.fillers = {
     queryAll,
+    customValue,
+    customOptions,
     setTextValue,
     setDateSpinner,
     setNativeSelect,

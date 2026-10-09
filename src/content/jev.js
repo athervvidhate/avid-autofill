@@ -1,35 +1,45 @@
-// Initial AI fallback owns only unmatched native controls. Custom dropdowns and
-// repeaters keep using their existing adapters.
+// AI fallback for controls the rules left unmatched: native text, select and
+// radio controls, and custom dropdowns whose input names its own listbox.
+// Repeaters keep using their existing adapters.
 (function () {
   const A = globalThis.AvidAutofill = globalThis.AvidAutofill || {};
   const blocked = /gender|\bsex\b|race|ethnic|disabilit|veteran|hispanic|latino|consent|certif|acknowledg|\bagree\b|terms|privacy|signature|social security|\bssn\b|captcha|password|\bsearch\b|\bfilter\b/;
   const visible = el => el?.isConnected && !el.disabled && !el.readOnly && el.getAttribute("aria-hidden") !== "true" && (el.offsetParent !== null || el.getClientRects().length > 0);
+  const answered = ({ el, group, custom }) => custom ? !!A.fillers.customValue(el) : group ? group.some(r => r.checked) : !!el.value;
+  // Drop repeated label fragments, bare question IDs and select placeholders.
+  const clean = signal => [...new Set(String(signal || "").split(" | ").map(part => part.trim()).filter(part => part && !/^(select\.*|question \d+)$/.test(part)))].join(" | ");
   function describe(candidate, id) {
-    const { el, group } = candidate;
+    const { el, group, custom } = candidate;
     if (!visible(el) || blocked.test(candidate.signal)) return null;
-    const type = group ? "radio" : el.tagName === "SELECT" ? "select" : el.tagName === "TEXTAREA" ? "textarea" : el.type;
-    if (!["text", "textarea", "email", "tel", "url", "select", "radio"].includes(type) || el.getAttribute("role") === "spinbutton" || el.getAttribute("role") === "combobox") return null;
-    if (group ? group.some(r => r.checked) : !!el.value) return null;
-    const label = (candidate.signal || "").slice(0, 1200);
+    const type = custom ? "select" : group ? "radio" : el.tagName === "SELECT" ? "select" : el.tagName === "TEXTAREA" ? "textarea" : el.type;
+    if (!custom && (!["text", "textarea", "email", "tel", "url", "select", "radio"].includes(type) || el.getAttribute("role") === "spinbutton" || el.getAttribute("role") === "combobox")) return null;
+    if (answered(candidate)) return null;
+    const label = clean(candidate.signal).slice(0, 1200);
     if (!label.trim()) return null;
     let options;
-    if (group) options = Object.fromEntries(group.map((radio, i) => [`o${i}`, A.labelTextFor(radio).trim() || radio.value]).filter(([, label]) => label && label.length <= 500));
+    if (custom) options = Object.fromEntries((candidate.choices || []).map((label, i) => [`o${i}`, label]).filter(([, label]) => label.length <= 500));
+    else if (group) options = Object.fromEntries(group.map((radio, i) => [`o${i}`, A.labelTextFor(radio).trim() || radio.value]).filter(([, label]) => label && label.length <= 500));
     else if (type === "select") options = Object.fromEntries(Array.from(el.options).map((option, i) => [`o${i}`, option]).filter(([, option]) => !option.disabled && !option.parentElement.disabled && option.value && option.textContent.trim() && option.textContent.trim().length <= 500).map(([id, option]) => [id, option.textContent.trim()]));
     if (options && (!Object.keys(options).length || Object.keys(options).length > 100)) return null;
     return { id, label, type, ...(options ? { options } : {}) };
   }
-  function fingerprint({ el, group }) {
+  function fingerprint(candidate) {
+    const { el, group } = candidate;
     if (group) {
       const current = A.fillers.queryAll('input[type="radio"]').filter(r => r.name === el.name && visible(r));
       if (current.length !== group.length || current.some((r, i) => r !== group[i])) return "changed-radio-group";
     }
     return JSON.stringify({
       limits: [el.name, el.id, el.maxLength, el.minLength, el.pattern, el.required],
-      choices: group ? group.map(r => [r.value, r.disabled, A.labelTextFor(r)]) : el.options ? Array.from(el.options).map(o => [o.value, o.textContent, o.disabled, !!o.parentElement.disabled]) : null,
+      choices: candidate.custom ? candidate.choices : group ? group.map(r => [r.value, r.disabled, A.labelTextFor(r)]) : el.options ? Array.from(el.options).map(o => [o.value, o.textContent, o.disabled, !!o.parentElement.disabled]) : null,
     });
   }
   async function fill(candidates, profile, run) {
     const url = location.href, root = document.documentElement;
+    // Custom dropdowns list their options only while open: read them once now.
+    for (const candidate of candidates) {
+      if (candidate.custom && visible(candidate.el) && !blocked.test(candidate.signal) && !answered(candidate)) candidate.choices = await A.fillers.customOptions(candidate.el);
+    }
     const pending = candidates.map((candidate, i) => ({ ...candidate, field: describe(candidate, `f${i}`), fingerprint: fingerprint(candidate) })).filter(candidate => candidate.field);
     const report = { results: [], aiMessage: "" };
     if (!pending.length) return report;
@@ -47,11 +57,11 @@
     }
     const fresh = location.href === url && document.documentElement === root && A._fillRun === run && JSON.stringify(await A.getProfile()) === JSON.stringify(profile) && (await A.getSettings()).jevEnabled;
     for (const candidate of batch) {
-      const { field, el, group } = candidate, result = response.results.find(result => result.id === field.id);
+      const { field, el, group, custom } = candidate, result = response.results.find(result => result.id === field.id);
       const record = (status, value = "") => report.results.push({ label: field.label, value, status, method: "jev", reason: result.sourceQuestion || "" });
       if (!fresh || location.href !== url || document.documentElement !== root || A._fillRun !== run) { record("ai-stale"); continue; }
-      const live = describe({ ...candidate, signal: group ? groupSignal(group[0]) : A.matcher.signalFor(el) }, field.id);
-      if (!live) { record(group?.some(r => r.checked) || el.value ? "kept-existing" : "ai-stale"); continue; }
+      const live = describe({ ...candidate, signal: group ? groupSignal(group[0]) : A.matcher.signalFor(custom ? inner(el) : el) }, field.id);
+      if (!live) { record(answered(candidate) ? "kept-existing" : "ai-stale"); continue; }
       if (JSON.stringify(live) !== JSON.stringify(field) || fingerprint(candidate) !== candidate.fingerprint) { record("ai-stale"); continue; }
       if (result.status !== "fill") { record(result.status === "ai-incompatible" ? result.status : "ai-needs-answer"); continue; }
       if (typeof result.value !== "string" || !result.value.trim()) { record("ai-incompatible"); continue; }
@@ -59,7 +69,11 @@
         if (field.options) {
           if (!Object.hasOwn(field.options, result.optionId)) { record("ai-incompatible"); continue; }
           const index = Number(result.optionId.slice(1));
-          if (group) {
+          if (custom) {
+            const label = field.options[result.optionId];
+            const ok = await A.fillers.setReactSelect(el, [label], { exact: true });
+            record(ok && A.matcher.norm(A.fillers.customValue(el)) === A.matcher.norm(label) ? "filled" : "skipped", label);
+          } else if (group) {
             const radio = group[index];
             if (!visible(radio)) { record("ai-stale"); continue; }
             const ok = A.fillers.setRadio([radio], radio.value);
@@ -82,6 +96,7 @@
     report.aiMessage = `Jev filled ${count} extra ${count === 1 ? "field" : "fields"}. Review every AI-filled answer before submitting.`;
     return report;
   }
+  const inner = el => el.matches("input") ? el : el.querySelector("input") || el;
   function groupSignal(el) { return A.matcher.norm(el.closest("fieldset")?.querySelector("legend")?.textContent || A.matcher.signalFor(el)); }
   A.jevContent = { fill };
 })();
