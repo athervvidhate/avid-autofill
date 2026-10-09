@@ -476,7 +476,7 @@
       label.title = r.label;
       const value = document.createElement("span");
       value.className = "result-value";
-      value.textContent = completed ? r.value : statusLabel(r.status);
+      value.textContent = completed ? r.value : r.status === "assumed" ? `Assumed: ${r.value}` : statusLabel(r.status);
       value.title = `${r.value || ""} · ${statusLabel(r.status)}${r.method === "jev" ? ` · Jev: ${r.reason || "saved answer"}` : ""}`;
       li.append(rail, label, value);
       if (r.field && AvidAutofill.jevContent && AvidAutofill.jevContent.answerFor(r.field)) addSave(li, r.field, r.label);
@@ -518,7 +518,7 @@
   }
 
   function statusLabel(status) {
-    return ({ "kept-existing": "Kept existing", skipped: "Skipped", "no-option-match": "No match", error: "Error", "ai-needs-answer": "Needs your answer", "ai-incompatible": "Value does not fit", "ai-unavailable": "Jev unavailable", "ai-stale": "Page or profile changed", "ai-limit": "Fill again for more" })[status] || status;
+    return ({ "kept-existing": "Kept existing", skipped: "Skipped", "no-option-match": "No match", error: "Error", assumed: "Assumed answer", "ai-needs-answer": "Needs your answer", "ai-incompatible": "Value does not fit", "ai-unavailable": "Jev unavailable", "ai-stale": "Page or profile changed", "ai-limit": "Fill again for more" })[status] || status;
   }
 
   // --- Dev-only fixture capture -------------------------------------------
