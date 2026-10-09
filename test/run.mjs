@@ -1247,3 +1247,12 @@ test("Lever card radio groups are matched by their question text", async () => {
     assert.equal(radios.find(r => r.checked)?.value, "No");
   } finally { dom.window.close(); }
 });
+
+test("profile links do not answer questions that only mention the platform", () => {
+  const A = blankWindow().AvidAutofill, profile = testProfile(A), helpers = A.matcher.makeHelpers(profile);
+  profile.links.github = "https://github.com/alexrivera";
+  const answer = signal => A.matcher.match(signal, profile, helpers)?.value ?? null;
+  for (const signal of ["github profile", "github url", "link to your github", "*github profile github profile"]) assert.equal(answer(signal), profile.links.github, signal);
+  assert.equal(answer("*share 2–3 of your open-source contributions with links (github prs, issues, etc.)"), null);
+  assert.equal(answer("link to a github repository for a project you are proud of"), null);
+});

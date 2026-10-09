@@ -137,7 +137,7 @@
 
     // --- Links ---
     { any: [/linkedin/], get: (p) => p.links.linkedin },
-    { any: [/github/], get: (p) => p.links.github },
+    { any: [/github/], not: [/contribution|repositor|project|describe|example/], get: (p) => p.links.github },
     { any: [/portfolio/, /personal (web)?site/, /^website$/, /web ?site url/], get: (p) => p.links.portfolio || p.links.website },
     { any: [/twitter|(^| )x( |$)/], get: (p) => p.links.twitter },
 
