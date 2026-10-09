@@ -29,6 +29,7 @@ const LAYOUT = {
   ],
   questions: [
     ["previouslyEmployedHere", "Previously employed here?", "select:No|Yes"],
+    ["relativesAtCompany", "Relatives employed by the company?", "select:No|Yes"],
     ["formerContractorOrIntern", "Former/current intern or contractor?", "select:No|Yes"],
     ["currentStudent", "Currently a student?", "select:|Yes|No"],
     ["consentToContact", "Consent to text/email updates?", "select:Yes|No"],

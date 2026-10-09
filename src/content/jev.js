@@ -21,7 +21,10 @@
     if (custom) options = Object.fromEntries((candidate.choices || []).map((label, i) => [`o${i}`, label]).filter(([, label]) => label.length <= 500));
     else if (group) options = Object.fromEntries(group.map((radio, i) => [`o${i}`, A.labelTextFor(radio).trim() || radio.value]).filter(([, label]) => label && label.length <= 500));
     else if (type === "select") options = Object.fromEntries(Array.from(el.options).map((option, i) => [`o${i}`, option]).filter(([, option]) => !option.disabled && !option.parentElement.disabled && option.value && option.textContent.trim() && option.textContent.trim().length <= 500).map(([id, option]) => [id, option.textContent.trim()]));
-    if (options && (!Object.keys(options).length || Object.keys(options).length > 100)) return null;
+    if (options && Object.keys(options).length > 100) return null;
+    // A dropdown whose options could not be read is still a question for the
+    // applicant: describe it without options so it is listed, never sent to Jev.
+    if (options && !Object.keys(options).length) return custom ? { id, label, type, unreadable: true } : null;
     return { id, label, type, ...(options ? { options } : {}) };
   }
   function fingerprint(candidate) {
@@ -72,9 +75,13 @@
     const pending = candidates.map((candidate, i) => ({ ...candidate, field: describe(candidate, `f${i}`), fingerprint: fingerprint(candidate) })).filter(candidate => candidate.field);
     const report = { results: [], aiMessage: "" };
     if (!pending.length) return report;
+    const unreadable = pending.filter(candidate => candidate.field.unreadable);
+    for (const candidate of unreadable) { unanswered.set(candidate.field.id, candidate); report.results.push({ label: candidate.field.label, value: "", status: "ai-needs-answer", field: candidate.field.id }); }
+    const sendable = pending.filter(candidate => !candidate.field.unreadable);
+    if (!sendable.length) { report.aiMessage = "Jev could not read the options for some dropdowns. Answer them on the page, then save them to your question bank."; return report; }
     // shortcut: cap one user-initiated fill at 20 fields; add batching after live evaluation.
-    const batch = pending.slice(0, 20);
-    for (const candidate of pending.slice(20)) { unanswered.set(candidate.field.id, candidate); report.results.push({ label: candidate.field.label, value: "", status: "ai-limit", field: candidate.field.id }); }
+    const batch = sendable.slice(0, 20);
+    for (const candidate of sendable.slice(20)) { unanswered.set(candidate.field.id, candidate); report.results.push({ label: candidate.field.label, value: "", status: "ai-limit", field: candidate.field.id }); }
     let response;
     try { response = await chrome.runtime.sendMessage({ type: "AVID_JEV_FILL", fields: batch.map(candidate => candidate.field) }); }
     catch { response = { ok: false, error: "Jev is unavailable. Reload the extension and application page." }; }

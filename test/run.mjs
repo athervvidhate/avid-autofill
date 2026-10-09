@@ -287,6 +287,58 @@ test("fillPage selects Mobile for Workday Phone Device Type", async () => {
   assert.equal(control.dataset.selected, "Mobile");
 });
 
+test("fillPage answers Workday relatives and PwC screening questions as assumed No", async () => {
+  const win = blankWindow();
+  const { document, AvidAutofill: A } = win;
+  const questions = [
+    "Do you have any relatives or others with close personal relationships employed by Bank of America or any of its subsidiaries or affiliates?",
+    "Do you currently or have you worked at PricewaterhouseCoopers LLP (PwC), the bank's independent auditor, since July 2002?",
+  ];
+  document.body.innerHTML = `<div data-automation-id="applyFlowPage">${questions.map((q, i) =>
+    `<fieldset><legend>${q}</legend><button type="button" name="q${i}" aria-haspopup="listbox">Select One</button></fieldset>`).join("")}</div>`;
+  const visible = (el) => Object.defineProperty(el, "offsetParent", { configurable: true, get: () => document.body });
+  for (const control of document.querySelectorAll("button")) {
+    visible(control);
+    control.addEventListener("click", () => {
+      if (document.querySelector('[data-automation-id="promptOption"]')) return;
+      for (const text of ["Yes", "No"]) {
+        const option = document.createElement("div");
+        option.dataset.automationId = "promptOption";
+        option.textContent = text;
+        visible(option);
+        option.addEventListener("click", () => { control.dataset.selected = text; document.querySelectorAll('[data-automation-id="promptOption"]').forEach((o) => o.remove()); });
+        document.body.append(option);
+      }
+    });
+  }
+  A.fillers.sleep = async () => {};
+  const report = await A.engine.fillPage(testProfile(A), { overwriteFilled: false, fillEEO: false, highlightFilled: false }, null);
+  assert.deepEqual([...document.querySelectorAll("button")].map((b) => b.dataset.selected), ["No", "No"]);
+  assert.equal(report.results.filter((r) => r.status === "assumed").length, 2);
+});
+
+test("Jev reads Workday button-dropdown options and lists unreadable ones as needing an answer", async () => {
+  const win = blankWindow();
+  const { document, AvidAutofill: A } = win;
+  document.body.innerHTML = `<fieldset><legend>Were you referred by an employee?</legend><button type="button" aria-haspopup="listbox">Select One</button></fieldset>`;
+  const button = document.querySelector("button");
+  Object.defineProperty(button, "offsetParent", { configurable: true, get: () => document.body });
+  A.fillers.sleep = async () => {};
+  assert.deepEqual([...await A.fillers.customOptions(button)], []);
+  button.addEventListener("click", () => {
+    if (document.querySelector('[role="listbox"]')) return;
+    const box = document.createElement("ul");
+    box.setAttribute("role", "listbox");
+    Object.defineProperty(box, "offsetParent", { configurable: true, get: () => document.body });
+    box.innerHTML = '<li role="option">Yes</li><li role="option">No</li>';
+    document.body.append(box);
+  });
+  assert.deepEqual([...await A.fillers.customOptions(button)], ["Yes", "No"]);
+  assert.equal(A.fillers.customValue(button), "");
+  button.textContent = "No";
+  assert.equal(A.fillers.customValue(button), "No");
+});
+
 test("fillPage treats a rendered Workday phone input as visible when offsetParent is null", async () => {
   const win = blankWindow();
   const { document, AvidAutofill: A } = win;
