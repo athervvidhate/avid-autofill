@@ -300,3 +300,28 @@ test("My Info saves approved scoped bank entries and exports no Jev key", async 
     assert.ok(JSON.parse(data).questionBank.length);
   } finally { dom.window.close(); }
 });
+
+test("live evaluation cases have a consistent oracle and grading", () => {
+  const context = vm.createContext({ URL, TextEncoder });
+  for (const file of ["src/shared/jev.js", "test/live/jev-cases.js", "test/live/jev-eval.js"]) vm.runInContext(read(file), context);
+  const J = context.AvidAutofill.jev, grade = context.JEV_GRADE, ids = new Set();
+  for (const c of context.JEV_CASES) {
+    assert.ok(!ids.has(c.id), `duplicate case ${c.id}`); ids.add(c.id);
+    const sources = J.sourcesFor(context.JEV_PROFILE, c.pageUrl);
+    J.cleanFields(c.fields);
+    for (const field of c.fields) {
+      if (field.expect === null) continue;
+      if (field.expect.option) assert.ok(Object.hasOwn(field.options, field.expect.option), `${c.id}/${field.id} expects a missing option`);
+      else for (const id of [].concat(field.expect)) assert.ok(Object.hasOwn(sources, id), `${c.id}/${field.id} expects unavailable source ${id}`);
+    }
+  }
+  assert.ok(!Object.hasOwn(J.sourcesFor(context.JEV_PROFILE, "https://jobs.lever.co/globex/x"), "bank_why_acme"));
+  assert.ok(!Object.hasOwn(J.sourcesFor(context.JEV_PROFILE, "https://boards.greenhouse.io/acme/x"), "bank_noncompete"));
+  assert.equal(grade({ expect: null }, { status: "ai-needs-answer" }), "correct-abstain");
+  assert.equal(grade({ expect: null }, { status: "fill", sourceId: "bank_salary" }), "wrong-fill");
+  assert.equal(grade({ expect: "bank_salary" }, { status: "ai-needs-answer" }), "missed");
+  assert.equal(grade({ expect: "bank_salary" }, { status: "fill", sourceId: "bank_notice" }), "wrong-fill");
+  assert.equal(grade({ expect: ["bank_start", "bank_notice"] }, { status: "fill", sourceId: "bank_notice" }), "correct");
+  assert.equal(grade({ expect: { option: "o2" } }, { status: "fill", sourceId: "bank_sponsor", optionId: "o2" }), "correct");
+  assert.equal(grade({ expect: { option: "o2" } }, { status: "fill", sourceId: "bank_sponsor", optionId: "o1" }), "wrong-fill");
+});

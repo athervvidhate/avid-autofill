@@ -3,3 +3,6 @@ node_modules/
 !.claude/settings.json
 # Contains your personal data — never commit
 profile.json
+
+# Live Jev evaluation reports
+test/live/results/
