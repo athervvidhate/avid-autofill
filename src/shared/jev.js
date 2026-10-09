@@ -21,6 +21,30 @@
         (page.pathname === scope.pathname || page.pathname.startsWith(scope.pathname.endsWith("/") ? scope.pathname : scope.pathname + "/"));
     } catch { return false; }
   }
+  // Company scope for answers saved from a page. Shared ATS hosts keep the
+  // company's path segment (job-boards.greenhouse.io/acme/); other hosts are
+  // the company's own site.
+  const SHARED_HOSTS = /(^|\.)(greenhouse\.io|lever\.co|ashbyhq\.com|workable\.com|smartrecruiters\.com)$/;
+  function scopeFor(pageUrl) {
+    const url = new URL(pageUrl);
+    if (!/^https?:$/.test(url.protocol)) throw new Error("Save answers from an application page.");
+    if (!SHARED_HOSTS.test(url.hostname)) return `${url.origin}/`;
+    const company = url.pathname.split("/")[1];
+    if (!company || ["embed", "oneclick-ui"].includes(company)) throw new Error("This page does not show which company it belongs to. Save the answer for any application, or add it in My Info.");
+    return `${url.origin}/${company}/`;
+  }
+  // Add an answer the applicant gave on a page to the question bank, approved,
+  // or update the answer already saved for that question and scope.
+  function saveAnswer(profile, entry, pageUrl) {
+    const question = typeof entry?.question === "string" ? entry.question.trim() : "", answer = typeof entry?.answer === "string" ? entry.answer.trim() : "";
+    if (!question || question.length > 500 || !answer || answer.length > 8000 || typeof entry.anySite !== "boolean") throw new Error("Answer the question on the page, then save it.");
+    const scopeUrl = entry.anySite ? "" : scopeFor(pageUrl);
+    const bank = Array.isArray(profile.questionBank) ? profile.questionBank : [];
+    const same = bank.find(e => e && typeof e.question === "string" && e.question.trim().toLowerCase() === question.toLowerCase() && e.anySite === entry.anySite && (entry.anySite || e.scopeUrl === scopeUrl));
+    if (same) Object.assign(same, { answer, approved: true });
+    else bank.push({ id: crypto.randomUUID(), question, answer, scopeUrl, anySite: entry.anySite, approved: true });
+    return { ...profile, questionBank: bank };
+  }
   function sourcesFor(profile, pageUrl) {
     const sources = {};
     for (const [section, fields] of Object.entries(PROFILE_SOURCES)) for (const [key, description] of Object.entries(fields)) {
@@ -133,5 +157,5 @@
     });
     return { results, usage };
   }
-  A.jev = { MODEL, KEY, ORIGIN, MAX_FIELDS, sourcesFor, cleanFields, requestFor, validate, accepted, scopeMatches, post, match };
+  A.jev = { MODEL, KEY, ORIGIN, MAX_FIELDS, sourcesFor, cleanFields, requestFor, validate, accepted, scopeMatches, scopeFor, saveAnswer, post, match };
 })();

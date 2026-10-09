@@ -23,7 +23,7 @@ function worker(fetcher = async (_, init) => ({ ok: true, json: async () => repl
     permissions: { async contains() { return permission; } },
     runtime: { id: "avid-test", getURL: path => `chrome-extension://avid-test/${path}`, onMessage: { addListener(fn) { listener = fn; } } },
   };
-  const context = vm.createContext({ chrome, URL, TextEncoder, AbortController, setTimeout, clearTimeout, fetch: async (url, init) => { calls.push({ url, init }); return fetcher(url, init); } });
+  const context = vm.createContext({ chrome, URL, TextEncoder, AbortController, crypto, setTimeout, clearTimeout, fetch: async (url, init) => { calls.push({ url, init }); return fetcher(url, init); } });
   for (const file of ["src/shared/schema.js", "src/shared/jev.js", "src/background/jev.js"]) vm.runInContext(read(file), context);
   const A = context.AvidAutofill;
   const send = (message, sender = admin) => new Promise(resolve => listener(message, sender, resolve));
@@ -404,5 +404,54 @@ test("reading a custom dropdown's options closes it even when Escape does not", 
     input.addEventListener("focusout", () => doc.getElementById("restrict-list")?.remove());
     await p.A.engine.fillPage(p.profile, p.settings, null);
     assert.equal(doc.getElementById("restrict-list"), null, "menu left open");
+  } finally { p.close(); }
+});
+
+test("answers saved from a page join the question bank, scoped by the sender's URL", async () => {
+  const w = worker(), page = "https://job-boards.greenhouse.io/gitlab/jobs/8704363002";
+  const from = { ...content, url: page };
+  const save = (fields, sender = from) => w.send({ type: "AVID_JEV_SAVE_ANSWER", ...fields }, sender);
+  assert.equal((await save({ question: "Are you subject to any employment agreements?", answer: "No", anySite: false, scopeUrl: "https://evil.example/" })).ok, true);
+  assert.equal((await save({ question: "are you subject to any employment agreements? ", answer: "Yes", anySite: false })).ok, true);
+  assert.equal((await save({ question: "What is your GitLab username?", answer: "octo", anySite: true })).ok, true);
+  const bank = w.local.avidProfile.questionBank;
+  assert.equal(bank.length, 2, "same question and scope updates the saved answer");
+  assert.deepEqual({ ...bank[0], id: "" }, { id: "", question: "Are you subject to any employment agreements?", answer: "Yes", scopeUrl: "https://job-boards.greenhouse.io/gitlab/", anySite: false, approved: true });
+  assert.equal(bank[1].anySite, true); assert.equal(bank[1].scopeUrl, "");
+  const sources = w.A.jev.sourcesFor(w.local.avidProfile, "https://job-boards.greenhouse.io/gitlab/jobs/1");
+  assert.equal(Object.values(sources).filter(source => source.kind === "text" && /employment agreements|username/i.test(source.description)).length, 2);
+  assert.equal(Object.values(w.A.jev.sourcesFor(w.local.avidProfile, "https://job-boards.greenhouse.io/scaleai/jobs/1")).some(s => /employment agreements/.test(s.description)), false);
+  // Only an application page's content script may save, with an answer.
+  assert.equal((await save({ question: "Q?", answer: "A", anySite: true }, admin)).ok, false);
+  assert.equal((await save({ question: "Q?", answer: "A", anySite: true }, { ...from, url: "file:///form.html" })).ok, false);
+  assert.equal((await save({ question: "Q?", answer: " ", anySite: true })).ok, false);
+  assert.equal(w.local.avidProfile.questionBank.length, 2);
+});
+
+test("company scope keeps the company path on shared ATS hosts", () => {
+  const { scopeFor } = worker().A.jev;
+  assert.equal(scopeFor("https://job-boards.greenhouse.io/gitlab/jobs/1?gh_src=x"), "https://job-boards.greenhouse.io/gitlab/");
+  assert.equal(scopeFor("https://jobs.lever.co/palantir/10dfc8bc/apply"), "https://jobs.lever.co/palantir/");
+  assert.equal(scopeFor("https://jobs.ashbyhq.com/acme/123/application"), "https://jobs.ashbyhq.com/acme/");
+  assert.equal(scopeFor("https://acme.wd5.myworkdayjobs.com/en-US/careers/job/1"), "https://acme.wd5.myworkdayjobs.com/");
+  assert.throws(() => scopeFor("https://boards.greenhouse.io/embed/job_app?for=acme"), /which company/);
+});
+
+test("the drawer reads and saves the applicant's answer for a field Jev left", async () => {
+  const sent = [];
+  const p = await page('<form><label for="agreements">Are you subject to any employment agreements? *</label><select id="agreements"><option value="">Select...</option><option value="1">Yes</option><option value="0">No</option></select></form>', async msg => {
+    sent.push(msg);
+    return msg.type === "AVID_JEV_FILL" ? { ok: true, results: msg.fields.map(f => ({ id: f.id, status: "ai-needs-answer" })) } : { ok: true };
+  });
+  try {
+    const report = await p.A.engine.fillPage(p.profile, p.settings, null);
+    const row = report.results.find(r => r.status === "ai-needs-answer");
+    assert.ok(row.field);
+    assert.deepEqual({ ...p.A.jevContent.answerFor(row.field) }, { question: "Are you subject to any employment agreements?", answer: "" });
+    p.dom.window.document.getElementById("agreements").value = "0";
+    assert.equal(p.A.jevContent.answerFor(row.field).answer, "No");
+    await assert.rejects(p.A.jevContent.saveAnswer(row.field, "Yes", true), /changed/);
+    await p.A.jevContent.saveAnswer(row.field, "No", false);
+    assert.deepEqual({ ...sent.at(-1) }, { type: "AVID_JEV_SAVE_ANSWER", question: "Are you subject to any employment agreements?", answer: "No", anySite: false });
   } finally { p.close(); }
 });

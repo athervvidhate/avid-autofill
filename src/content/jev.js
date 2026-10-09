@@ -35,8 +35,36 @@
       choices: candidate.custom ? candidate.choices : group ? group.map(r => [r.value, r.disabled, A.labelTextFor(r)]) : el.options ? Array.from(el.options).map(o => [o.value, o.textContent, o.disabled, !!o.parentElement.disabled]) : null,
     });
   }
+  // Fields Jev left for the applicant in the latest fill, by field ID, so the
+  // drawer can save the answer they give on the page to the question bank.
+  let unanswered = new Map();
+  const NEEDS_APPLICANT = ["ai-needs-answer", "ai-unavailable", "ai-incompatible", "ai-limit"];
+  function questionText(candidate) {
+    const { el, group, custom } = candidate;
+    const text = group ? "" : A.labelTextFor(custom ? inner(el) : el);
+    return (text.replace(/\s+/g, " ").trim() || clean(candidate.signal).split(" | ")[0]).replace(/\s*\*$/, "").slice(0, 500);
+  }
+  function currentAnswer({ el, group, custom }) {
+    if (custom) return A.fillers.customValue(el);
+    if (group) { const radio = group.find(r => r.checked); return radio ? (A.labelTextFor(radio).trim() || radio.value) : ""; }
+    if (el.tagName === "SELECT") return el.value ? el.options[el.selectedIndex].textContent.trim() : "";
+    return el.value.trim();
+  }
+  // { question, answer } for a field left for the applicant, or null.
+  function answerFor(fieldId) {
+    const candidate = unanswered.get(fieldId);
+    return candidate && candidate.el.isConnected ? { question: questionText(candidate), answer: currentAnswer(candidate) } : null;
+  }
+  // Save the answer the applicant confirmed, if the page still shows it.
+  async function saveAnswer(fieldId, answer, anySite) {
+    const current = answerFor(fieldId);
+    if (!current || current.answer !== answer) throw new Error("The answer on the page changed. Click Save again.");
+    const response = await chrome.runtime.sendMessage({ type: "AVID_JEV_SAVE_ANSWER", question: current.question, answer, anySite });
+    if (!response?.ok) throw new Error(response?.error || "Avid could not save the answer.");
+  }
   async function fill(candidates, profile, run) {
     const url = location.href, root = document.documentElement;
+    unanswered = new Map();
     // Custom dropdowns list their options only while open: read them once now.
     for (const candidate of candidates) {
       if (candidate.custom && visible(candidate.el) && !blocked.test(candidate.signal) && !answered(candidate)) candidate.choices = await A.fillers.customOptions(candidate.el);
@@ -46,20 +74,24 @@
     if (!pending.length) return report;
     // shortcut: cap one user-initiated fill at 20 fields; add batching after live evaluation.
     const batch = pending.slice(0, 20);
-    for (const candidate of pending.slice(20)) report.results.push({ label: candidate.field.label, value: "", status: "ai-limit" });
+    for (const candidate of pending.slice(20)) { unanswered.set(candidate.field.id, candidate); report.results.push({ label: candidate.field.label, value: "", status: "ai-limit", field: candidate.field.id }); }
     let response;
     try { response = await chrome.runtime.sendMessage({ type: "AVID_JEV_FILL", fields: batch.map(candidate => candidate.field) }); }
     catch { response = { ok: false, error: "Jev is unavailable. Reload the extension and application page." }; }
     const valid = response?.ok && Array.isArray(response.results) && response.results.length === batch.length && response.results.every(result => result && typeof result.id === "string" && batch.some(candidate => candidate.field.id === result.id)) && new Set(response.results.map(result => result.id)).size === batch.length;
     if (!valid) {
       report.aiMessage = response?.error || "Jev returned an invalid result. No AI answers were applied.";
-      report.results.push(...batch.map(candidate => ({ label: candidate.field.label, value: "", status: "ai-unavailable" })));
+      for (const candidate of batch) unanswered.set(candidate.field.id, candidate);
+      report.results.push(...batch.map(candidate => ({ label: candidate.field.label, value: "", status: "ai-unavailable", field: candidate.field.id })));
       return report;
     }
     const fresh = location.href === url && document.documentElement === root && A._fillRun === run && JSON.stringify(await A.getProfile()) === JSON.stringify(profile) && (await A.getSettings()).jevEnabled;
     for (const candidate of batch) {
       const { field, el, group, custom } = candidate, result = response.results.find(result => result.id === field.id);
-      const record = (status, value = "") => report.results.push({ label: field.label, value, status, method: "jev", reason: result.sourceQuestion || "" });
+      const record = (status, value = "") => {
+        if (NEEDS_APPLICANT.includes(status)) unanswered.set(field.id, candidate);
+        report.results.push({ label: field.label, value, status, method: "jev", reason: result.sourceQuestion || "", ...(NEEDS_APPLICANT.includes(status) ? { field: field.id } : {}) });
+      };
       if (!fresh || location.href !== url || document.documentElement !== root || A._fillRun !== run) { record("ai-stale"); continue; }
       const live = describe({ ...candidate, signal: group ? A.matcher.groupSignal(group) : A.matcher.signalFor(custom ? inner(el) : el) }, field.id);
       if (!live) { record(answered(candidate) ? "kept-existing" : "ai-stale"); continue; }
@@ -100,5 +132,5 @@
     return report;
   }
   const inner = el => el.matches("input") ? el : el.querySelector("input") || el;
-  A.jevContent = { fill };
+  A.jevContent = { fill, answerFor, saveAnswer };
 })();

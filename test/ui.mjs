@@ -326,3 +326,24 @@ test("service worker relays an outer iCIMS fill request to the tab frames", asyn
   );
   assert.equal(forwarded.length, 1);
 });
+
+test("only a real click saves a review answer to the question bank", async () => {
+  const dom = new JSDOM("<body></body>", { runScripts: "outside-only", pretendToBeVisual: true });
+  try {
+    dom.window.chrome = chromeShim();
+    for (const file of ["src/shared/schema.js", "src/content/widget.js"]) dom.window.eval(fs.readFileSync(path.join(ROOT, file), "utf8"));
+    const A = dom.window.AvidAutofill, saved = [];
+    A.getProfile = async () => ({ personal: { email: "test@example.com" } });
+    A.jevContent = { answerFor: () => ({ question: "Are you subject to any employment agreements?", answer: "No" }), saveAnswer: async (...args) => saved.push(args) };
+    A.engine = { fillPage: async () => ({ ats: "Greenhouse", filledCount: 0, results: [{ label: "are you subject to any employment agreements?", value: "", status: "ai-needs-answer", method: "jev", field: "f0" }] }) };
+    A.widget.mount({ name: "Greenhouse" });
+    const root = dom.window.document.getElementById("avid-autofill-root").shadowRoot;
+    root.querySelector(".fill").click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const save = root.querySelector(".save-answer");
+    assert.ok(save, "a review row Jev left has a Save button");
+    save.click(); // page script: untrusted
+    assert.equal(root.querySelector(".save-panel").hidden, true);
+    assert.equal(saved.length, 0);
+  } finally { dom.window.close(); }
+});

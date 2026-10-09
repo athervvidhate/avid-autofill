@@ -95,6 +95,10 @@
     .result.review .rail { background: var(--warn); }
     .result.error .rail { background: var(--error); }
     .result-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .result.saveable { grid-template-columns: 5px minmax(0, 1fr) auto auto; }
+    .save-answer, .save-choices button { padding: 4px 8px; border: 1px solid var(--line); border-radius: 7px; background: var(--accent-soft); color: var(--accent); cursor: pointer; font-size: 11px; font-weight: 700; }
+    .save-panel { grid-column: 2 / -1; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 0 0 10px; color: var(--muted); font-size: 12px; }
+    .save-choices { display: flex; gap: 6px; }
     .result-value { max-width: 150px; overflow: hidden; color: var(--muted); text-align: right; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 700; }
     .empty { padding: 14px 0; color: var(--muted); font-size: 13px; }
     .notice { padding: 11px 12px; border-radius: 10px; background: var(--warn-soft); color: var(--warn); font-size: 12px; line-height: 1.4; }
@@ -468,10 +472,42 @@
       value.textContent = completed ? r.value : statusLabel(r.status);
       value.title = `${r.value || ""} · ${statusLabel(r.status)}${r.method === "jev" ? ` · Jev: ${r.reason || "saved answer"}` : ""}`;
       li.append(rail, label, value);
+      if (r.field && AvidAutofill.jevContent && AvidAutofill.jevContent.answerFor(r.field)) addSave(li, r.field);
       list.append(li);
     }
     group.append(list);
     host.append(group);
+  }
+
+  // Save the answer the applicant gave on the page to the question bank, so
+  // Jev can reuse it. Only real clicks count: the page can reach this open
+  // shadow root and must not plant answers.
+  function addSave(li, fieldId) {
+    const jev = AvidAutofill.jevContent;
+    const button = el(`<button class="save-answer" type="button">Save</button>`);
+    const panel = el(`<div class="save-panel" hidden></div>`);
+    li.classList.add("saveable");
+    li.append(button, panel);
+    const show = (text) => { panel.hidden = false; panel.textContent = text; };
+    button.addEventListener("click", (event) => {
+      if (!event.isTrusted) return;
+      const current = jev.answerFor(fieldId);
+      if (!current || !current.answer) return show("Answer this on the page, then save it.");
+      panel.hidden = false;
+      panel.innerHTML = `<span class="save-prompt"></span><span class="save-choices"><button type="button" class="scope-company">This company</button><button type="button" class="scope-any">Any application</button></span>`;
+      panel.querySelector(".save-prompt").textContent = `Save “${current.answer}” for:`;
+      for (const [selector, anySite] of [[".scope-company", false], [".scope-any", true]]) {
+        panel.querySelector(selector).addEventListener("click", async (choice) => {
+          if (!choice.isTrusted) return;
+          try {
+            await jev.saveAnswer(fieldId, current.answer, anySite);
+            button.remove();
+            li.querySelector(".result-value").textContent = "Saved to bank";
+            show(anySite ? "Saved. Jev can reuse it on any application." : "Saved. Jev can reuse it on this company's applications.");
+          } catch (error) { show(error.message); }
+        });
+      }
+    });
   }
 
   function statusLabel(status) {

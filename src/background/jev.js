@@ -36,8 +36,16 @@
       return { results };
     } finally { active.delete(run); }
   }
+  // The page drawer saves an answer the applicant gave on the page. The scope
+  // comes from the sender's URL, never from the message.
+  async function saveAnswer(msg, sender) {
+    if (sender.id !== chrome.runtime.id || !Number.isInteger(sender.tab?.id) || !/^https?:/.test(sender.url || "")) throw new Error("Save answers from an application page.");
+    await A.saveProfile(J.saveAnswer(await A.getProfile(), msg, sender.url));
+    return {};
+  }
   async function handle(msg, sender) {
     if (msg.type === "AVID_JEV_FILL") return fill(msg, sender);
+    if (msg.type === "AVID_JEV_SAVE_ANSWER") return saveAnswer(msg, sender);
     if (!optionsSender(sender)) throw new Error("Open My Info to change the Jev connection.");
     if (msg.type === "AVID_JEV_STATE") return state();
     if (msg.type === "AVID_JEV_SAVE") return save(msg);
