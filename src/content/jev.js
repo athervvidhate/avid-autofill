@@ -6,8 +6,9 @@
   const blocked = /gender|\bsex\b|race|ethnic|disabilit|veteran|hispanic|latino|consent|certif|acknowledg|\bagree\b|terms|privacy|signature|social security|\bssn\b|captcha|password|\bsearch\b|\bfilter\b/;
   const visible = el => el?.isConnected && !el.disabled && !el.readOnly && el.getAttribute("aria-hidden") !== "true" && (el.offsetParent !== null || el.getClientRects().length > 0);
   const answered = ({ el, group, custom }) => custom ? !!A.fillers.customValue(el) : group ? group.some(r => r.checked) : !!el.value;
-  // Drop repeated label fragments, bare question IDs and select placeholders.
-  const clean = signal => [...new Set(String(signal || "").split(" | ").map(part => part.trim()).filter(part => part && !/^(select\.*|question \d+)$/.test(part)))].join(" | ");
+  // Drop repeated label fragments, select placeholders and generated IDs
+  // ("question 123", "cards 1c719ca9 ... field0").
+  const clean = signal => [...new Set(String(signal || "").split(" | ").map(part => part.trim()).filter(part => part && !/^(select\.*|question \d+)$/.test(part) && !/[0-9a-f]{8}/.test(part)))].join(" | ");
   function describe(candidate, id) {
     const { el, group, custom } = candidate;
     if (!visible(el) || blocked.test(candidate.signal)) return null;

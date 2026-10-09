@@ -363,3 +363,14 @@ test("custom dropdowns reach Jev with their real options and fill by exact label
     assert.equal(report.results.find(r => r.method === "jev").status, "filled");
   } finally { p.close(); }
 });
+
+test("labels sent to Jev drop generated field identifiers", async () => {
+  let sent;
+  const p = await page('<form><label for="why">Why us?</label><textarea id="why" name="cards[1c719ca9-5069-4afe-9e82-39ca420e0edb][field0]"></textarea></form>', async msg => {
+    sent = msg.fields; return { ok: true, results: msg.fields.map(f => ({ id: f.id, status: "ai-needs-answer" })) };
+  });
+  try {
+    await p.A.engine.fillPage(p.profile, p.settings, null);
+    assert.equal(sent[0].label, "why us? | why"); // the element id remains; the generated name is gone
+  } finally { p.close(); }
+});
