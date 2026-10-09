@@ -37,6 +37,7 @@
     education: [
       // { school, degree, field, location, startDate, endDate, gpa }
     ],
+    questionBank: [], // { id, question, answer, scopeUrl, anySite, approved }
     // Voluntary self-ID. Blank = leave untouched (the safe default).
     eeo: {
       gender: "",
@@ -86,6 +87,7 @@
     overwriteFilled: false, // if true, replace values already present in a field
     fillEEO: false, // opt-in: only fill voluntary self-ID when explicitly enabled
     highlightFilled: true, // briefly outline fields we touched
+    jevEnabled: false, // optional matching of approved saved answers
   };
 
   // Deep-merge a stored partial over the defaults so new schema keys always exist.

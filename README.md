@@ -27,6 +27,7 @@ Job seekers retype the same fifteen fields into a dozen different applicant
 tracking systems every week. Existing autofillers work, but they route your
 personal data through a third-party account. Avid Autofill does the same job
 with a different contract: **your profile and resume stay in your browser.**
+Optional Jev matching sends limited context directly to TypeSafe AI when enabled.
 The optional application tracker sends only the job details you approve directly
 to your Google spreadsheet. It is open source so you can verify that and change
 the field matching for your own search.
@@ -49,6 +50,9 @@ the field matching for your own search.
   consent, "consider me for other roles").
 - **Local profile** - your profile and resume live in `chrome.storage.local`.
   Autofill needs no account. No telemetry.
+- **Optional Jev matching** - bring your TypeSafe AI key to select approved saved
+  answers for unmatched native fields. A scoped question bank keeps company
+  answers tied to their application URLs. Off by default; review every result.
 - **Application tracker** - connect Google Sheets through Connections to create
   a formatted tracker. After confirmed submission, a small prompt lets you review
   and save the job. Optional broader site access covers company career pages and
@@ -101,6 +105,13 @@ copy button beside every field. Paste the value into the application yourself.
 
 Multi-step flows (Workday) fill one step at a time: click *Autofill* on each
 step as you advance.
+
+### Try Jev matching
+
+Reload the extension and application tabs, then open **My Info → Question bank**
+to save approved answers. In **Jev matching**, enter your TypeSafe AI key, enable
+matching, and save the connection. Keys last for the browser session and are not
+part of profile exports. See [setup, requests, validation, and limits](docs/jev.md).
 
 ### Track applications in Google Sheets
 
@@ -166,10 +177,18 @@ touch it and its styles never leak out.
 ## Privacy
 
 **Autofill:** Avid Autofill stores your profile and resume in `chrome.storage.local`
-on your machine. Autofill makes no network requests and needs no account.
+on your machine. Default autofill makes no network requests and needs no account.
 The extension has no analytics or backend. The resume is held as bytes so it can be injected into a file
 input; browsers cannot read files off your disk during autofill, which is why it
 must be saved once in the extension first.
+
+**Optional Jev:** when enabled, clicking Fill sends unmatched field labels,
+available options, and descriptions of eligible saved answers directly to
+TypeSafe AI. Mapping a dropdown or radio choice also sends the selected saved
+fact. Your resume and complete profile are not sent. The key stays in trusted
+extension session storage and is cleared by browser restart or extension reload.
+This uses your TypeSafe account and API credits. Remove the key and turn off Jev
+in My Info to return to local-only filling.
 
 **Optional tracker:** Google sign-in and Sheets/Drive requests go directly to
 Google. Approved tracker fields, including any notes you enter, are stored in
@@ -198,8 +217,8 @@ version.
 - **Never submits.** By design.
 - **File inputs** need the resume saved in the extension first (browser
   security). Drag-and-drop-only zones are best-effort.
-- **Open-ended questions** ("Why this company?") are left blank; an optional,
-  local AI draft layer is on the roadmap.
+- **Open-ended questions** can reuse approved bank answers with Jev. Generating
+  new drafts is not implemented.
 - **Workday** calendar-popover dates and multi-panel work history are
   implemented, but still need live passes against those widget variants. Use the
   page drawer; it keeps the fill action in the same user-initiated page context
@@ -214,7 +233,8 @@ version.
 - [x] On-demand in-page widget with narrowed host permissions
 - [ ] iCIMS / Taleo / Workable / SmartRecruiters full adapters
 - [x] Workday calendar-popover-only dates (live validation pending)
-- [ ] Optional local AI layer for open-ended questions
+- [x] Optional Jev matching of approved saved answers for native fields
+- [ ] Optional generation of new answers to open-ended questions
 - [ ] Per-site field-mapping overrides and multiple profiles
 - [ ] Chrome Web Store release
 

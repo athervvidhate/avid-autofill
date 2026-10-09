@@ -18,9 +18,11 @@
           <a href="#education">Education</a>
           <a href="#work-auth">Application answers</a>
           <a href="#eeo-section">Voluntary self-ID</a>
+          <a href="#question-bank">Question bank</a>
+          <a href="#jev-section">Jev matching</a>
           <a href="#connections">Connections</a>
         </nav>
-        <div class="sidebar-note"><span class="local-dot"></span><b>Local profile</b><span>Your profile stays in this browser.</span></div>
+        <div class="sidebar-note"><span class="local-dot"></span><b>Local profile</b><span>Optional Jev matching sends selected context to TypeSafe AI.</span></div>
       </aside>
 
       <main class="content" id="top">
@@ -69,13 +71,33 @@
           </details>
         </section>
 
+        <section id="question-bank" class="section-card">
+          <div class="section-heading"><div><h2>Question bank</h2><p>Save answers you approve for reuse. Jev can select these answers for similar questions.</p></div></div>
+          <p>Restrict company-specific answers to that company's application URL, such as https://jobs.ashbyhq.com/acme/. Check "Use on any application" only for answers that apply everywhere.</p>
+          <div id="questionBank-list"></div>
+          <button class="btn add" data-add="questionBank">+ Add answer</button>
+        </section>
+
+        <section id="jev-section" class="section-card">
+          <div class="section-heading"><div><h2>Jev matching <small>Experimental</small></h2><p>Fill more unanswered fields using your saved answers.</p></div></div>
+          <p>When you click Fill this application, Jev receives unmatched field labels, available options, and descriptions of saved answers directly at TypeSafe AI. Mapping a dropdown or radio option also sends the selected saved answer. Your resume and complete profile are not sent.</p>
+          <p>This first version handles text fields, native dropdowns, and radio groups. It chooses saved answers and does not write new responses. Review every filled answer before submitting.</p>
+          <label class="field">TypeSafe AI API key<input id="jev-key" type="password" autocomplete="off" spellcheck="false" placeholder="Enter your own Jev key" aria-describedby="jev-key-note"></label>
+          <p id="jev-key-note">Your key is held for this browser session in extension-only storage. Re-enter it after restarting the browser or reloading the extension. It is never included in a profile export.</p>
+          <label class="tracker-toggle"><input id="jev-enabled" type="checkbox"><span><b>Use Jev for unmatched fields</b><small>Off by default. Uses your TypeSafe AI account and API credits.</small></span></label>
+          <div class="io-actions"><button class="btn primary" id="jev-save">Save Jev connection</button><button class="btn danger-quiet" id="jev-clear">Remove key and turn off</button><a href="https://typesafe.ai" target="_blank" rel="noopener noreferrer">TypeSafe AI</a></div>
+          <p id="jev-status" role="status" aria-live="polite"></p>
+        </section>
+
         <div class="save-bar"><div><b>Save your profile changes</b><span id="save-msg" class="io-msg" role="status" aria-live="polite"></span></div><button class="btn primary" id="save">Save changes</button></div>
       </main>
     </div>
 
     <script src="../shared/schema.js"></script>
+    <script src="../shared/jev.js"></script>
     <script src="../shared/tracker-model.js"></script>
     <script src="options.js"></script>
     <script src="connections.js"></script>
+    <script src="jev.js"></script>
   </body>
 </html>

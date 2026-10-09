@@ -16,6 +16,7 @@
   const isAffirmative = (v) => /^(yes|y|true|1)$/i.test(String(v).trim());
 
   async function fillPage(profile, settings, resume) {
+    const run = AvidAutofill._fillRun = (AvidAutofill._fillRun || 0) + 1;
     AvidAutofill._highlight = settings.highlightFilled;
     const fillers = F();
     const matcher = M();
@@ -23,6 +24,7 @@
     const adapter = AvidAutofill.adapters.detect();
     const handled = new WeakSet();
     const results = [];
+    const unmatched = [];
 
     if (
       adapter.name === "Workday" &&
@@ -106,7 +108,7 @@
       group.forEach((r) => handled.add(r));
       const signal = groupSignal(group[0]);
       const m = matcher.match(signal, profile, helpers);
-      if (!m) continue;
+      if (!m) { unmatched.push({ el: group[0], group, signal }); continue; }
       if (m.eeo && !settings.fillEEO) continue;
       const ok = fillers.setRadio(group, m.value);
       record(signal, m.value, ok ? "filled" : "skipped");
@@ -138,7 +140,7 @@
 
       const signal = matcher.signalFor(el);
       const m = matcher.match(signal, profile, helpers);
-      if (!m) continue;
+      if (!m) { unmatched.push({ el, signal }); continue; }
       if (m.eeo && !settings.fillEEO) continue;
 
       // Respect existing content unless overwrite is on.
@@ -168,12 +170,19 @@
       }
     }
 
+    let aiMessage = "";
+    if (settings.jevEnabled && AvidAutofill.jevContent) {
+      const ai = await AvidAutofill.jevContent.fill(unmatched, profile, run);
+      results.push(...ai.results);
+      aiMessage = ai.aiMessage;
+    }
     return {
       ats: adapter.name,
       stub: !!adapter.stub,
       beta: !!(adapter.beta || adapter.stub),
       filledCount: results.filter((r) => r.status === "filled" || r.status === "checked").length,
       results,
+      aiMessage,
     };
   }
 

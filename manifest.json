@@ -47,6 +47,7 @@
         "src/content/matcher.js",
         "src/content/adapters.js",
         "src/content/workday.js",
+        "src/content/jev.js",
         "src/content/engine.js",
         "src/content/widget.js",
         "src/content/main.js"

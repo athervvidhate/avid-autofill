@@ -422,6 +422,12 @@
     title.textContent = review.length ? `${report.filledCount} fields filled. Check the items below.` : `${report.filledCount} fields filled on ${report.ats}.`;
     head.append(title);
     summary.append(head);
+    if (report.aiMessage) {
+      const notice = document.createElement("p");
+      notice.className = "notice";
+      notice.textContent = report.aiMessage;
+      summary.append(notice);
+    }
     const metrics = document.createElement("div");
     metrics.className = "metrics";
     [[done.length, "Filled"], [review.length, "Review"], [report.results.length, "Matched"]].forEach(([count, label]) => {
@@ -460,7 +466,7 @@
       const value = document.createElement("span");
       value.className = "result-value";
       value.textContent = completed ? r.value : statusLabel(r.status);
-      value.title = `${r.value || ""} · ${statusLabel(r.status)}`;
+      value.title = `${r.value || ""} · ${statusLabel(r.status)}${r.method === "jev" ? ` · Jev: ${r.reason || "saved answer"}` : ""}`;
       li.append(rail, label, value);
       list.append(li);
     }
@@ -469,7 +475,7 @@
   }
 
   function statusLabel(status) {
-    return ({ "kept-existing": "Kept existing", skipped: "Skipped", "no-option-match": "No match", error: "Error" })[status] || status;
+    return ({ "kept-existing": "Kept existing", skipped: "Skipped", "no-option-match": "No match", error: "Error", "ai-needs-answer": "Needs your answer", "ai-incompatible": "Value does not fit", "ai-unavailable": "Jev unavailable", "ai-stale": "Page or profile changed", "ai-limit": "Fill again for more" })[status] || status;
   }
 
   // --- Dev-only fixture capture -------------------------------------------

@@ -1,4 +1,4 @@
-importScripts("../shared/tracker-model.js", "google-config.js", "tracker.js");
+importScripts("../shared/schema.js", "../shared/jev.js", "jev.js", "../shared/tracker-model.js", "google-config.js", "tracker.js");
 
 // Opens the options page on first install and whenever the page drawer asks.
 chrome.runtime.onInstalled.addListener((details) => {

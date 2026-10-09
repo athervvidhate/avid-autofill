@@ -52,6 +52,12 @@ const EDU_FIELDS = [
   ["location", "Location"], ["startDate", "Start"], ["endDate", "End / expected"],
   ["gpa", "GPA"],
 ];
+const BANK_FIELDS = [
+  ["question", "Question or fact description", "wide"],
+  ["answer", "Approved answer", "wide-area"],
+  ["scopeUrl", "Company application URL prefix", "wide"],
+  ["anySite", "Use on any application", "checkbox"],
+];
 
 let profile;
 
@@ -78,9 +84,11 @@ function makeField(section, key, label, type) {
     control.type = "text";
   }
   control.dataset.path = id;
+  control.id = id;
   const lbl = document.createElement("label");
   lbl.className = "lbl";
   lbl.textContent = label;
+  lbl.htmlFor = id;
   if (type === "checkbox") { wrap.append(control, lbl); }
   else { wrap.append(lbl, control); }
   return wrap;
@@ -105,7 +113,7 @@ function makeCard(section, fields, item, i) {
   card.className = "card";
   const rm = document.createElement("button");
   rm.className = "remove"; rm.textContent = "×"; rm.title = "Remove";
-  rm.onclick = () => { profile[section].splice(i, 1); buildCards(section, fields, profile[section]); };
+  rm.onclick = () => { readIntoProfile(); profile[section].splice(i, 1); buildCards(section, fields, profile[section]); };
   const grid = document.createElement("div");
   grid.className = "grid";
   for (const [key, label, type] of fields) {
@@ -159,6 +167,7 @@ async function render() {
   fillFromProfile();
   buildCards("work", WORK_FIELDS, profile.work);
   buildCards("education", EDU_FIELDS, profile.education);
+  buildCards("questionBank", BANK_FIELDS, profile.questionBank);
 }
 
 // --- events ---
@@ -166,13 +175,25 @@ document.querySelectorAll("[data-add]").forEach((btn) => {
   btn.onclick = () => {
     const section = btn.dataset.add;
     readIntoProfile();
-    profile[section].push({});
-    buildCards(section, section === "work" ? WORK_FIELDS : EDU_FIELDS, profile[section]);
+    profile[section].push(section === "questionBank" ? { id: crypto.randomUUID(), approved: false, anySite: false } : {});
+    buildCards(section, section === "work" ? WORK_FIELDS : section === "education" ? EDU_FIELDS : BANK_FIELDS, profile[section]);
   };
 });
 
 $("save").onclick = async () => {
   readIntoProfile();
+  for (const entry of profile.questionBank) {
+    if (!entry.question?.trim() || entry.question.length > 500 || !entry.answer?.trim() || entry.answer.length > 8000) {
+      $("save-msg").textContent = "Each bank entry needs a question up to 500 characters and an answer up to 8,000 characters.";
+      return;
+    }
+    if (!entry.anySite && !AvidAutofill.jev.scopeMatches(entry.scopeUrl, entry.scopeUrl)) {
+      $("save-msg").textContent = "Add an HTTP/HTTPS application URL prefix, or approve using the answer on any application.";
+      return;
+    }
+    entry.id ||= crypto.randomUUID();
+  }
+  profile.questionBank.forEach(entry => { entry.approved = true; });
   await AvidAutofill.saveProfile(profile);
   flash($("save-msg"), "Saved ✓");
 };
