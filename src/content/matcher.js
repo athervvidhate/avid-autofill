@@ -118,7 +118,7 @@
     // --- Name ---
     { any: [/first name/, /given name/, /^fname$/, /legal first/], not: [/preferred/], get: (p, h) => h.firstName() },
     { any: [/last name/, /family name/, /surname/, /^lname$/, /legal last/], get: (p, h) => h.lastName() },
-    { any: [/preferred (first )?name/, /nick ?name/, /goes by/], get: (p) => p.personal.preferredName || p.personal.firstName },
+    { any: [/preferred (first )?name/, /nick ?name/, /goes by/, /name you('d| would) prefer/, /like us to call you/], get: (p) => p.personal.preferredName || p.personal.firstName },
     { any: [/legal name/, /full name/, /^name$/, /(^|\| )name(\*| \||$)/, /your name/, /candidate name/], not: [/company|user|file|first|last|middle|event|account|maiden|screen|pronounc|phonetic/], get: (p) => p.personal.fullName || `${p.personal.firstName} ${p.personal.lastName}`.trim() },
 
     // --- Contact ---
@@ -133,6 +133,7 @@
     { any: [/\bcity\b/, /\btown\b/], not: [/velocity|capacity|ethnic/], expand: "place", get: (p) => p.personal.city },
     { any: [/\bstate\b/, /\bprovince\b/, /\bregion\b/], not: [/statement|estate|united states|work/], expand: "usState", get: (p) => p.personal.state },
     { any: [/zip/, /postal code/, /post code/], get: (p) => p.personal.postalCode },
+    { any: [/\b(located|location|based|living|reside|residing) in\b/], not: [/relocat|willing|commut|authoriz|work|time ?zone|hours/], kind: "yesno", get: (p, h, signal) => inListedCountry(signal, p.personal.country) },
     { any: [/country/, /nationality/], not: [/authoriz/, /eligible to work/, /sponsor/, /work in the country/, /citizen/], get: (p) => p.personal.country },
 
     // --- Links ---
@@ -224,12 +225,41 @@
     return names.map((name) => `${city}, ${name}`);
   }
 
+  // Country names from the browser's own region list plus common short forms,
+  // so "are you located in Canada, UK or Poland?" can be answered.
+  let countryNames;
+  function countriesIn(text) {
+    if (!countryNames) {
+      const names = new Intl.DisplayNames(["en"], { type: "region" });
+      countryNames = [["uk", "GB"], ["great britain", "GB"], ["england", "GB"], ["usa", "US"], ["u.s.a", "US"], ["america", "US"]];
+      for (let a = 65; a < 91; a++) {
+        for (let b = 65; b < 91; b++) {
+          const code = String.fromCharCode(a, b), name = names.of(code);
+          if (name && name !== code) countryNames.push([norm(name), code]);
+        }
+      }
+    }
+    const has = (name) => new RegExp(`(^|[^a-z])${name.replace(/[.]/g, "\\.")}([^a-z]|$)`).test(text);
+    return new Set(countryNames.filter(([name]) => has(name)).map(([, code]) => code));
+  }
+  // "Yes" when the question names the applicant's country, "No" when it names
+  // only other countries and nothing that could be theirs ("US", a US state).
+  function inListedCountry(signal, country) {
+    const own = [...countriesIn(norm(country))][0];
+    if (!own) return null;
+    const text = Object.keys(US_STATES).reduce((t, state) => t.replace(new RegExp(`\\b${state}\\b`, "g"), " "), signal);
+    const named = countriesIn(text);
+    if (named.has(own)) return "Yes";
+    if (!named.size || /\bu\.?s\b/.test(text)) return null;
+    return "No";
+  }
+
   // Return { value, alts, kind, eeo, place } for a signal, or null if no rule matches.
   function match(signal, profile, helpers) {
     for (const rule of RULES) {
       if (rule.not && rule.not.some((re) => re.test(signal))) continue;
       if (rule.any.some((re) => re.test(signal))) {
-        const value = rule.get(profile, helpers);
+        const value = rule.get(profile, helpers, signal);
         if (value == null || value === "") return null;
         const alts = rule.expand === "usState" ? stateAlternates(value) : rule.expand === "place" ? placeAlternates(value, profile) : [];
         return { value: String(value), alts, kind: rule.kind || "text", eeo: !!rule.eeo, place: rule.expand === "place" };

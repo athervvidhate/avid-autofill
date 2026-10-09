@@ -1264,3 +1264,32 @@ test("name pronunciation questions are not answered with the legal name", () => 
   assert.equal(A.matcher.match("type your response | preferred name | what would you like us to call you?", profile, helpers).value, "Al");
   assert.equal(A.matcher.match("your name", profile, helpers).value, "Alex Rivera");
 });
+
+test("preferred-name questions phrased as what to call you use the preferred name", () => {
+  const A = blankWindow().AvidAutofill, profile = testProfile(A), helpers = A.matcher.makeHelpers(profile);
+  assert.equal(A.matcher.match("what's the name you'd prefer us to use throughout the interview process?", profile, helpers).value, "Al");
+  assert.equal(A.matcher.match("what name would you like us to call you?", profile, helpers).value, "Al");
+  profile.personal.preferredName = "";
+  assert.equal(A.matcher.match("what's the name you'd prefer us to use throughout the interview process?", profile, helpers).value, "Alex");
+});
+
+test("location questions naming countries are answered from the profile country", () => {
+  const A = blankWindow().AvidAutofill, profile = testProfile(A), helpers = A.matcher.makeHelpers(profile);
+  const answer = signal => A.matcher.match(signal, profile, helpers)?.value ?? null;
+  // GitLab's wording, typo included.
+  assert.equal(answer("are you currently location in either canada, uk or poland?*"), "No");
+  assert.equal(answer("are you located in the united states?"), "Yes");
+  assert.equal(answer("are you currently based in the usa or canada?"), "Yes");
+  assert.equal(answer("are you located in london, united kingdom?"), "No");
+  // Nothing that could be the applicant's country may be read as "No".
+  assert.equal(answer("are you located in the us or canada?"), null);
+  assert.equal(answer("are you located in new jersey or new york?"), null);
+  assert.equal(answer("are you located in the san francisco bay area?"), null);
+  // Willingness, commuting and work-permission questions are different questions.
+  assert.equal(answer("are you located in or willing to relocate to canada?"), null);
+  assert.equal(answer("do you live within commuting distance of toronto, canada?"), null);
+  assert.equal(answer("are you located in poland and able to work there?"), null);
+  profile.personal.country = "Canada";
+  assert.equal(answer("are you currently location in either canada, uk or poland?*"), "Yes");
+  assert.equal(answer("are you located in the united states?"), "No");
+});

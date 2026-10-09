@@ -337,16 +337,16 @@ test("acceptance gate is the live-calibrated probability of 0.80", () => {
 
 test("custom dropdowns reach Jev with their real options and fill by exact label", async () => {
   let sent;
-  const p = await page('<form><label for="reside">Do you currently reside in the United States?</label><input id="reside" role="combobox" aria-controls="reside-list"></form>', async msg => {
+  const p = await page('<form><label for="clearance">Do you hold an active security clearance?</label><input id="clearance" role="combobox" aria-controls="clearance-list"></form>', async msg => {
     sent = msg.fields;
-    return { ok: true, results: [{ id: msg.fields[0].id, status: "fill", value: "Yes", optionId: "o1", sourceQuestion: "Where do you live?" }] };
+    return { ok: true, results: [{ id: msg.fields[0].id, status: "fill", value: "Yes", optionId: "o1", sourceQuestion: "Do you hold a clearance?" }] };
   });
   try {
-    const doc = p.dom.window.document, input = doc.getElementById("reside");
-    const close = () => doc.getElementById("reside-list")?.remove();
+    const doc = p.dom.window.document, input = doc.getElementById("clearance");
+    const close = () => doc.getElementById("clearance-list")?.remove();
     input.addEventListener("click", () => {
-      if (doc.getElementById("reside-list")) return;
-      const list = doc.createElement("div"); list.id = "reside-list";
+      if (doc.getElementById("clearance-list")) return;
+      const list = doc.createElement("div"); list.id = "clearance-list";
       for (const text of ["No", "Yes", "Prefer not to say"]) {
         const option = doc.createElement("div"); option.setAttribute("role", "option"); option.textContent = text;
         option.getClientRects = () => [{}];
@@ -358,7 +358,7 @@ test("custom dropdowns reach Jev with their real options and fill by exact label
     input.addEventListener("keydown", event => { if (event.key === "Escape") close(); });
     const report = await p.A.engine.fillPage(p.profile, p.settings, null);
     assert.equal(sent.length, 1);
-    assert.deepEqual(JSON.parse(JSON.stringify(sent[0])), { id: sent[0].id, label: "do you currently reside in the united states? | reside", type: "select", options: { o0: "No", o1: "Yes", o2: "Prefer not to say" } });
+    assert.deepEqual(JSON.parse(JSON.stringify(sent[0])), { id: sent[0].id, label: "do you hold an active security clearance? | clearance", type: "select", options: { o0: "No", o1: "Yes", o2: "Prefer not to say" } });
     assert.equal(input.value, "Yes");
     assert.equal(report.results.find(r => r.method === "jev").status, "filled");
   } finally { p.close(); }
