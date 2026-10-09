@@ -118,6 +118,32 @@
       record(signal, m.value, ok ? (m.assumed ? "assumed" : "filled") : "skipped");
     }
 
+    // --- 2b. Yes/No button pairs: a parent whose only buttons read "Yes" and "No".
+    //         Any checkbox beside them is the form's hidden mirror of the buttons. ---
+    const yesNoGroups = new Map();
+    F().queryAll("button").forEach((b) => {
+      const parent = b.parentElement;
+      if (parent && !handled.has(b) && /^(yes|no)$/i.test(b.textContent.trim())) {
+        yesNoGroups.set(parent, [...(yesNoGroups.get(parent) || []), b]);
+      }
+    });
+    for (const [container, buttons] of yesNoGroups) {
+      const answers = buttons.map((b) => b.textContent.trim().toLowerCase()).sort().join();
+      if (answers !== "no,yes" || container.querySelectorAll("button").length !== 2 || !buttons.every(isVisible)) continue;
+      buttons.forEach((b) => handled.add(b));
+      F().queryAll("input", container).forEach((i) => handled.add(i));
+      const signal = matcher.choiceSignal(container);
+      const m = matcher.match(signal, profile, helpers);
+      if (!m) { unmatched.push({ el: buttons[0], signal }); continue; }
+      if (m.eeo && !settings.fillEEO) continue;
+      if (!settings.overwriteFilled && buttons.some((b) => b.getAttribute("aria-pressed") === "true")) {
+        record(signal, m.value, "kept-existing");
+        continue;
+      }
+      const ok = fillers.setButtonChoice(buttons, m.value);
+      record(signal, m.value, ok ? (m.assumed ? "assumed" : "filled") : "skipped");
+    }
+
     // --- 3. Everything else: text inputs, textareas, native selects, checkboxes.
     const nodes = F().queryAll(
       'input, textarea, select'

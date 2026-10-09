@@ -57,6 +57,8 @@
   function groupSignal(radios) {
     const legend = radios[0].closest("fieldset")?.querySelector("legend");
     if (legend && legend.textContent.trim()) return norm(legend.textContent);
+    const title = groupTitle(radios);
+    if (title) return title;
     let node = radios[0].parentElement;
     while (node && !radios.every((r) => node.contains(r))) node = node.parentElement;
     for (let i = 0; i < 4 && node && node.parentElement; i++, node = node.parentElement) {
@@ -67,6 +69,27 @@
       if (norm(text).length > 2) return norm(text).slice(0, 300);
     }
     return signalFor(radios[0]);
+  }
+
+  // The question label of a radio group wrapped in a fieldset or role=radiogroup
+  // with no <legend> (Ashby): the first label in the group that is not one of the
+  // options. Without it the sibling-text fallback below sweeps up neighbouring
+  // questions and the group is answered as the wrong one.
+  function groupTitle(radios) {
+    const box = radios[0].closest('fieldset, [role="radiogroup"], [role="group"]');
+    if (!box) return "";
+    const named = norm(attr(box, "aria-label"));
+    if (named) return named;
+    const ids = new Set(radios.map((r) => r.id).filter(Boolean));
+    const label = Array.from(box.querySelectorAll("label")).find(
+      (l) => !ids.has(l.getAttribute("for")) && !l.querySelector("input") && norm(l.textContent)
+    );
+    return label ? norm(label.textContent) : "";
+  }
+
+  // Question text for a container of Yes/No buttons: the text around the buttons.
+  function choiceSignal(container) {
+    return norm(nearbyText(container) || container.getAttribute("aria-label"));
   }
 
   // Turn camelCase / snake_case / kebab-case identifiers into spaced words so
@@ -126,7 +149,7 @@
     { any: [/e-?mail/, /^email address$/], not: [/confirm|company/], get: (p) => p.personal.email },
     { any: [/phone device type/], kind: "select", get: (p) => p.personal.phoneDeviceType || "Mobile" },
     { any: [/phone/, /mobile/, /telephone/, /contact number/], not: [/extension/, /device type/, /\bsms\b/, /opt.?in/, /phone code/, /country.*code/, /phonetic/], get: (p) => p.personal.phone },
-    { any: [/pronoun/], get: (p) => p.personal.pronouns },
+    { any: [/\bpronouns?\b/], not: [/pronounc|pronunciation|phonetic/], get: (p) => p.personal.pronouns },
 
     // --- Address ---
     { any: [/street address/, /address line ?1/, /^address$/, /mailing address/], not: [/email/], get: (p) => p.personal.address },
@@ -164,6 +187,8 @@
     { any: [/notice period/, /availability to start/, /when can you start/, /earliest start/, /start date/], get: (p) => p.misc.earliestStartDate || p.misc.noticePeriod },
     // General willingness only: a named destination or relocation assistance is a different question.
     { any: [/willing to relocate/, /open to relocat/, /relocat/], not: [/relocat\w* to \w/, /assistance|package|stipend|support/], kind: "yesno", get: (p) => p.misc.willingToRelocate },
+    // In-office attendance ("This role is onsite ... willing to work from our local office?").
+    { any: [/on-?site/, /in[- ]person/, /(work|working|come|commute|report)\w* (from|in|into|to|at) (the |our |a |an )?(\w+ )?(local |physical |regional )?office/], not: [/relocat/, /remote(ly)? (work|position|role)? ?only/], kind: "yesno", get: (p) => p.questions.willingOnsite },
     { any: [/how did you (hear|find)/, /referral source/, /source/], not: [/open ?source/], get: (p) => p.misc.howHeard },
     { any: [/cover letter/], get: (p) => p.misc.coverLetter },
     { any: [/graduation date/, /anticipated graduation/, /expected graduation/, /grad(uation)? date/], get: (p, h) => p.misc.graduationDate || h.edu0().endDate },
@@ -269,5 +294,5 @@
   }
 
   AvidAutofill.labelTextFor = labelTextFor;
-  AvidAutofill.matcher = { signalFor, groupSignal, match, makeHelpers: P, norm, deCamel };
+  AvidAutofill.matcher = { signalFor, groupSignal, choiceSignal, match, makeHelpers: P, norm, deCamel };
 })();

@@ -35,6 +35,7 @@ const LAYOUT = {
     ["consentToContact", "Consent to text/email updates?", "select:Yes|No"],
     ["consentToOtherRoles", "Consider me for other roles?", "select:Yes|No"],
     ["over18", "Are you 18 or older?", "select:Yes|No"],
+    ["willingOnsite", "Willing to work onsite?", "select:Yes|No"],
   ],
   eeo: [
     ["gender", "Gender"], ["hispanicLatino", "Hispanic/Latino?", "select:|Yes|No"],

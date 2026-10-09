@@ -73,6 +73,7 @@
       consentToContact: "Yes",
       consentToOtherRoles: "Yes",
       over18: "Yes",
+      willingOnsite: "Yes", // willing to work from the office / onsite in person
     },
     meta: {
       importedAt: "",

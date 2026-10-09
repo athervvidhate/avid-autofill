@@ -1641,3 +1641,35 @@ test("Lever location search picks the suggestion in the profile's state", async 
   assert.equal(document.getElementById("selected-location").value, '{"name":"Portland, CA, USA"}');
   assert.equal(report.results.find(r => /location/.test(r.label))?.status, "filled");
 });
+
+test("fillPage answers a captured Ashby form: yes/no buttons, pronouns, LinkedIn, gender and race", async () => {
+  const { document, A, dom } = loadFixture("ashby-application.html", "https://jobs.ashbyhq.com/example/job/application");
+  dom.window.HTMLElement.prototype.getClientRects = function () { return [{}]; };
+  // Ashby's buttons only change state through their click handler.
+  document.querySelectorAll(".ashby-application-form-input-yesno-option").forEach((b) =>
+    b.addEventListener("click", () => {
+      b.parentElement.querySelectorAll("button").forEach((o) => o.setAttribute("aria-pressed", String(o === b)));
+    })
+  );
+  const profile = testProfile(A);
+  Object.assign(profile.personal, { pronouns: "he/him" });
+  profile.eeo.gender = "Male";
+  profile.eeo.race = "Asian";
+  profile.workAuth = { authorizedToWork: "Yes", requireSponsorship: "No" };
+  await A.engine.fillPage(profile, { overwriteFilled: false, fillEEO: true, highlightFilled: false }, null);
+
+  const pressed = (path) =>
+    document.querySelector(`[data-field-path="${path}"] button[aria-pressed="true"]`)?.textContent;
+  assert.equal(pressed("1cd98c1a-3766-498b-8ab7-f7e325a11883"), "Yes", "onsite");
+  assert.equal(pressed("28aa6e1c-b695-442a-adea-8ac56073529d"), "Yes", "work authorization");
+  assert.equal(pressed("c86cc07c-951c-46a2-8804-dfdbc4a00150"), "No", "sponsorship");
+  const value = (id) => document.getElementById(id).value;
+  assert.equal(value("ad70a2c7-3548-440d-bd8f-4b72c54fc521"), "he/him", "pronouns");
+  assert.equal(value("36e042a7-71c3-4d17-a72f-54d355a547b9"), "", "name pronunciation is not the pronouns field");
+  assert.equal(value("aebd5254-2ac1-40d3-827f-01e4eaadaf29"), "https://linkedin.com/in/alexrivera", "LinkedIn");
+  const checked = (name) => document.querySelector(`input[type="radio"][name$="${name}"]:checked`)?.id;
+  assert.match(checked("_systemfield_eeoc_gender"), /gender-labeled-radio-0$/);
+  assert.match(checked("_systemfield_eeoc_race"), /race-labeled-radio-4$/);
+  // The relocation question keeps its own answer, not a neighbour's.
+  assert.match(checked("fb61f6eb-5a53-477d-9f04-8f6118f14a4f"), /radio-0$/);
+});
