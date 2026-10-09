@@ -262,9 +262,9 @@
     // Options render in a portal. When the opener names its listbox, look only
     // there, so hidden lists elsewhere on the page (phone country codes) are ignored.
     const listboxId = typeInput && typeInput.getAttribute("aria-controls");
-    for (let attempt = 0; attempt < 8 && !pick; attempt++) {
+    const findOption = () => {
       const listbox = listboxId && document.getElementById(listboxId);
-      const available = Array.from(
+      const visible = Array.from(
         queryAll(
           '[data-automation-id="promptOption"], [class*="option"], [role="option"], li[id*="option"]',
           listbox || undefined
@@ -272,11 +272,28 @@
       ).filter(
         (o) => o.offsetParent !== null || o.getClientRects().length > 0
       );
+      // A wrapper whose class mentions "option" holds every option's text, so it
+      // would match any target and a click on it lands on whichever option the
+      // list has highlighted (the first). Only innermost elements are options.
+      const available = visible.filter((o) => !visible.some((c) => c !== o && o.contains(c)));
       // Exact text for any target first; otherwise the earliest (most specific)
       // target that some option contains.
-      pick =
+      return (
         available.find((o) => targets.some((t) => optText(o) === t)) ||
-        (config && config.exact ? null : targets.map((t) => available.find((o) => optText(o).includes(t))).find(Boolean));
+        (config && config.exact ? null : targets.map((t) => available.find((o) => optText(o).includes(t))).find(Boolean)) ||
+        null
+      );
+    };
+    for (let attempt = 0; attempt < 8 && !pick; attempt++) {
+      pick = findOption();
+      if (pick) {
+        // The list re-renders while a typed search resolves, and a node found
+        // mid-render can end up showing a different option when it is clicked.
+        // Click only an option that is still the match after the list settles.
+        await sleep(120);
+        const again = findOption();
+        if (!again || !pick.isConnected || again !== pick || optText(again) !== optText(pick)) pick = null;
+      }
       if (!pick && typeInput && attempt < 7) await sleep(150);
     }
 
@@ -292,10 +309,24 @@
       }
       return false;
     }
+    const chosen = optText(pick);
     pick.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
     pick.click();
     flash(control);
-    return true;
+    await sleep(120);
+    return selectionAgrees(control, chosen);
+  }
+
+  // After a click, whether the control now shows the option we meant to pick.
+  // A control that shows nothing we can read counts as agreeing; one that shows
+  // some other choice does not, so a misclick is reported rather than "filled".
+  function selectionAgrees(control, chosen) {
+    const field = control.closest('[data-automation-id^="formField"]');
+    const shown = [customValue(control)];
+    if (control.matches("button")) shown.push(control.textContent);
+    if (field) queryAll('[data-automation-id="selectedItem"], button[aria-haspopup="listbox"]', field).forEach((n) => shown.push(n.textContent));
+    const seen = shown.map(normalize).filter((t) => t && !/^select\b/.test(t));
+    return !seen.length || seen.some((t) => t.includes(chosen) || chosen.includes(t));
   }
 
   // Lever-style place search: type the city, which searches on keydown, then

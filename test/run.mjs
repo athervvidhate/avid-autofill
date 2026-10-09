@@ -1010,6 +1010,59 @@ test("setReactSelect never chooses an unrelated first option", async () => {
   assert.equal(clicked, false);
 });
 
+const RACE_OPTIONS = [
+  "American Indian or Alaska Native (Not Hispanic or Latino) (United States of America)",
+  "Asian (Not Hispanic or Latino) (United States of America)",
+  "White (Not Hispanic or Latino) (United States of America)",
+];
+
+// A Workday-style button dropdown whose popup is a wrapper (class mentions
+// "option") around the options. Clicking the wrapper selects the highlighted
+// (first) option, as the real list does; clicking an option selects it.
+function raceDropdown(document) {
+  document.body.innerHTML = `
+    <div data-automation-id="formField-race">
+      <button aria-haspopup="listbox" aria-label="Race/Ethnicity Select One">Select One</button>
+    </div>
+    <div class="css-optionsWrapper">
+      <ul role="listbox">${RACE_OPTIONS.map((t) => `<li role="option">${t}</li>`).join("")}</ul>
+    </div>`;
+  const button = document.querySelector("button");
+  for (const el of document.querySelectorAll("div.css-optionsWrapper, ul, li")) {
+    Object.defineProperty(el, "offsetParent", { configurable: true, get: () => document.body });
+  }
+  document.querySelector(".css-optionsWrapper").addEventListener("click", (e) => {
+    const li = e.target.closest("li");
+    button.textContent = li ? li.textContent : RACE_OPTIONS[0];
+  });
+  return button;
+}
+
+test("setReactSelect clicks the Asian option, not the list wrapper that holds every option", async () => {
+  const win = blankWindow();
+  const { document, AvidAutofill: A } = win;
+  const button = raceDropdown(document);
+
+  const ok = await A.fillers.setReactSelect(button, ["Asian"]);
+
+  assert.equal(ok, true);
+  assert.equal(button.textContent, RACE_OPTIONS[1]);
+});
+
+test("setReactSelect reports a dropdown that ends up on a different option", async () => {
+  const win = blankWindow();
+  const { document, AvidAutofill: A } = win;
+  const button = raceDropdown(document);
+  // The page ignores clicks on options and keeps selecting the first one.
+  document.querySelectorAll("li").forEach((li) =>
+    li.addEventListener("click", (e) => { e.stopPropagation(); button.textContent = RACE_OPTIONS[0]; })
+  );
+
+  const ok = await A.fillers.setReactSelect(button, ["Asian"]);
+
+  assert.equal(ok, false);
+});
+
 test("setReactSelect keeps a typeahead focused until its matching option is chosen", async () => {
   const win = blankWindow();
   const { document, AvidAutofill: A } = win;
