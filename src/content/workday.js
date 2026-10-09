@@ -282,7 +282,9 @@
     const year = wrap && wrap.querySelector('input[data-automation-id="dateSectionYear-input"]');
     if (!year || handled.has(year)) return;
     handled.add(year);
-    const date = parseDate(rawDate);
+    // These spinners take a year only, so a bare "2022" is enough.
+    const bare = String(rawDate).trim().match(/^(\d{4})$/);
+    const date = bare ? { yyyy: bare[1] } : parseDate(rawDate);
     if (!date) {
       record(label, rawDate, "date-unparsed");
       return;

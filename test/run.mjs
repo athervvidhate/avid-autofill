@@ -572,14 +572,16 @@ test("education fills a plain-text School or University box", async () => {
         <div role="group" aria-labelledby="Education-1-panel">
           <h5 id="Education-1-panel">Education 1</h5>
           <div data-automation-id="formField-schoolName"><label for="s">School or University</label><input type="text" id="s" name="schoolName"></div>
+          <div data-automation-id="formField-firstYearAttended"><label>From</label><input role="spinbutton" data-automation-id="dateSectionYear-input"></div>
         </div>
       </div>
     </div>`;
   A.fillers.sleep = async () => {};
   const p = testProfile(A);
-  p.education = [{ school: "UC San Diego", degree: "", field: "" }];
+  p.education = [{ school: "UC San Diego", degree: "", field: "", startDate: "2022" }];
   await A.engine.fillPage(p, { overwriteFilled: false, fillEEO: false, highlightFilled: false }, null);
   assert.equal(document.querySelector("#s").value, "UC San Diego");
+  assert.equal(document.querySelector('[data-automation-id="dateSectionYear-input"]').getAttribute("aria-valuenow"), "2022");
 });
 
 test("Workday skills search runs on Enter, then the matching result is clicked", async () => {
