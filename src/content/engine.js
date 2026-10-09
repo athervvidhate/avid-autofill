@@ -78,7 +78,9 @@
         if (handled.has(control) || !isVisible(control)) continue;
         F().queryAll("input", control).forEach((i) => handled.add(i));
         handled.add(control);
-        const signal = matcher.signalFor(control);
+        // React-select's question label belongs to its inner input; the control
+        // itself only exposes the "Select..." placeholder.
+        const signal = matcher.signalFor(control.matches("input") ? control : control.querySelector("input") || control);
         const m = matcher.match(signal, profile, helpers);
         if (!m) continue;
         if (m.eeo && !settings.fillEEO) continue;

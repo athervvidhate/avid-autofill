@@ -124,7 +124,7 @@
     { any: [/twitter|(^| )x( |$)/], get: (p) => p.links.twitter },
 
     // --- Current role / employer ---
-    { any: [/current company/, /current employer/, /present employer/, /^company$/, /employer/], not: [/why|reason|previous/], get: (p, h) => h.work0().company },
+    { any: [/current company/, /current employer/, /present employer/, /^company$/, /employer/], not: [/why|reason|previous|agreement|restriction/], get: (p, h) => h.work0().company },
     { any: [/current title/, /current role/, /job title/, /^title$/, /current position/], not: [/mr\.?|mrs\.?|salutation/], get: (p, h) => h.work0().title },
 
     // --- Education ---

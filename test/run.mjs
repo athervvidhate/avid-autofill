@@ -1171,3 +1171,16 @@ test("preferred first name uses the saved preferred name, not the first name", (
   profile.personal.preferredName = "";
   assert.equal(A.matcher.match("preferred first name*", profile, helpers).value, "Alex");
 });
+
+test("Greenhouse Remix react-select questions are matched by their visible label", async () => {
+  const { A, dom } = loadFixture("greenhouse-remix-application.html", "https://job-boards.greenhouse.io/gitlab/jobs/8698314002");
+  dom.window.HTMLElement.prototype.getClientRects = () => [{ width: 100, height: 20 }]; // jsdom has no layout
+  try {
+    const report = await A.engine.fillPage(testProfile(A), A.DEFAULT_SETTINGS, null);
+    assert.equal(report.ats, "Greenhouse");
+    const sponsorship = report.results.find(r => /require sponsorship/.test(r.label));
+    assert.ok(sponsorship, `sponsorship question not matched; labels: ${report.results.map(r => r.label).join(" || ")}`);
+    assert.equal(sponsorship.value, "No");
+    assert.ok(!report.results.some(r => /employment agreements/.test(r.label)), "an agreements question is not the current employer");
+  } finally { dom.window.close(); }
+});

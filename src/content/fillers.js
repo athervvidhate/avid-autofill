@@ -239,15 +239,9 @@
       control.scrollIntoView({ block: "center" });
     }
 
-    // The opener is an inner input/combobox, else the control itself (Workday
-    // dropdowns are a bare <button>).
-    const opener =
-      (control.matches("input") && control) ||
-      control.querySelector("input") ||
-      control.querySelector('[role="combobox"], [class*="control"]') ||
-      control;
-    opener.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
-    opener.click();
+    // Press the control the way a pointer click does. React-select (Greenhouse)
+    // ignores a lone mousedown or click on its inner input.
+    press(control);
     await sleep(150);
 
     // Type into a filter box if one exists (react-select inner input, or
@@ -265,10 +259,15 @@
     const optText = (o) =>
       normalize(o.getAttribute("data-automation-label") || o.textContent);
     let pick = null;
+    // Options render in a portal. When the opener names its listbox, look only
+    // there, so hidden lists elsewhere on the page (phone country codes) are ignored.
+    const listboxId = typeInput && typeInput.getAttribute("aria-controls");
     for (let attempt = 0; attempt < 8 && !pick; attempt++) {
+      const listbox = listboxId && document.getElementById(listboxId);
       const available = Array.from(
         queryAll(
-          '[data-automation-id="promptOption"], [class*="option"], [role="option"], li[id*="option"]'
+          '[data-automation-id="promptOption"], [class*="option"], [role="option"], li[id*="option"]',
+          listbox || undefined
         )
       ).filter(
         (o) => o.offsetParent !== null || o.getClientRects().length > 0
@@ -295,6 +294,16 @@
     pick.click();
     flash(control);
     return true;
+  }
+
+  function press(el) {
+    const init = { bubbles: true, cancelable: true, composed: true, button: 0, view: window };
+    const Pointer = typeof PointerEvent === "function" ? PointerEvent : MouseEvent;
+    el.dispatchEvent(new Pointer("pointerdown", { ...init, buttons: 1 }));
+    el.dispatchEvent(new MouseEvent("mousedown", { ...init, buttons: 1 }));
+    el.dispatchEvent(new Pointer("pointerup", init));
+    el.dispatchEvent(new MouseEvent("mouseup", init));
+    el.dispatchEvent(new MouseEvent("click", init));
   }
 
   function sleep(ms) {
