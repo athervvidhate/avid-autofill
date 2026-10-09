@@ -178,6 +178,12 @@ The 0.80 gate was fixed from dev data before holdout was scored: the lowest grid
 value with no wrong dev fills and at least 0.05 margin over the worst wrong pick.
 The only wrong pick seen was an inference ("willing to travel more than 50%?"
 answered "No" from "up to 25%"), with stage-one probability up to 0.71.
+Later cases for opposite-direction negation, placeholder options, helper text
+and unsatisfiable date formats (dev `formats`, holdout `holdout-c`) produced no
+wrong fills at 0.80. The closest call was mapping "No active clearance" to the
+option "None" when "Inactive / expired" was also offered (stage two p=0.79).
+Questions two facts can answer (work authorization and sponsorship) split
+stage-one probability and are left for review.
 Provider probabilities vary by up to about 0.08 between identical runs, and one
 borderline negation flipped between a source and `NEEDS_USER`. Zero wrong fills
 in about 130 decisions bounds the wrong-fill rate near 2% at 95% confidence on

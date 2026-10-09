@@ -99,6 +99,14 @@ globalThis.JEV_CASES = [
     { id: "f3", label: "Middle name", type: "text", expect: null, tag: "missing" },
   ] },
 
+  { id: "formats", set: "dev", pageUrl: ACME, fields: [
+    { id: "f0", label: "Are you able to work in the US without needing visa sponsorship?", type: "radio", options: yesNo, expect: { option: "o1" }, tag: "negation" },
+    { id: "f1", label: "Will you require sponsorship?", type: "select", options: { o1: "Select...", o2: "Yes", o3: "No" }, expect: { option: "o3" }, tag: "placeholder" },
+    { id: "f2", label: "Notice period (leave blank if not currently employed)", type: "text", expect: "bank_notice", tag: "helper-text" },
+    { id: "f3", label: "Desired start date (MM/DD/YYYY)", type: "text", expect: null, tag: "format" },
+    { id: "f4", label: "Weekend availability", type: "select", options: { o1: "Available", o2: "Not available" }, expect: { option: "o2" }, tag: "option-wording" },
+  ] },
+
   { id: "holdout-a", set: "holdout", pageUrl: ACME, fields: [
     { id: "f0", label: "Do you require employer sponsorship to work in the US now or later?", type: "select", options: yesNo, expect: { option: "o2" }, tag: "option" },
     { id: "f1", label: "Are you able to work weekends?", type: "radio", options: noYes, expect: { option: "o1" }, tag: "reorder" },
@@ -122,5 +130,12 @@ globalThis.JEV_CASES = [
     { id: "f7", label: "What name do you go by?", type: "text", expect: "personal_preferredName", tag: "paraphrase" },
     { id: "f8", label: "Surname", type: "text", expect: "personal_lastName", tag: "profile" },
     { id: "f9", label: "City of residence", type: "text", expect: "personal_city", tag: "profile" },
+  ] },
+  { id: "holdout-c", set: "holdout", pageUrl: ACME, fields: [
+    { id: "f0", label: "Can you work in the United States without employer sponsorship?", type: "radio", options: yesNo, expect: { option: "o1" }, tag: "negation" },
+    { id: "f1", label: "Are you willing to relocate?", type: "select", options: { o1: "-- Select --", o2: "Yes", o3: "No" }, expect: { option: "o2" }, tag: "placeholder" },
+    { id: "f2", label: "Earliest start date (optional; leave blank if flexible)", type: "text", expect: "bank_start", tag: "helper-text" },
+    { id: "f3", label: "Date available (YYYY-MM-DD)", type: "text", expect: null, tag: "format" },
+    { id: "f4", label: "Security clearance status", type: "select", options: { o1: "Active", o2: "Inactive / expired", o3: "None" }, expect: null, tag: "insufficient" },
   ] },
 ];
