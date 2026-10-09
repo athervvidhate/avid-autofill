@@ -198,6 +198,11 @@
         } else if (m.place && adapter.locationSearch && el.matches(adapter.locationSearch)) {
           const picked = await fillers.setLocationSearch(el, m.value, m.alts);
           record(signal, picked || m.value, picked ? "filled" : "no-option-match");
+        } else if (type === "number" && !/^-?\d+(\.\d+)?$/.test(m.value)) {
+          // A number input rejects text like "100,000-130,000": use its first number.
+          const first = m.value.replace(/(\d),(?=\d{3})/g, "$1").match(/-?\d+(\.\d+)?/);
+          if (first) fillers.setTextValue(el, first[0]);
+          record(signal, first ? first[0] : m.value, first && el.value ? "filled" : "skipped");
         } else {
           fillers.setTextValue(el, m.value);
           record(signal, m.value, "filled");

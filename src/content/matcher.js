@@ -34,6 +34,19 @@
     return window.CSS && CSS.escape ? CSS.escape(s) : s.replace(/"/g, '\\"');
   }
 
+  const CONTROLS = new Set(["INPUT", "TEXTAREA", "SELECT", "BUTTON"]);
+  function textWithoutControls(root) {
+    let out = "";
+    const walk = (n) => {
+      for (const child of n.childNodes) {
+        if (child.nodeType === 3) out += child.textContent;
+        else if (child.nodeType === 1 && !CONTROLS.has(child.tagName)) walk(child);
+      }
+    };
+    walk(root);
+    return out.replace(/\s+/g, " ").trim();
+  }
+
   // Text of the closest preceding block that looks like a question/label.
   function nearbyText(el) {
     let node = el;
@@ -41,11 +54,9 @@
       node = node.parentElement;
       if (!node) break;
       // A field group container often holds the question text as its first text.
-      const clone = node.cloneNode(true);
-      clone.querySelectorAll("input, textarea, select, button").forEach((n) =>
-        n.remove()
-      );
-      const t = clone.textContent.replace(/\s+/g, " ").trim();
+      // Read text nodes directly: cloning a number input that holds an
+      // unparseable value logs a console error.
+      const t = textWithoutControls(node);
       if (t.length > 2 && t.length < 220) return t;
     }
     return "";

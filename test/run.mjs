@@ -1702,7 +1702,7 @@ test("fillPage fills a second captured Ashby form without misreading long questi
   });
   const profile = testProfile(A);
   Object.assign(profile.personal, { city: "Austin", state: "TX" });
-  profile.misc.salaryExpectation = "150000";
+  profile.misc.salaryExpectation = "100,000-130,000";
   await A.engine.fillPage(profile, { overwriteFilled: false, fillEEO: false, highlightFilled: false }, null);
 
   const entryFor = (title) =>
@@ -1715,7 +1715,7 @@ test("fillPage fills a second captured Ashby form without misreading long questi
   assert.equal(pressedFor("On-Call Requirements"), undefined, "unknown yes/no questions are left for Jev");
   assert.equal(answer("What is your work location"), "Austin, TX");
   assert.equal(answer("Please list your most recent employer"), "Globex");
-  assert.equal(answer("Please share your base compensation"), "150000");
+  assert.equal(answer("Please share your base compensation"), "100000", "a number input gets the first number of a salary range");
   assert.equal(answer("Why are you considering leaving"), "", "a 'why leaving' question is not the job title");
   assert.equal(answer("If yes, please provide details"), "", "a follow-up for details is not the sponsorship answer");
   assert.equal(document.querySelector('input[type="radio"][name*="b8b84bc4"]:checked'), null, "a lone policy radio is left alone");
