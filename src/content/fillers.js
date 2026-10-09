@@ -304,15 +304,20 @@
       }
       if (!pick && typeInput && attempt < 7) await sleep(150);
     }
+    // Workday's search prompts (skills, field of study) list matches only after
+    // Enter runs the search.
+    if (!pick && typeInput && config && config.searchOnEnter) {
+      pressEnter(typeInput);
+      for (let attempt = 0; attempt < 12 && !pick; attempt++) {
+        await sleep(200);
+        pick = findOption();
+      }
+      if (!pick) return false;
+    }
 
     if (!pick) {
       if (typeInput && config && config.allowCreate) {
-        typeInput.dispatchEvent(
-          new KeyboardEvent("keydown", { bubbles: true, key: "Enter", keyCode: 13 })
-        );
-        typeInput.dispatchEvent(
-          new KeyboardEvent("keyup", { bubbles: true, key: "Enter", keyCode: 13 })
-        );
+        pressEnter(typeInput);
         return true;
       }
       return false;
@@ -362,6 +367,11 @@
 
   // The selection a custom dropdown shows, or "" when it has none.
   function customValue(control) {
+    // Workday button-listboxes show their selection as the button text.
+    if (control.matches("button")) {
+      const text = control.textContent.trim();
+      return /^select( one)?\.*$/i.test(text) ? "" : text;
+    }
     const shown = control.querySelector('[class*="single-value"], [class*="singleValue"], [class*="multi-value"], [class*="multiValue"]');
     if (shown) return shown.textContent.trim();
     const input = control.matches("input") ? control : control.querySelector("input");
@@ -371,6 +381,7 @@
   // Open a custom dropdown, read the option labels from the listbox its input
   // controls, and close it. Returns [] when it names no listbox of its own.
   async function customOptions(control) {
+    if (control.matches("button")) return buttonOptions(control);
     const input = control.matches("input") ? control : control.querySelector("input");
     if (!input) return [];
     press(control);
@@ -382,6 +393,27 @@
     // react-select ignores Escape. React's onBlur listens to focusout.
     input.dispatchEvent(new FocusEvent("focusout", { bubbles: true, composed: true }));
     input.blur();
+    await sleep(100);
+    return [...new Set(labels)];
+  }
+
+  function pressEnter(el) {
+    el.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Enter", keyCode: 13 }));
+    el.dispatchEvent(new KeyboardEvent("keyup", { bubbles: true, key: "Enter", keyCode: 13 }));
+  }
+
+  // Workday button-listboxes have no inner input: the popup is a portal listbox,
+  // named by aria-controls when the page sets it, else the visible one.
+  async function buttonOptions(button) {
+    press(button);
+    await sleep(300);
+    const shown = (o) => o.offsetParent !== null || o.getClientRects().length > 0;
+    const named = document.getElementById(button.getAttribute("aria-controls") || "");
+    const boxes = named ? [named] : queryAll('[role="listbox"]').filter(shown);
+    const labels = boxes.flatMap((box) => queryAll('[role="option"], [data-automation-id="promptOption"]', box)).map((o) => (o.getAttribute("data-automation-label") || o.textContent).trim()).filter(Boolean);
+    for (const target of [button, document.activeElement || button]) {
+      target.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, cancelable: true, key: "Escape", keyCode: 27 }));
+    }
     await sleep(100);
     return [...new Set(labels)];
   }

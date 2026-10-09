@@ -42,8 +42,24 @@
     await A.saveProfile(J.saveAnswer(await A.getProfile(), msg, sender.url));
     return {};
   }
+  // Which skills to add to an application's skills section: Jev judges each
+  // candidate against the job description and the saved profile. The caller
+  // falls back to local ranking on any error.
+  async function skills(msg, sender) {
+    if (sender.id !== chrome.runtime.id || !Number.isInteger(sender.tab?.id) || !/^https?:/.test(sender.url || "")) throw new Error("Skills matching must start from an application page.");
+    const description = typeof msg.description === "string" ? msg.description.trim() : "";
+    if (!description) throw new Error("No job description to match skills against.");
+    if (!(await A.getSettings()).jevEnabled || !await chrome.permissions.contains({ origins: [J.ORIGIN] })) throw new Error("Jev is off.");
+    const key = (await chrome.storage.local.get(J.KEY))[J.KEY];
+    if (!key) throw new Error("Enter your Jev API key in My Info.");
+    const profile = await A.getProfile(), candidates = A.skills.candidatesFor(profile, description);
+    if (!candidates.length) return { skills: [] };
+    const { answers } = await J.post(A.skills.requestFor(J.MODEL, profile, description, candidates), key);
+    return { skills: A.skills.select(profile, description, candidates, answers) };
+  }
   async function handle(msg, sender) {
     if (msg.type === "AVID_JEV_FILL") return fill(msg, sender);
+    if (msg.type === "AVID_JEV_SKILLS") return skills(msg, sender);
     if (msg.type === "AVID_JEV_SAVE_ANSWER") return saveAnswer(msg, sender);
     if (!optionsSender(sender)) throw new Error("Open My Info to change the Jev connection.");
     if (msg.type === "AVID_JEV_STATE") return state();

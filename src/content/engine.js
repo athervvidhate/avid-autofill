@@ -59,7 +59,7 @@
         await AvidAutofill.workday.educationPass(profile, { fillers, record, handled });
       }
       if (AvidAutofill.workday.skillsPass) {
-        await AvidAutofill.workday.skillsPass(profile, { fillers, record, handled });
+        await AvidAutofill.workday.skillsPass(profile, { fillers, record, handled, enabled: settings.fillSkills !== false });
       }
       // Workday typeable and calendar-popover date widgets.
       await AvidAutofill.workday.datePass(profile, { matcher, helpers, fillers, record, handled });
@@ -88,7 +88,7 @@
           // Location autocompletes search as you type: lead with "City, State".
           const values = m.place ? [...m.alts, m.value] : [m.value, ...(m.alts || [])];
           const ok = await fillers.setReactSelect(control, values);
-          record(signal, m.value, ok ? "filled" : "skipped");
+          record(signal, m.value, ok ? (m.assumed ? "assumed" : "filled") : "skipped");
         } catch (_) {
           record(signal, m.value, "error");
         }
@@ -115,7 +115,7 @@
       if (!m) { unmatched.push({ el: group[0], group, signal }); continue; }
       if (m.eeo && !settings.fillEEO) continue;
       const ok = fillers.setRadio(group, m.value);
-      record(signal, m.value, ok ? "filled" : "skipped");
+      record(signal, m.value, ok ? (m.assumed ? "assumed" : "filled") : "skipped");
     }
 
     // --- 3. Everything else: text inputs, textareas, native selects, checkboxes.
@@ -159,7 +159,7 @@
       try {
         if (el.tagName === "SELECT") {
           const ok = fillers.setNativeSelect(el, [m.value, ...(m.alts || [])]);
-          record(signal, m.value, ok ? "filled" : "no-option-match");
+          record(signal, m.value, ok ? (m.assumed ? "assumed" : "filled") : "no-option-match");
         } else if (type === "checkbox") {
           // Affirmative yes/no answers tick the box; negatives leave it.
           const want = m.kind === "yesno" ? isAffirmative(m.value) : true;
@@ -187,7 +187,7 @@
       ats: adapter.name,
       stub: !!adapter.stub,
       beta: !!(adapter.beta || adapter.stub),
-      filledCount: results.filter((r) => r.status === "filled" || r.status === "checked").length,
+      filledCount: results.filter((r) => r.status === "filled" || r.status === "checked" || r.status === "assumed").length,
       results,
       aiMessage,
     };

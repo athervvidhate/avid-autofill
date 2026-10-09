@@ -67,6 +67,7 @@
     // the options page. Blank = leave the field untouched.
     questions: {
       previouslyEmployedHere: "No",
+      relativesAtCompany: "No", // relatives or close personal relationships employed by the company
       formerContractorOrIntern: "No",
       currentStudent: "",
       consentToContact: "Yes",
@@ -85,6 +86,7 @@
   AvidAutofill.DEFAULT_SETTINGS = {
     overwriteFilled: false, // if true, replace values already present in a field
     fillEEO: false, // opt-in: only fill voluntary self-ID when explicitly enabled
+    fillSkills: true, // add skills to Workday skills sections
     highlightFilled: true, // briefly outline fields we touched
     jevEnabled: false, // optional matching of approved saved answers
   };

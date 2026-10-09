@@ -169,7 +169,8 @@
     { any: [/graduation date/, /anticipated graduation/, /expected graduation/, /grad(uation)? date/], get: (p, h) => p.misc.graduationDate || h.edu0().endDate },
 
     // --- Common yes/no application questions (Tesla-style legal/consent step) ---
-    { any: [/previously (been )?employed/, /previously worked (here|for|at)/, /former employee/, /worked (here|for us) before/, /previous worker/], kind: "yesno", get: (p) => p.questions.previouslyEmployedHere },
+    { any: [/(relatives?|family|friends?|close personal relationships?).*(employed|work(s|ing)?) (by|at|for|with)/, /(employed|work(s|ing)?) (by|at|for|with).*(relatives?|family members?)/, /related to (anyone|an employee|any employee)/], kind: "yesno", assumed: true, get: (p) => p.questions.relativesAtCompany },
+    { any: [/previously (been )?employed/, /\bhave you (ever )?worked (at|for|with)\b/, /currently or have you worked (at|for)/, /previously worked (here|for|at)/, /former employee/, /worked (here|for us) before/, /previous worker/], kind: "yesno", assumed: true, get: (p) => p.questions.previouslyEmployedHere },
     { any: [/intern or contractor/, /current or former (intern|contractor)/, /former\/current (intern|contractor)/, /contractor/], kind: "yesno", get: (p) => p.questions.formerContractorOrIntern },
     { any: [/current(ly)? (a )?(university |college )?student/, /currently enrolled/, /enrolled in an academic/, /pursuing a degree/], kind: "yesno", get: (p) => p.questions.currentStudent },
     { any: [/text message/, /sms/, /consent to receiv/, /receive.*(notification|message)/], kind: "yesno", get: (p) => p.questions.consentToContact },
@@ -261,7 +262,7 @@
         const value = rule.get(profile, helpers, signal);
         if (value == null || value === "") return null;
         const alts = rule.expand === "usState" ? stateAlternates(value) : rule.expand === "place" ? placeAlternates(value, profile) : [];
-        return { value: String(value), alts, kind: rule.kind || "text", eeo: !!rule.eeo, place: rule.expand === "place" };
+        return { value: String(value), alts, kind: rule.kind || "text", eeo: !!rule.eeo, assumed: !!rule.assumed, place: rule.expand === "place" };
       }
     }
     return null;
