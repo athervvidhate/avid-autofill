@@ -174,7 +174,7 @@
     if (!matched) {
       for (const opt of el.options) {
         const t = normalize(opt.textContent);
-        if (t && targets.some((tg) => t.includes(tg) || tg.includes(t))) {
+        if (t && targets.some((tg) => hasWord(t, tg) || hasWord(tg, t))) {
           matched = opt;
           break;
         }
@@ -184,7 +184,15 @@
     nativeSelectSetter.call(el, matched.value);
     fireInput(el);
     flash(el);
-    return true;
+    return el.value === matched.value;
+  }
+
+  // Whole-word containment, so "man" does not match "woman" and "no" does not
+  // match "not a veteran". Both texts are already normalized.
+  function hasWord(text, word) {
+    if (!text || !word) return false;
+    const esc = word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return new RegExp(`(^|[^a-z0-9])${esc}($|[^a-z0-9])`).test(text);
   }
 
   function toList(v) {
@@ -199,14 +207,14 @@
       const v = normalize(el.value);
       if (v === target || labelText === target) {
         clickChoice(el);
-        return true;
+        return el.checked;
       }
     }
     for (const el of inputs) {
       const labelText = normalize(AvidAutofill.labelTextFor(el));
-      if (labelText && (labelText.includes(target) || target.includes(labelText))) {
+      if (labelText && (hasWord(labelText, target) || hasWord(target, labelText))) {
         clickChoice(el);
-        return true;
+        return el.checked;
       }
     }
     return false;
@@ -216,7 +224,7 @@
     if (el.checked !== shouldCheck) {
       clickChoice(el);
     }
-    return true;
+    return el.checked === shouldCheck;
   }
 
   function clickChoice(el) {
@@ -280,7 +288,7 @@
       // target that some option contains.
       return (
         available.find((o) => targets.some((t) => optText(o) === t)) ||
-        (config && config.exact ? null : targets.map((t) => available.find((o) => optText(o).includes(t))).find(Boolean)) ||
+        (config && config.exact ? null : targets.map((t) => available.find((o) => hasWord(optText(o), t))).find(Boolean)) ||
         null
       );
     };

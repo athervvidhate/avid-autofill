@@ -1380,3 +1380,29 @@ test("Lever location search picks the suggestion in the profile's state", async 
   assert.equal(document.getElementById("selected-location").value, '{"name":"Portland, CA, USA"}');
   assert.equal(report.results.find(r => /location/.test(r.label))?.status, "filled");
 });
+
+test("native selects and radios match whole words, so Man does not pick Woman or No pick Not", () => {
+  const { document, AvidAutofill: A } = blankWindow();
+  document.body.innerHTML = `
+    <select id="g"><option value="">Select</option><option>Woman</option><option>Man</option></select>
+    <select id="v"><option value="">Select</option><option>I am not a protected veteran</option><option>Prefer not to say</option></select>
+    <input type="radio" name="x" id="r1"><label for="r1">Woman</label>
+    <input type="radio" name="x" id="r2"><label for="r2">Man (he/him)</label>`;
+  assert.equal(A.fillers.setNativeSelect(document.getElementById("g"), ["Man"]), true);
+  assert.equal(document.getElementById("g").value, "Man");
+  assert.equal(A.fillers.setNativeSelect(document.getElementById("v"), ["No"]), false);
+  assert.equal(document.getElementById("v").value, "");
+  assert.equal(A.fillers.setRadio([document.getElementById("r1"), document.getElementById("r2")], "Man"), true);
+  assert.equal(document.getElementById("r2").checked, true);
+  assert.equal(document.getElementById("r1").checked, false);
+});
+
+test("setRadio and setCheckbox report false when the click does not take", () => {
+  const { document, AvidAutofill: A } = blankWindow();
+  document.body.innerHTML = `<input type="radio" name="y" id="a" value="Yes"><input type="checkbox" id="c">`;
+  const stuck = (el) => el.addEventListener("click", (e) => e.preventDefault());
+  stuck(document.getElementById("a"));
+  stuck(document.getElementById("c"));
+  assert.equal(A.fillers.setRadio([document.getElementById("a")], "Yes"), false);
+  assert.equal(A.fillers.setCheckbox(document.getElementById("c"), true), false);
+});
