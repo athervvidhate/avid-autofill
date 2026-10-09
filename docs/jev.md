@@ -8,8 +8,11 @@ extension worker to the hosted TypeSafe AI service. It does not generate prose.
 
 1. Reload the unpacked extension at `chrome://extensions`, then refresh
    application tabs to receive the new scripts.
-2. In **My Info → Question bank**, add a question, an approved answer, and a
-   company application URL prefix. Select **Use on any application** only when
+2. Build the question bank. On a form, answer a field Jev left for you, click
+   **Save** beside it in the drawer, and choose **This company** or **Any
+   application**; saving approves the answer. Or, in **My Info → Question
+   bank**, add a question, an approved answer, and a company application URL
+   prefix. Select **Use on any application** only when
    the answer applies everywhere. Click **Save changes** to approve reuse.
 3. Obtain a key from [TypeSafe AI](https://typesafe.ai). In **Jev matching**, enter
    it, enable matching, and save. The browser requests optional access to
@@ -28,19 +31,26 @@ persists, so a missing session key produces an actionable error.
 
 | File | Responsibility |
 | --- | --- |
-| `src/shared/jev.js` | Eligible sources, field contract, requests, validation |
-| `src/background/jev.js` | Trusted configuration, session key, fetch, two stages, freshness |
+| `src/shared/jev.js` | Eligible sources, field contract, requests, validation, company scope and saving drawer answers |
+| `src/background/jev.js` | Trusted configuration, session key, fetch, two stages, freshness, drawer answer saves |
 | `src/background/service-worker.js` | Imports the Jev worker |
 | `src/content/engine.js` | Collects unmatched native controls after rule matching |
-| `src/content/jev.js` | Captures/rechecks controls and applies approved results with existing fillers |
-| `src/content/widget.js` | Extra fill count, provenance tooltips, review/error messages |
+| `src/content/jev.js` | Captures/rechecks controls, applies approved results with existing fillers, reads the applicant's answer for fields left to them |
+| `src/content/widget.js` | Extra fill count, provenance tooltips, review/error messages, Save to question bank |
 | `src/options/options.js` | Approved question-bank editor |
 | `src/options/jev.js` | Opt-in connection UI |
 | `manifest.json` | Loads the fallback on automatic and toolbar-triggered injections |
 | `test/jev.mjs` | Contract, worker, DOM, complete two-stage flow, key and export tests |
 
 The page sends `AVID_JEV_FILL` with field descriptions. The worker reads the
-profile itself. Only the My Info extension page can send `AVID_JEV_STATE`,
+profile itself. `AVID_JEV_SAVE_ANSWER` carries a question, the applicant's
+answer and whether it applies to any application; the worker takes the company
+scope from the sender's URL (the company path on shared ATS hosts such as
+`https://job-boards.greenhouse.io/gitlab/`, else the site's origin), never from
+the message, and updates the entry already saved for that question and scope.
+The drawer's Save buttons act only on trusted clicks, because page scripts can
+reach its open shadow root, and the content script saves only if the page still
+shows the answer the applicant confirmed. Only the My Info extension page can send `AVID_JEV_STATE`,
 `AVID_JEV_SAVE`, or `AVID_JEV_CLEAR`. Page data cannot choose the endpoint,
 credentials, or arbitrary request body.
 
@@ -235,13 +245,24 @@ covered by a test and, where useful, a captured fixture:
   name?" answered with the legal name; "employment agreements" matched the
   current employer.
 
-Open items: Lever's location autocomplete is filled as text without choosing a
-suggestion; Ashby's "I agree" checkbox is ticked from the profile's
-agree-to-terms answer, which the applicant should confirm; real-profile runs
-still need the applicant.
+A run with the applicant's real profile on GitLab's Greenhouse form
+(2026-10-09, in their browser, stopped before submit) filled 14 fields by rule.
+Jev correctly answered `NEEDS_USER` for the five remaining fields: the
+question bank was empty, and none was a profile fact. It found and fixed:
 
-Next: validate the opt-in flow on real ATS pages with a real profile. Custom dropdown discovery and
-generated writing are follow-up work.
+- Reading a react-select's options left its menu open when the browser window
+  was unfocused (Escape is ignored; React's blur listens to `focusout`). The
+  walkthrough now fills with the page unfocused and reports open menus.
+- "Are you currently located in either Canada, UK or Poland?" and "What's the
+  name you'd prefer us to use?" were left for review; both are now rules.
+- My Info did not say whether the key or page access was missing.
+
+Since then: consent and attestation checkboxes are no longer ticked (the
+agree-to-terms setting is gone), Lever's location search picks the suggestion
+in the profile's state, and answers can be saved to the bank from the drawer.
+
+Next: grow the question bank from real answers and measure how often Jev reuses
+them on later forms; Jev paths for SmartRecruiters, iCIMS and Workday.
 
 Primary references checked 2026-10-08: [API](https://docs.typesafe.ai/api),
 [models](https://docs.typesafe.ai/models), [confidence](https://docs.typesafe.ai/confidence),

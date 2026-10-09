@@ -45,14 +45,16 @@ the field matching for your own search.
   Workday remains beta and needs a live check when its form widgets change.
 - **Resume upload** - injects your saved resume into the file input via
   `DataTransfer`, the only sanctioned way to set a file programmatically.
-- **Common questions** - default answers for the recurring yes/no and legal
-  acknowledgment questions (sponsorship, prior employment, student status, SMS
-  consent, "consider me for other roles").
+- **Common questions** - default answers for the recurring yes/no questions
+  (sponsorship, prior employment, student status, SMS consent, "consider me for
+  other roles"). Consent and attestation checkboxes ("I agree", "I certify") are
+  always left for you.
 - **Local profile** - your profile and resume live in `chrome.storage.local`.
   Autofill needs no account. No telemetry.
 - **Optional Jev matching** - bring your TypeSafe AI key to select approved saved
   answers for unmatched native fields. A scoped question bank keeps company
-  answers tied to their application URLs. Off by default; review every result.
+  answers tied to their application URLs; save an answer you gave on a form
+  straight from the drawer. Off by default; review every result.
 - **Application tracker** - connect Google Sheets through Connections to create
   a formatted tracker. After confirmed submission, a small prompt lets you review
   and save the job. Optional broader site access covers company career pages and
@@ -109,7 +111,8 @@ step as you advance.
 ### Try Jev matching
 
 Reload the extension and application tabs, then open **My Info → Question bank**
-to save approved answers. In **Jev matching**, enter your TypeSafe AI key, enable
+to save approved answers, or answer a field Jev left on a form and click **Save**
+beside it in the drawer. In **Jev matching**, enter your TypeSafe AI key, enable
 matching, and save the connection. Keys last for the browser session and are not
 part of profile exports. See [setup, requests, validation, and limits](docs/jev.md).
 
