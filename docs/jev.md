@@ -190,7 +190,19 @@ in about 130 decisions bounds the wrong-fill rate near 2% at 95% confidence on
 this synthetic distribution, not on real forms. A fill of up to 9 fields took
 110-270 ms for both stages and used about 4,000-5,000 input tokens (under $0.0003).
 
-Next: validate the opt-in flow on real ATS pages. Custom dropdown discovery and
+`realforms` replays the exact Jev requests captured from five live public forms
+(GitLab and Scale AI on Greenhouse, Palantir on Lever, Perplexity on Ashby,
+Hugging Face on Workable): 38 fields, 9 with an answer the synthetic applicant
+supports. Over two runs at 0.80 there were no wrong fills in 76 decisions, and
+all 58 decisions on should-abstain fields abstained. Coverage on these real labels
+is low (1-4 of 9 per run): Jev chose `NEEDS_USER` for "core technical stack" and
+"website", and split probability on clearance and travel questions. The wrong
+picks it made below the gate (in-person London work from a hybrid preference,
+named-destination relocation from general willingness) peaked at stage-one
+p=0.62. Expect Jev to add a few safe answers on top of the rules, not to answer
+most custom questions.
+
+Next: validate the opt-in flow on real ATS pages with a real profile. Custom dropdown discovery and
 generated writing are follow-up work.
 
 Primary references checked 2026-10-08: [API](https://docs.typesafe.ai/api),
