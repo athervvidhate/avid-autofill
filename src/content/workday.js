@@ -267,7 +267,7 @@
       // The saved value is not one of the dropdown's options (e.g. no "Data
       // Science" field of study): take the list's "Other" instead of leaving it blank.
       if (!ok && config && config.fallback) {
-        ok = await fillers.setReactSelect(control, [config.fallback], { exact: true });
+        ok = await fillers.setReactSelect(control, [config.fallback], { exact: true, searchOnEnter: config.searchOnEnter });
         used = config.fallback;
       }
       record(label, used, ok ? "filled" : "skipped");
@@ -320,13 +320,18 @@
       const panel = panels[i];
       const tag = `Education ${i + 1}`;
       if (entry.school) {
-        await fillEducationSelect(panel, "school", schoolTargets(entry.school), fillers, handled, record, `${tag} - School`, { allowCreate: true });
+        // Some tenants offer a school picker ("school"), others a plain text box ("schoolName").
+        if (panel.querySelector('[data-automation-id="formField-school"]')) {
+          await fillEducationSelect(panel, "school", schoolTargets(entry.school), fillers, handled, record, `${tag} - School`, { allowCreate: true, searchOnEnter: true });
+        } else {
+          fillPanelText(panel, "schoolName", entry.school, fillers, handled, record, `${tag} - School`);
+        }
       }
       if (entry.degree) {
         await fillEducationSelect(panel, "degree", degreeTargets(entry.degree), fillers, handled, record, `${tag} - Degree`);
       }
       if (entry.field) {
-        await fillEducationSelect(panel, "fieldOfStudy", [entry.field], fillers, handled, record, `${tag} - Field of Study`, { fallback: "other" });
+        await fillEducationSelect(panel, "fieldOfStudy", [entry.field], fillers, handled, record, `${tag} - Field of Study`, { fallback: "other", searchOnEnter: true });
       }
       fillPanelText(panel, "gradeAverage", entry.gpa, fillers, handled, record, `${tag} - GPA`);
       fillEducationYear(panel, "firstYearAttended", entry.startDate, fillers, handled, record, `${tag} - Start Year`);
@@ -408,7 +413,7 @@
       }
       handled.add(control);
       try {
-        const ok = await fillers.setReactSelect(control, [skill], { allowCreate: true });
+        const ok = await fillers.setReactSelect(control, [skill], { searchOnEnter: true });
         record("Skills", skill, ok ? "filled" : "skipped");
       } catch (_) {
         record("Skills", skill, "error");

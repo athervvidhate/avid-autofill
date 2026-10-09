@@ -65,15 +65,18 @@
     return [...work.map(job => `${job.title} ${job.description}`), ...education.map(school => `${school.degree} ${school.field}`)].join("\n");
   };
 
-  // Saved skills first, then vocabulary skills the job description names, those
-  // most-mentioned first. Each carries how often the description mentions it.
+  // Saved skills first, then vocabulary skills the job description or the
+  // applicant's own work and education text names, most-mentioned first.
   function candidatesFor(profile, description) {
     const text = String(description || "").slice(0, 20000), saved = list(profile.misc && profile.misc.skills);
+    const evidence = evidenceText(profile);
     const score = skill => Math.min(mentions(text, skill), 5);
     const have = new Set(saved.map(skill => skill.toLowerCase()));
-    const named = Object.keys(VOCAB).filter(skill => !have.has(skill.toLowerCase())).map(skill => ({ skill, jd: score(skill), saved: false })).filter(c => c.jd > 0);
-    named.sort((a, b) => b.jd - a.jd);
-    return [...saved.map(skill => ({ skill, jd: score(skill), saved: true })), ...named].slice(0, MAX_CANDIDATES);
+    const named = Object.keys(VOCAB).filter(skill => !have.has(skill.toLowerCase()))
+      .map(skill => ({ skill, jd: score(skill), saved: false, own: Math.min(mentions(evidence, skill), 5) }))
+      .filter(c => c.jd > 0 || c.own > 0);
+    named.sort((a, b) => b.jd - a.jd || b.own - a.own);
+    return [...saved.map(skill => ({ skill, jd: score(skill), saved: true, own: 0 })), ...named].slice(0, MAX_CANDIDATES);
   }
 
   function requestFor(model, profile, description, candidates) {
@@ -93,8 +96,10 @@
     return { model, state, questions };
   }
 
-  // Order by how much the description mentions the skill, keeping saved order for ties.
-  const byOverlap = items => items.map((c, i) => ({ c, i })).sort((a, b) => b.c.jd - a.c.jd || a.i - b.i).map(x => x.c.skill);
+  // Most-mentioned in the description first; ties go to saved skills, then to
+  // skills the applicant's own text mentions most, then to saved order.
+  const byOverlap = items => items.map((c, i) => ({ c, i }))
+    .sort((a, b) => b.c.jd - a.c.jd || b.c.saved - a.c.saved || b.c.own - a.c.own || a.i - b.i).map(x => x.c.skill);
 
   // `verdicts`: validated Jev answers keyed `answer_s<i>`, or null for the local path.
   function select(profile, description, candidates, verdicts, cap = MAX_SKILLS) {
@@ -104,11 +109,10 @@
         const a = verdicts[`answer_s${i}`];
         return a && a.choice === INCLUDE && a.probabilities[INCLUDE] >= MIN_PROBABILITY;
       });
-    } else if (!String(description || "").trim()) {
-      chosen = candidates.filter(c => c.saved);
     } else {
-      const evidence = evidenceText(profile);
-      chosen = candidates.filter(c => c.saved || mentions(evidence, c.skill) > 0);
+      // Locally, a skill needs the applicant's own word for it: saved, or named
+      // in their work or education text.
+      chosen = candidates.filter(c => c.saved || c.own > 0);
     }
     return byOverlap(chosen).slice(0, cap);
   }

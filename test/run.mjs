@@ -550,6 +550,70 @@ test("education falls back to Other when the saved field of study is not an opti
   assert.equal(input.dataset.selected, "Other");
 });
 
+test("skills: with nothing saved, skills named in work and education text are used", () => {
+  const { A } = loadFixture("workday-page2.html");
+  const p = testProfile(A);
+  p.misc.skills = "";
+  p.work = [{ title: "Data Analyst", company: "Globex", description: "Built dashboards in Tableau with SQL and Python; more SQL tuning" }];
+  p.education = [{ school: "State University", degree: "BS", field: "Data Science" }];
+  const picked = [...A.skills.select(p, "", A.skills.candidatesFor(p, ""), null)];
+  assert.deepEqual(picked.slice(0, 1), ["SQL"]);
+  for (const skill of ["Python", "Tableau", "Data Science"]) assert.ok(picked.includes(skill), skill);
+  assert.ok(!picked.includes("Java"));
+});
+
+test("education fills a plain-text School or University box", async () => {
+  const win = blankWindow();
+  const { document, AvidAutofill: A } = win;
+  document.body.innerHTML = `
+    <div data-automation-id="applyFlowPage">
+      <div role="group" aria-labelledby="Education-section">
+        <h4 id="Education-section">Education</h4>
+        <div role="group" aria-labelledby="Education-1-panel">
+          <h5 id="Education-1-panel">Education 1</h5>
+          <div data-automation-id="formField-schoolName"><label for="s">School or University</label><input type="text" id="s" name="schoolName"></div>
+        </div>
+      </div>
+    </div>`;
+  A.fillers.sleep = async () => {};
+  const p = testProfile(A);
+  p.education = [{ school: "UC San Diego", degree: "", field: "" }];
+  await A.engine.fillPage(p, { overwriteFilled: false, fillEEO: false, highlightFilled: false }, null);
+  assert.equal(document.querySelector("#s").value, "UC San Diego");
+});
+
+test("Workday skills search runs on Enter, then the matching result is clicked", async () => {
+  const win = blankWindow();
+  const { document, AvidAutofill: A } = win;
+  document.body.innerHTML = `
+    <div data-automation-id="applyFlowPage">
+      <div role="group" aria-labelledby="Skills-section">
+        <h4 id="Skills-section">Skills</h4>
+        <div data-automation-id="formField-skills"><label>Type to Add Skills</label>
+          <input data-uxi-widget-type="selectinput" placeholder="Search"></div>
+      </div>
+    </div>`;
+  const input = document.querySelector('[data-automation-id="formField-skills"] input');
+  const selected = [];
+  input.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") return;
+    document.querySelectorAll('[data-automation-id="promptOption"]').forEach((n) => n.remove());
+    for (const text of ["Python (Programming Language)", "Something Else"]) {
+      const option = document.createElement("div");
+      option.dataset.automationId = "promptOption";
+      option.textContent = text;
+      Object.defineProperty(option, "offsetParent", { configurable: true, get: () => document.body });
+      option.addEventListener("click", () => { selected.push(text); option.remove(); });
+      document.body.append(option);
+    }
+  });
+  A.fillers.sleep = async () => {};
+  const p = testProfile(A);
+  p.misc.skills = "Python";
+  await A.engine.fillPage(p, { overwriteFilled: false, fillEEO: false, highlightFilled: false }, null);
+  assert.deepEqual(selected, ["Python (Programming Language)"]);
+});
+
 test("fillPage adds saved skills through Workday's skills picker", async () => {
   const win = blankWindow();
   const { document, AvidAutofill: A } = win;

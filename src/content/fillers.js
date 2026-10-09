@@ -258,11 +258,10 @@
 
     const optText = (o) =>
       normalize(o.getAttribute("data-automation-label") || o.textContent);
-    let pick = null;
     // Options render in a portal. When the opener names its listbox, look only
     // there, so hidden lists elsewhere on the page (phone country codes) are ignored.
     const listboxId = typeInput && typeInput.getAttribute("aria-controls");
-    for (let attempt = 0; attempt < 8 && !pick; attempt++) {
+    const findPick = () => {
       const listbox = listboxId && document.getElementById(listboxId);
       const available = Array.from(
         queryAll(
@@ -274,20 +273,30 @@
       );
       // Exact text for any target first; otherwise the earliest (most specific)
       // target that some option contains.
-      pick =
+      return (
         available.find((o) => targets.some((t) => optText(o) === t)) ||
-        (config && config.exact ? null : targets.map((t) => available.find((o) => optText(o).includes(t))).find(Boolean));
+        (config && config.exact ? null : targets.map((t) => available.find((o) => optText(o).includes(t))).find(Boolean))
+      );
+    };
+    let pick = null;
+    for (let attempt = 0; attempt < 8 && !pick; attempt++) {
+      pick = findPick();
       if (!pick && typeInput && attempt < 7) await sleep(150);
+    }
+    // Workday's search prompts (skills, field of study) list matches only after
+    // Enter runs the search.
+    if (!pick && typeInput && config && config.searchOnEnter) {
+      pressEnter(typeInput);
+      for (let attempt = 0; attempt < 12 && !pick; attempt++) {
+        await sleep(200);
+        pick = findPick();
+      }
+      if (!pick) return false;
     }
 
     if (!pick) {
       if (typeInput && config && config.allowCreate) {
-        typeInput.dispatchEvent(
-          new KeyboardEvent("keydown", { bubbles: true, key: "Enter", keyCode: 13 })
-        );
-        typeInput.dispatchEvent(
-          new KeyboardEvent("keyup", { bubbles: true, key: "Enter", keyCode: 13 })
-        );
+        pressEnter(typeInput);
         return true;
       }
       return false;
@@ -345,6 +354,11 @@
     input.blur();
     await sleep(100);
     return [...new Set(labels)];
+  }
+
+  function pressEnter(el) {
+    el.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Enter", keyCode: 13 }));
+    el.dispatchEvent(new KeyboardEvent("keyup", { bubbles: true, key: "Enter", keyCode: 13 }));
   }
 
   function press(el) {
