@@ -31,6 +31,8 @@
         !!document.querySelector(".application-form, [data-qa='application-form']"),
       // Lever mostly uses native <select>; keep a selector in case of custom ones.
       customSelectSelectors: ['[class*="select__control"]'],
+      // Searches places as you type; only a picked suggestion counts.
+      locationSearch: "input.location-input",
     },
     {
       name: "Ashby",

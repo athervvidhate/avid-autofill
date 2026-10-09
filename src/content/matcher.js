@@ -130,7 +130,7 @@
 
     // --- Address ---
     { any: [/street address/, /address line ?1/, /^address$/, /mailing address/], not: [/email/], get: (p) => p.personal.address },
-    { any: [/\bcity\b/, /\btown\b/], not: [/velocity|capacity|ethnic/], expand: "place", get: (p) => p.personal.city },
+    { any: [/\bcity\b/, /\btown\b/, /(^|\| )(current )?location( \||$)/, /(^|\| )current location\b/], not: [/velocity|capacity|ethnic/], expand: "place", get: (p) => p.personal.city },
     { any: [/\bstate\b/, /\bprovince\b/, /\bregion\b/], not: [/statement|estate|united states|work/], expand: "usState", get: (p) => p.personal.state },
     { any: [/zip/, /postal code/, /post code/], get: (p) => p.personal.postalCode },
     { any: [/\b(located|location|based|living|reside|residing) in\b/], not: [/relocat|willing|commut|authoriz|work|time ?zone|hours/], kind: "yesno", get: (p, h, signal) => inListedCountry(signal, p.personal.country) },

@@ -298,6 +298,29 @@
     return true;
   }
 
+  // Lever-style place search: type the city, which searches on keydown, then
+  // press the suggestion for the profile's state ("City, State, ..."). Returns
+  // the picked suggestion's text, or "" when none matches.
+  async function setLocationSearch(input, city, places) {
+    const field = input.closest(".application-field") || input.parentElement;
+    setSearchValue(input, city);
+    input.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, cancelable: true, key: city.slice(-1) }));
+    const wanted = places.map(normalize);
+    let pick = null;
+    for (let attempt = 0; attempt < 20 && !pick; attempt++) {
+      if (attempt) await sleep(250);
+      pick = queryAll(".dropdown-location", field).find((o) => {
+        const text = normalize(o.textContent);
+        return wanted.some((place) => text === place || text.startsWith(place + ","));
+      });
+    }
+    if (!pick) return "";
+    const text = pick.textContent.trim();
+    pick.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true, button: 0 }));
+    flash(input);
+    return input.value.trim() === text ? text : "";
+  }
+
   // The selection a custom dropdown shows, or "" when it has none.
   function customValue(control) {
     const shown = control.querySelector('[class*="single-value"], [class*="singleValue"], [class*="multi-value"], [class*="multiValue"]');
@@ -387,6 +410,7 @@
     setRadio,
     setCheckbox,
     setReactSelect,
+    setLocationSearch,
     uploadToInput,
     dropOnZone,
     normalize,

@@ -165,6 +165,9 @@
           const want = m.kind === "yesno" ? isAffirmative(m.value) : true;
           fillers.setCheckbox(el, want);
           record(signal, want ? "checked" : "unchecked", "filled");
+        } else if (m.place && adapter.locationSearch && el.matches(adapter.locationSearch)) {
+          const picked = await fillers.setLocationSearch(el, m.value, m.alts);
+          record(signal, picked || m.value, picked ? "filled" : "no-option-match");
         } else {
           fillers.setTextValue(el, m.value);
           record(signal, m.value, "filled");

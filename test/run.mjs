@@ -1301,3 +1301,29 @@ test("consent and attestation checkboxes are left for the applicant", async () =
   await A.engine.fillPage(profile, A.DEFAULT_SETTINGS, null);
   assert.equal(document.getElementById("agree").checked, false);
 });
+
+test("Lever location search picks the suggestion in the profile's state", async () => {
+  const win = blankWindow();
+  const { document, AvidAutofill: A } = win;
+  document.body.innerHTML = `<form class="application-form"><div class="application-question"><label>Current location ✱</label>
+    <div class="application-field"><input class="location-input" id="location-input" type="text" name="location"><input id="selected-location" type="hidden" name="selectedLocation">
+    <div class="dropdown-container"><div class="dropdown-results"></div><div class="dropdown-no-results">No location found. Try entering a different location</div></div></div></div></form>`;
+  const input = document.getElementById("location-input"), results = document.querySelector(".dropdown-results");
+  input.getClientRects = () => [{}];
+  // Lever searches on keydown and selects on mousedown (jQuery handlers).
+  input.addEventListener("keydown", () => {
+    results.innerHTML = ["Portland, ME, USA", "Portland, CA, USA"].map((name, i) => `<div class="dropdown-location" id="location-${i}">${name}</div>`).join("");
+  });
+  document.addEventListener("mousedown", (event) => {
+    const option = event.target.closest(".dropdown-location");
+    if (!option) return;
+    input.value = option.textContent;
+    document.getElementById("selected-location").value = JSON.stringify({ name: option.textContent });
+    results.innerHTML = "";
+  });
+  A.fillers.sleep = async () => {};
+  const report = await A.engine.fillPage(testProfile(A), { overwriteFilled: false, fillEEO: false, highlightFilled: false }, null);
+  assert.equal(input.value, "Portland, CA, USA");
+  assert.equal(document.getElementById("selected-location").value, '{"name":"Portland, CA, USA"}');
+  assert.equal(report.results.find(r => /location/.test(r.label))?.status, "filled");
+});
