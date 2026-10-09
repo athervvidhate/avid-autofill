@@ -208,6 +208,38 @@ The same facts saved as profile fields instead of bank answers (dev
 `misc-sources`, holdout `holdout-misc`) filled 92% and 100% of fillable fields
 with no wrong fills; an unsatisfiable "MM/DD/YYYY" start date peaked at p=0.71.
 
+Live evaluation on 2026-10-08 used 74 calls and about 221,000 input tokens,
+roughly $0.01 at the listed price.
+
+## Real-form walkthrough
+
+`node test/live/walk.mjs <out-dir> <url>...` loads the extension into a throwaway
+browser profile (`AVID_BROWSER`, default Helium), fills public application pages
+as the synthetic applicant, and records the fill report, the fields Jev would
+receive (requests are answered 401, never sent) and a screenshot. It never
+submits.
+
+Walking GitLab and Scale AI (Greenhouse), Palantir (Lever), Perplexity and Modal
+(Ashby) and Hugging Face (Workable) found and fixed these rule defects, each now
+covered by a test and, where useful, a captured fixture:
+
+- Current Greenhouse boards: react-select questions were invisible to rules and
+  Jev (label on the inner input; menu opens only on a full pointer sequence).
+- "Require company sponsorship ... work authorization" answered Yes.
+- Location (City) picked a same-named city in another state.
+- Preferred First Name filled with the legal first name.
+- Lever radio questions read as "yes | cards[...]"; Lever and Ashby field UUIDs
+  leaked into Jev labels.
+- Destination-specific relocation answered from general willingness; GitHub
+  profile URL put into a contributions question; "How do you pronounce your
+  name?" answered with the legal name; "employment agreements" matched the
+  current employer.
+
+Open items: Lever's location autocomplete is filled as text without choosing a
+suggestion; Ashby's "I agree" checkbox is ticked from the profile's
+agree-to-terms answer, which the applicant should confirm; real-profile runs
+still need the applicant.
+
 Next: validate the opt-in flow on real ATS pages with a real profile. Custom dropdown discovery and
 generated writing are follow-up work.
 
