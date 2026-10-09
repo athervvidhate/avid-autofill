@@ -63,6 +63,7 @@ const SCRIPTS = [
   "src/content/fillers.js",
   "src/content/matcher.js",
   "src/content/adapters.js",
+  "src/shared/skills.js",
   "src/content/workday.js",
   "src/content/engine.js",
 ].map((p) => fs.readFileSync(path.join(ROOT, p), "utf8"));
@@ -557,6 +558,84 @@ test("fillPage adds saved skills through Workday's skills picker", async () => {
   );
 
   assert.deepEqual(selected.map((value) => value.toLowerCase()), ["python", "sql"]);
+});
+
+test("skills: candidates mix saved skills with skills the posting names, whole terms only", () => {
+  const { A } = loadFixture("workday-page2.html");
+  const p = testProfile(A);
+  p.misc.skills = "Python, Java, SQL";
+  const jd = "We use JavaScript, k8s and Python daily. Strong Postgres a plus. Java experience welcome.";
+  const names = A.skills.candidatesFor(p, jd).map((c) => c.skill);
+  assert.deepEqual([...names.slice(0, 3)], ["Python", "Java", "SQL"]);
+  assert.ok(names.includes("JavaScript") && names.includes("Kubernetes") && names.includes("PostgreSQL"));
+  const jdOnlyJs = A.skills.candidatesFor({ ...p, misc: { skills: "" } }, "We write JavaScript.").map((c) => c.skill);
+  assert.ok(!jdOnlyJs.includes("Java") && jdOnlyJs.includes("JavaScript"));
+  assert.equal(A.skills.mentions("We write JavaScript.", "Java"), 0);
+  assert.equal(A.skills.mentions("React and C++ roles", "R"), 0);
+});
+
+test("skills: local selection ranks saved skills by posting overlap and keeps evidenced posting skills", () => {
+  const { A } = loadFixture("workday-page2.html");
+  const p = testProfile(A);
+  p.misc.skills = "Excel, Python, SQL";
+  p.work = [{ title: "Engineer", company: "Globex", description: "Built Kubernetes tooling in Go" }];
+  const jd = "SQL SQL SQL and Python. Kubernetes, Rust and Go are used.";
+  const picked = A.skills.select(p, jd, A.skills.candidatesFor(p, jd), null);
+  assert.deepEqual([...picked], ["SQL", "Python", "Go", "Kubernetes", "Excel"]);
+  const many = Array.from({ length: 30 }, (_, i) => `Skill${i}`).join(",");
+  p.misc.skills = many;
+  assert.equal(A.skills.select(p, "", A.skills.candidatesFor(p, ""), null).length, 15);
+});
+
+test("skills: Jev verdicts decide, low-probability includes are dropped", () => {
+  const { A } = loadFixture("workday-page2.html");
+  const p = testProfile(A);
+  p.misc.skills = "Python, SQL, Excel";
+  const jd = "Python and SQL required.";
+  const candidates = A.skills.candidatesFor(p, jd);
+  const verdict = (inc, prob) => ({ choice: inc ? "INCLUDE" : "SKIP", probabilities: { INCLUDE: inc ? prob : 1 - prob, SKIP: inc ? 1 - prob : prob } });
+  const verdicts = { answer_s0: verdict(true, 0.95), answer_s1: verdict(true, 0.5), answer_s2: verdict(false, 0.9) };
+  assert.deepEqual([...A.skills.select(p, jd, candidates, verdicts)], ["Python"]);
+  const request = A.skills.requestFor("m", p, jd, candidates);
+  assert.deepEqual([...Object.keys(request.questions)], ["answer_s0", "answer_s1", "answer_s2"]);
+  assert.equal(request.state.candidates.s1, "SQL");
+});
+
+test("fillPage picks Workday skills ranked by the stored posting description", async () => {
+  const win = blankWindow();
+  const { document, AvidAutofill: A } = win;
+  document.body.innerHTML = `
+    <div data-automation-id="applyFlowPage">
+      <div role="group" aria-labelledby="Skills-section">
+        <h4 id="Skills-section">Skills</h4>
+        <div data-automation-id="formField-skills"><label>Type to Add Skills</label>
+          <input data-uxi-widget-type="selectinput" placeholder="Search"></div>
+      </div>
+    </div>`;
+  const input = document.querySelector('[data-automation-id="formField-skills"] input');
+  const selected = [];
+  input.addEventListener("click", () => {
+    document.querySelectorAll('[data-automation-id="promptOption"]').forEach((n) => n.remove());
+    const option = document.createElement("div");
+    option.dataset.automationId = "promptOption";
+    option.textContent = input.value || "x";
+    Object.defineProperty(option, "offsetParent", { configurable: true, get: () => document.body });
+    option.addEventListener("click", () => { selected.push(option.textContent); option.remove(); });
+    document.body.append(option);
+  });
+  input.addEventListener("input", () => {
+    const option = document.querySelector('[data-automation-id="promptOption"]');
+    if (option) option.textContent = input.value;
+  });
+  A.fillers.sleep = async () => {};
+  const posting = document.createElement("div");
+  posting.dataset.automationId = "jobPostingDescription";
+  posting.textContent = "SQL, SQL and a little Python.";
+  document.body.append(posting);
+  const p = testProfile(A);
+  p.misc.skills = "Excel, Python, SQL";
+  await A.engine.fillPage(p, { overwriteFilled: false, fillEEO: false, highlightFilled: false }, null);
+  assert.deepEqual(selected.map((v) => v.toLowerCase()), ["sql", "python", "excel"]);
 });
 
 test("page2: datePass skips date sections workExperiencePass already filled", async () => {

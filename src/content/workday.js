@@ -327,14 +327,63 @@
     }
   }
 
-  function skillList(raw) {
-    const values = Array.isArray(raw) ? raw : String(raw || "").split(/[,\n]/);
-    return values.map((value) => String(value).trim()).filter(Boolean);
+  // --- Job description: the posting page is where Workday shows it, the apply
+  // flow does not, so remember it per posting while the applicant browses. ---
+  const DESCRIPTION_KEY = "avidJobDesc", MAX_STORED = 20;
+  const postingKey = () => {
+    const M = AvidAutofill.trackerModel;
+    return (M && M.jobUrl(location.href)) || "";
+  };
+  function readDescription() {
+    const node = document.querySelector('[data-automation-id="jobPostingDescription"]');
+    const text = node ? node.textContent : "";
+    return text.replace(/\s+/g, " ").trim().slice(0, 12000);
+  }
+  async function captureDescription(tries = 10) {
+    const key = postingKey();
+    if (!key || typeof chrome === "undefined" || !chrome.storage) return false;
+    for (let i = 0; i < tries; i++) {
+      const text = readDescription();
+      if (text) {
+        const stored = (await chrome.storage.local.get(DESCRIPTION_KEY))[DESCRIPTION_KEY] || {};
+        stored[key] = { text, at: Date.now() };
+        const keep = Object.entries(stored).sort((a, b) => b[1].at - a[1].at).slice(0, MAX_STORED);
+        await chrome.storage.local.set({ [DESCRIPTION_KEY]: Object.fromEntries(keep) });
+        return true;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+    return false;
+  }
+  async function loadDescription() {
+    const live = readDescription();
+    if (live) return live;
+    const key = postingKey();
+    if (!key || typeof chrome === "undefined" || !chrome.storage) return "";
+    const stored = (await chrome.storage.local.get(DESCRIPTION_KEY))[DESCRIPTION_KEY] || {};
+    return (stored[key] && stored[key].text) || "";
+  }
+
+  // Skills to add: Jev picks from the saved list plus skills the posting names,
+  // judged against the profile; without Jev, saved skills ranked by how much the
+  // posting mentions them. Capped so the section stays focused.
+  async function chooseSkills(profile) {
+    const S = AvidAutofill.skills;
+    if (!S) return String((profile.misc && profile.misc.skills) || "").split(/[,\n]/).map((v) => v.trim()).filter(Boolean);
+    const description = await loadDescription();
+    if (description && typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
+      try {
+        const response = await chrome.runtime.sendMessage({ type: "AVID_JEV_SKILLS", description });
+        if (response && response.ok && Array.isArray(response.skills)) return response.skills;
+      } catch (_) { /* fall through to the local ranking */ }
+    }
+    return S.select(profile, description, S.candidatesFor(profile, description), null);
   }
 
   async function skillsPass(profile, ctx) {
     const { fillers, record, handled } = ctx;
-    const skills = skillList(profile.misc && profile.misc.skills);
+    if (!document.querySelector(SKILLS_SECTION_SELECTOR)) return;
+    const skills = await chooseSkills(profile);
     if (!skills.length) return;
     for (const skill of skills) {
       const section = document.querySelector(SKILLS_SECTION_SELECTOR);
@@ -444,6 +493,7 @@
     workExperiencePass,
     educationPass,
     skillsPass,
+    captureDescription,
     isWorkExperienceField,
     isEducationField,
   };

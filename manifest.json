@@ -41,6 +41,7 @@
       "js": [
         "src/shared/schema.js",
         "src/shared/tracker-model.js",
+        "src/shared/skills.js",
         "src/content/job-detector.js",
         "src/content/tracker.js",
         "src/content/fillers.js",

@@ -24,7 +24,7 @@ function worker(fetcher = async (_, init) => ({ ok: true, json: async () => repl
     runtime: { id: "avid-test", getURL: path => `chrome-extension://avid-test/${path}`, onMessage: { addListener(fn) { listener = fn; } } },
   };
   const context = vm.createContext({ chrome, URL, TextEncoder, AbortController, crypto, setTimeout, clearTimeout, fetch: async (url, init) => { calls.push({ url, init }); return fetcher(url, init); } });
-  for (const file of ["src/shared/schema.js", "src/shared/jev.js", "src/background/jev.js"]) vm.runInContext(read(file), context);
+  for (const file of ["src/shared/schema.js", "src/shared/jev.js", "src/shared/skills.js", "src/background/jev.js"]) vm.runInContext(read(file), context);
   const A = context.AvidAutofill;
   const send = (message, sender = admin) => new Promise(resolve => listener(message, sender, resolve));
   return { A, local, session, calls, send, set permission(value) { permission = value; } };
@@ -79,6 +79,25 @@ test("question-bank scope uses the trusted sender URL and respects path boundari
   assert.equal(J.sourcesFor(p, content.url).bank_weekends, undefined);
   assert.equal(J.sourcesFor(p, content.url).workAuth_requireSponsorship, undefined);
 });
+test("skills matching asks Jev per candidate, applies only confident includes, and needs a page sender", async () => {
+  const w = await connected(async (_, init) => {
+    const request = JSON.parse(init.body);
+    return { ok: true, json: async () => reply(request, { answer_s0: "INCLUDE", answer_s1: "SKIP" }) };
+  });
+  const profile = clone(await w.A.getProfile());
+  profile.misc.skills = "Python, Excel";
+  profile.work = [{ title: "Engineer", company: "Acme", description: "Wrote Python services" }];
+  await w.A.saveProfile(profile);
+  const description = "Python required. Excel is not used.";
+  const result = await w.send({ type: "AVID_JEV_SKILLS", description }, content);
+  assert.deepEqual([...result.skills], ["Python"]);
+  const body = JSON.parse(w.calls.at(-1).init.body);
+  assert.equal(body.state.candidates.s0, "Python");
+  assert.equal(body.state.job_description, description);
+  assert.equal((await w.send({ type: "AVID_JEV_SKILLS", description }, admin)).ok, false);
+  assert.equal((await w.send({ type: "AVID_JEV_SKILLS", description: "" }, content)).ok, false);
+});
+
 test("native choices require a second validated request carrying only the selected fact", async () => {
   let stage = 0;
   const w = await connected(async (_, init) => {
