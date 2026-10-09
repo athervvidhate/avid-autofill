@@ -325,3 +325,12 @@ test("live evaluation cases have a consistent oracle and grading", () => {
   assert.equal(grade({ expect: { option: "o2" } }, { status: "fill", sourceId: "bank_sponsor", optionId: "o2" }), "correct");
   assert.equal(grade({ expect: { option: "o2" } }, { status: "fill", sourceId: "bank_sponsor", optionId: "o1" }), "wrong-fill");
 });
+
+test("acceptance gate is the live-calibrated probability of 0.80", () => {
+  const context = vm.createContext({ URL, TextEncoder });
+  vm.runInContext(read("src/shared/jev.js"), context);
+  const { accepted } = context.AvidAutofill.jev, answer = (choice, p) => ({ choice, probabilities: { bank_a: p, NEEDS_USER: 1 - p } });
+  assert.equal(accepted(answer("bank_a", .8)), true);
+  assert.equal(accepted(answer("bank_a", .79)), false);
+  assert.equal(accepted({ choice: "NEEDS_USER", probabilities: { bank_a: .01, NEEDS_USER: .99 } }), false);
+});

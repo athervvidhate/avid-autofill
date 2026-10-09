@@ -4,7 +4,7 @@
   const A = globalThis.AvidAutofill = globalThis.AvidAutofill || {};
   const MODEL = "jev-1.13.0", NEEDS_USER = "NEEDS_USER";
   const KEY = "avidJevKey", ORIGIN = "https://api.typesafe.ai/*";
-  const MAX_FIELDS = 20, MAX_SOURCES = 80, MIN_PROBABILITY = .95;
+  const MAX_FIELDS = 20, MAX_SOURCES = 80, MIN_PROBABILITY = .8;
   const object = value => value !== null && typeof value === "object" && !Array.isArray(value);
   const sameKeys = (a, b) => Object.keys(a).length === Object.keys(b).length && Object.keys(a).every(k => Object.hasOwn(b, k));
   const PROFILE_SOURCES = {

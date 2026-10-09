@@ -122,9 +122,10 @@ stage discards the AI batch while preserving prior rule fills.
   duplicate native select values. Unknown IDs and malformed responses cause no
   AI writes. Provider errors are sanitized; keys and raw provider bodies are not
   logged or returned. Requests refuse redirects and time out after 12 seconds.
-- Initial policy requires top probability >=0.95. This is not a measured accuracy
-  guarantee. `NEEDS_USER` and uncertainty leave fields for review. Runtime checks
-  cannot prove that the model selected the semantically correct saved answer.
+- Both stages require a top probability of at least 0.80, calibrated on the live
+  evaluation below. `NEEDS_USER` and lower probabilities leave fields for review.
+  Runtime checks cannot prove that the model selected the semantically correct
+  saved answer.
 - Sources include saved personal/contact details, links, skills, and approved
   applicable bank entries. Default work-authorization/yes-no answers, EEO, and
   entire work/education histories are not model sources. Explicitly approved bank
@@ -140,19 +141,51 @@ stage discards the AI batch while preserving prior rule fills.
   current answers before another fill handles more fields. No automatic retries,
   background polling, auto-created facts or automatic submission.
 
-## Verification and next work
+## Verification
 
 Run `npm ci` and `npm test`. Jev tests use synthetic values and mocked provider
 responses, including the actual engine-worker-validator two-stage path. Existing
-tracker and ATS tests remain in the suite. No live Jev key was used during
-implementation, so provider accuracy and real ATS behavior remain unverified.
+tracker and ATS tests remain in the suite.
 
-Next, evaluate synthetic application questions with expected answers using a
-user-provided key. Cover missing facts, negation, similar sources, company scope,
-misleading page text and reordered choices. Keep a held-out evaluation set and
-measure wrong fills, abstention, coverage, latency and cost. Then validate the
-opt-in flow on real ATS pages. Custom dropdown discovery and generated writing
-are follow-up work.
+## Live evaluation
+
+`test/live/` runs the production pipeline against the real API with synthetic
+cases. Each field carries an expected source, an expected option, or `null` for
+"leave it for the user". Holdout pages are kept out of tuning.
+
+1. Start the collector: `node test/live/collect.mjs <dir>`.
+2. Save a key in My Info. In the same browser, open
+   `chrome-extension://<extension-id>/test/live/jev-eval.html?set=dev`.
+   `set` takes `smoke`, `dev`, `holdout` or case IDs, comma-separated. The page
+   reads the session key itself; new or edited files under `test/live/` and
+   `src/shared/jev.js` take effect on page reload, without an extension reload.
+3. `node test/live/sweep.mjs <dir>/*.json` replays reports under candidate
+   thresholds and lists every wrong pick.
+
+The page also probes stage two for choice fields that stage one picked but the
+gate stopped, so thresholds can be compared without extra runs. Grading uses only
+the production path.
+
+Results on 2026-10-08 (`jev-1.13.0`, 30 synthetic sources):
+
+| Gate | Dev, 3 runs (70 fillable / 113) | Holdout (14 fillable / 19) |
+| --- | --- | --- |
+| p >= 0.95 (previous) | 23% filled, 0 wrong | 7% filled, 0 wrong |
+| p >= 0.80 (current) | 81% filled, 0 wrong | 93% filled, 0 wrong |
+| p >= 0.70 | 94% filled, 2 wrong | 93% filled, 0 wrong |
+
+The 0.80 gate was fixed from dev data before holdout was scored: the lowest grid
+value with no wrong dev fills and at least 0.05 margin over the worst wrong pick.
+The only wrong pick seen was an inference ("willing to travel more than 50%?"
+answered "No" from "up to 25%"), with stage-one probability up to 0.71.
+Provider probabilities vary by up to about 0.08 between identical runs, and one
+borderline negation flipped between a source and `NEEDS_USER`. Zero wrong fills
+in about 130 decisions bounds the wrong-fill rate near 2% at 95% confidence on
+this synthetic distribution, not on real forms. A fill of up to 9 fields took
+110-270 ms for both stages and used about 4,000-5,000 input tokens (under $0.0003).
+
+Next: validate the opt-in flow on real ATS pages. Custom dropdown discovery and
+generated writing are follow-up work.
 
 Primary references checked 2026-10-08: [API](https://docs.typesafe.ai/api),
 [models](https://docs.typesafe.ai/models), [confidence](https://docs.typesafe.ai/confidence),
