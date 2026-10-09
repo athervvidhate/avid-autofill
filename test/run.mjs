@@ -1256,3 +1256,11 @@ test("profile links do not answer questions that only mention the platform", () 
   assert.equal(answer("*share 2–3 of your open-source contributions with links (github prs, issues, etc.)"), null);
   assert.equal(answer("link to a github repository for a project you are proud of"), null);
 });
+
+test("name pronunciation questions are not answered with the legal name", () => {
+  const A = blankWindow().AvidAutofill, profile = testProfile(A), helpers = A.matcher.makeHelpers(profile);
+  assert.equal(A.matcher.match("type your response | name pronunciation | how do you pronounce your name? | cards a69a985a field2", profile, helpers), null);
+  assert.equal(A.matcher.match("phonetic spelling of your name", profile, helpers), null);
+  assert.equal(A.matcher.match("type your response | preferred name | what would you like us to call you?", profile, helpers).value, "Al");
+  assert.equal(A.matcher.match("your name", profile, helpers).value, "Alex Rivera");
+});

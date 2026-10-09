@@ -119,13 +119,13 @@
     { any: [/first name/, /given name/, /^fname$/, /legal first/], not: [/preferred/], get: (p, h) => h.firstName() },
     { any: [/last name/, /family name/, /surname/, /^lname$/, /legal last/], get: (p, h) => h.lastName() },
     { any: [/preferred (first )?name/, /nick ?name/, /goes by/], get: (p) => p.personal.preferredName || p.personal.firstName },
-    { any: [/legal name/, /full name/, /^name$/, /(^|\| )name(\*| \||$)/, /your name/, /candidate name/], not: [/company|user|file|first|last|middle|event|account|maiden|screen/], get: (p) => p.personal.fullName || `${p.personal.firstName} ${p.personal.lastName}`.trim() },
+    { any: [/legal name/, /full name/, /^name$/, /(^|\| )name(\*| \||$)/, /your name/, /candidate name/], not: [/company|user|file|first|last|middle|event|account|maiden|screen|pronounc|phonetic/], get: (p) => p.personal.fullName || `${p.personal.firstName} ${p.personal.lastName}`.trim() },
 
     // --- Contact ---
     { any: [/confirm.*e-?mail/, /e-?mail.*confirm/], not: [/company/], get: (p) => p.personal.email },
     { any: [/e-?mail/, /^email address$/], not: [/confirm|company/], get: (p) => p.personal.email },
     { any: [/phone device type/], kind: "select", get: (p) => p.personal.phoneDeviceType || "Mobile" },
-    { any: [/phone/, /mobile/, /telephone/, /contact number/], not: [/extension/, /device type/, /\bsms\b/, /opt.?in/, /phone code/, /country.*code/], get: (p) => p.personal.phone },
+    { any: [/phone/, /mobile/, /telephone/, /contact number/], not: [/extension/, /device type/, /\bsms\b/, /opt.?in/, /phone code/, /country.*code/, /phonetic/], get: (p) => p.personal.phone },
     { any: [/pronoun/], get: (p) => p.personal.pronouns },
 
     // --- Address ---
