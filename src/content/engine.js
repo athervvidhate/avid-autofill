@@ -89,6 +89,8 @@
           const values = m.place ? [...m.alts, m.value] : [m.value, ...(m.alts || [])];
           const ok = await fillers.setReactSelect(control, values);
           record(signal, m.value, ok ? (m.assumed ? "assumed" : "filled") : "skipped");
+          // No option read like the profile value: leave the question to Jev.
+          if (!ok) unmatched.push({ el: control, custom: true, signal });
         } catch (_) {
           record(signal, m.value, "error");
         }
@@ -111,7 +113,9 @@
       if (!group.length) continue;
       group.forEach((r) => handled.add(r));
       const signal = M().groupSignal(group);
-      const m = matcher.match(signal, profile, helpers);
+      // A lone radio is an acknowledgement ("I agree"), never a profile question,
+      // however much policy text its title carries.
+      const m = group.length > 1 ? matcher.match(signal, profile, helpers) : null;
       if (!m) { unmatched.push({ el: group[0], group, signal }); continue; }
       if (m.eeo && !settings.fillEEO) continue;
       const ok = fillers.setRadio(group, m.value);
@@ -134,7 +138,7 @@
       F().queryAll("input", container).forEach((i) => handled.add(i));
       const signal = matcher.choiceSignal(container);
       const m = matcher.match(signal, profile, helpers);
-      if (!m) { unmatched.push({ el: buttons[0], signal }); continue; }
+      if (!m) { unmatched.push({ el: buttons[0], buttons, signal }); continue; }
       if (m.eeo && !settings.fillEEO) continue;
       if (!settings.overwriteFilled && buttons.some((b) => b.getAttribute("aria-pressed") === "true")) {
         record(signal, m.value, "kept-existing");

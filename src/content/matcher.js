@@ -78,7 +78,7 @@
   function groupTitle(radios) {
     const box = radios[0].closest('fieldset, [role="radiogroup"], [role="group"]');
     if (!box) return "";
-    const named = norm(attr(box, "aria-label"));
+    const named = norm(attr(box, "aria-label")) || fieldTitle(box);
     if (named) return named;
     const ids = new Set(radios.map((r) => r.id).filter(Boolean));
     const label = Array.from(box.querySelectorAll("label")).find(
@@ -87,9 +87,18 @@
     return label ? norm(label.textContent) : "";
   }
 
-  // Question text for a container of Yes/No buttons: the text around the buttons.
+  // Title of the form field entry holding a control (Ashby's data-field-path
+  // wrapper). Comboboxes and button pairs have no label pointing at them, and
+  // long questions overrun nearbyText's length cap.
+  function fieldTitle(el) {
+    const label = el.closest("[data-field-path]")?.querySelector("label, legend");
+    return label ? norm(label.textContent) : "";
+  }
+
+  // Question text for a container of Yes/No buttons: the field title, else the
+  // text around the buttons.
   function choiceSignal(container) {
-    return norm(nearbyText(container) || container.getAttribute("aria-label"));
+    return fieldTitle(container) || norm(nearbyText(container) || container.getAttribute("aria-label"));
   }
 
   // Turn camelCase / snake_case / kebab-case identifiers into spaced words so
@@ -107,8 +116,9 @@
   // Aggregate signal string used for matching. Human-readable sources are used
   // as-is; identifier-like attributes are de-camelCased first.
   function signalFor(el) {
+    const labelled = labelTextFor(el);
     const human = [
-      labelTextFor(el),
+      labelled || fieldTitle(el),
       attr(el, "aria-label"),
       el.placeholder,
       nearbyText(el),
@@ -153,7 +163,7 @@
 
     // --- Address ---
     { any: [/street address/, /address line ?1/, /^address$/, /mailing address/], not: [/email/], get: (p) => p.personal.address },
-    { any: [/\bcity\b/, /\btown\b/, /(^|\| )(current )?location( \||$)/, /(^|\| )current location\b/], not: [/velocity|capacity|ethnic/], expand: "place", get: (p) => p.personal.city },
+    { any: [/\bcity\b/, /\btown\b/, /(^|\| )(current )?location( \||$)/, /(^|\| )current location\b/, /\bwork location\b/, /where (are you|do you) (located|based|live)/], not: [/velocity|capacity|ethnic/], expand: "place", get: (p) => p.personal.city },
     { any: [/\bstate\b/, /\bprovince\b/, /\bregion\b/], not: [/statement|estate|united states|work/], expand: "usState", get: (p) => p.personal.state },
     { any: [/zip/, /postal code/, /post code/], get: (p) => p.personal.postalCode },
     { any: [/\b(located|location|based|living|reside|residing) in\b/], not: [/relocat|willing|commut|authoriz|work|time ?zone|hours/], kind: "yesno", get: (p, h, signal) => inListedCountry(signal, p.personal.country) },
@@ -167,7 +177,7 @@
 
     // --- Current role / employer ---
     { any: [/current company/, /current employer/, /present employer/, /^company$/, /employer/], not: [/why|reason|previous|agreement|restriction/], get: (p, h) => h.work0().company },
-    { any: [/current title/, /current role/, /job title/, /^title$/, /current position/], not: [/mr\.?|mrs\.?|salutation/], get: (p, h) => h.work0().title },
+    { any: [/current title/, /current role/, /job title/, /^title$/, /current position/], not: [/mr\.?|mrs\.?|salutation/, /why|reason|leav|consider|looking for|seeking/], get: (p, h) => h.work0().title },
 
     // --- Education ---
     { any: [/school/, /university/, /college/, /institution/], not: [/high school diploma\?/, /are you/, /current.*student/, /enrolled/, /graduation/, /anticipated/], get: (p, h) => h.edu0().school },
@@ -188,7 +198,7 @@
     // General willingness only: a named destination or relocation assistance is a different question.
     { any: [/willing to relocate/, /open to relocat/, /relocat/], not: [/relocat\w* to \w/, /assistance|package|stipend|support/], kind: "yesno", get: (p) => p.misc.willingToRelocate },
     // In-office attendance ("This role is onsite ... willing to work from our local office?").
-    { any: [/on-?site/, /in[- ]person/, /(work|working|come|commute|report)\w* (from|in|into|to|at) (the |our |a |an )?(\w+ )?(local |physical |regional )?office/], not: [/relocat/, /remote(ly)? (work|position|role)? ?only/], kind: "yesno", get: (p) => p.questions.willingOnsite },
+    { any: [/on-?site/, /in[- ]person/, /(work|working|come|commute|report)\w* (from|in|into|to|at)\b.{0,60}\boffice\b/], not: [/relocat/, /remote(ly)? (work|position|role)? ?only/], kind: "yesno", get: (p) => p.questions.willingOnsite },
     { any: [/how did you (hear|find)/, /referral source/, /source/], not: [/open ?source/], get: (p) => p.misc.howHeard },
     { any: [/cover letter/], get: (p) => p.misc.coverLetter },
     { any: [/graduation date/, /anticipated graduation/, /expected graduation/, /grad(uation)? date/], get: (p, h) => p.misc.graduationDate || h.edu0().endDate },
@@ -279,11 +289,15 @@
     return "No";
   }
 
+  // "If yes, please provide details ..." follows a yes/no question but is free text.
+  const FOLLOW_UP = /^if (yes|so|you answered|applicable)\b|\b(provide|explain|describe|list|specify)\b.{0,30}\b(details|detail|explanation|more)\b/;
+
   // Return { value, alts, kind, eeo, place } for a signal, or null if no rule matches.
   function match(signal, profile, helpers) {
     for (const rule of RULES) {
       if (rule.not && rule.not.some((re) => re.test(signal))) continue;
       if (rule.any.some((re) => re.test(signal))) {
+        if (rule.kind === "yesno" && FOLLOW_UP.test(signal)) continue;
         const value = rule.get(profile, helpers, signal);
         if (value == null || value === "") return null;
         const alts = rule.expand === "usState" ? stateAlternates(value) : rule.expand === "place" ? placeAlternates(value, profile) : [];

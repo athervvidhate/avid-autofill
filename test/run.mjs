@@ -1673,3 +1673,50 @@ test("fillPage answers a captured Ashby form: yes/no buttons, pronouns, LinkedIn
   // The relocation question keeps its own answer, not a neighbour's.
   assert.match(checked("fb61f6eb-5a53-477d-9f04-8f6118f14a4f"), /radio-0$/);
 });
+
+test("fillPage fills a second captured Ashby form without misreading long questions", async () => {
+  const { document, A, dom } = loadFixture("ashby-application-2.html", "https://jobs.ashbyhq.com/example/job/application");
+  dom.window.HTMLElement.prototype.getClientRects = function () { return [{}]; };
+  document.querySelectorAll(".ashby-application-form-input-yesno-option").forEach((b) =>
+    b.addEventListener("click", () => {
+      b.parentElement.querySelectorAll("button").forEach((o) => o.setAttribute("aria-pressed", String(o === b)));
+    })
+  );
+  // Ashby comboboxes list their options in a popup once typed into.
+  const optionsFor = { "What is your work location": ["Austin, TX", "Portland, OR"] };
+  document.querySelectorAll('[role="combobox"]').forEach((input) => {
+    const title = input.closest("[data-field-path]").querySelector("label").textContent;
+    input.addEventListener("input", () => {
+      document.querySelectorAll("[data-popup]").forEach((n) => n.remove());
+      const popup = document.createElement("div");
+      popup.setAttribute("data-popup", "");
+      for (const text of optionsFor[title] || []) {
+        const option = document.createElement("div");
+        option.setAttribute("role", "option");
+        option.textContent = text;
+        option.addEventListener("click", () => { input.value = text; popup.remove(); });
+        popup.append(option);
+      }
+      document.body.append(popup);
+    });
+  });
+  const profile = testProfile(A);
+  Object.assign(profile.personal, { city: "Austin", state: "TX" });
+  profile.misc.salaryExpectation = "150000";
+  await A.engine.fillPage(profile, { overwriteFilled: false, fillEEO: false, highlightFilled: false }, null);
+
+  const entryFor = (title) =>
+    Array.from(document.querySelectorAll("[data-field-path]")).find((e) => e.querySelector("label")?.textContent.startsWith(title));
+  const answer = (title) => entryFor(title).querySelector("input:not([type=checkbox]), textarea").value;
+  const pressedFor = (title) => entryFor(title).querySelector('button[aria-pressed="true"]')?.textContent;
+  assert.equal(pressedFor("Are you able and willing to work from our Los Angeles"), "Yes", "office attendance");
+  assert.equal(pressedFor("Are you legally authorized"), "Yes");
+  assert.equal(pressedFor("Will you now or in the future require visa sponsorship"), "No");
+  assert.equal(pressedFor("On-Call Requirements"), undefined, "unknown yes/no questions are left for Jev");
+  assert.equal(answer("What is your work location"), "Austin, TX");
+  assert.equal(answer("Please list your most recent employer"), "Globex");
+  assert.equal(answer("Please share your base compensation"), "150000");
+  assert.equal(answer("Why are you considering leaving"), "", "a 'why leaving' question is not the job title");
+  assert.equal(answer("If yes, please provide details"), "", "a follow-up for details is not the sponsorship answer");
+  assert.equal(document.querySelector('input[type="radio"][name*="b8b84bc4"]:checked'), null, "a lone policy radio is left alone");
+});

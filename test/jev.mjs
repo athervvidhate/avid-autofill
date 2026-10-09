@@ -501,3 +501,18 @@ test("a field asking a saved question word for word uses that answer without a s
   await w.send({ type: "AVID_JEV_FILL", fields: [fields[0]] }, content);
   assert.equal(requests.length, 1);
 });
+test("Ashby yes/no buttons reach Jev with their options and are answered by clicking", async () => {
+  const html = '<form><div data-field-path="q"><label for="q">Are you willing to be on call?</label><div><button aria-pressed="false" data-option="yes">Yes</button><button aria-pressed="false" data-option="no">No</button><input type="checkbox" name="q" tabindex="-1"></div></div></form>';
+  const p = await page(html, async msg => {
+    assert.equal(JSON.stringify(msg.fields[0].options), JSON.stringify({ o0: "Yes", o1: "No" }));
+    assert.match(msg.fields[0].label, /^are you willing to be on call\?/);
+    return { ok: true, results: [{ id: msg.fields[0].id, status: "fill", value: "No", optionId: "o1" }] };
+  });
+  try {
+    const doc = p.dom.window.document;
+    doc.querySelectorAll("button").forEach(b => { b.getClientRects = () => [{}]; b.addEventListener("click", () => doc.querySelectorAll("button").forEach(o => o.setAttribute("aria-pressed", String(o === b)))); });
+    const report = await p.A.engine.fillPage(p.profile, p.settings, null);
+    assert.equal(doc.querySelector('button[aria-pressed="true"]').textContent, "No");
+    assert.equal(report.results.find(r => r.method === "jev").status, "filled");
+  } finally { p.close(); }
+});
