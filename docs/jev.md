@@ -133,6 +133,11 @@ stage discards the AI batch while preserving prior rule fills.
   duplicate native select values. Unknown IDs and malformed responses cause no
   AI writes. Provider errors are sanitized; keys and raw provider bodies are not
   logged or returned. Requests refuse redirects and time out after 12 seconds.
+- A field whose question equals a saved bank question (ignoring case,
+  punctuation and required markers) takes that saved answer without a stage-one
+  call; Jev scored such exact repeats at p=0.53-0.72 because it sees saved
+  questions, not answers. Disagreeing saved answers to one question go through
+  Jev. Dropdowns and radios still use stage two to pick the option.
 - Both stages require a top probability of at least 0.80, calibrated on the live
   evaluation below. `NEEDS_USER` and lower probabilities leave fields for review.
   Runtime checks cannot prove that the model selected the semantically correct
