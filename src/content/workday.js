@@ -262,8 +262,15 @@
     handled.add(control);
     control.querySelectorAll("input").forEach((input) => handled.add(input));
     try {
-      const ok = await fillers.setReactSelect(control, values, config);
-      record(label, values[0], ok ? "filled" : "skipped");
+      let ok = await fillers.setReactSelect(control, values, config);
+      let used = values[0];
+      // The saved value is not one of the dropdown's options (e.g. no "Data
+      // Science" field of study): take the list's "Other" instead of leaving it blank.
+      if (!ok && config && config.fallback) {
+        ok = await fillers.setReactSelect(control, [config.fallback], { exact: true });
+        used = config.fallback;
+      }
+      record(label, used, ok ? "filled" : "skipped");
     } catch (_) {
       record(label, values[0], "error");
     }
@@ -319,7 +326,7 @@
         await fillEducationSelect(panel, "degree", degreeTargets(entry.degree), fillers, handled, record, `${tag} - Degree`);
       }
       if (entry.field) {
-        await fillEducationSelect(panel, "fieldOfStudy", [entry.field], fillers, handled, record, `${tag} - Field of Study`, { allowCreate: true });
+        await fillEducationSelect(panel, "fieldOfStudy", [entry.field], fillers, handled, record, `${tag} - Field of Study`, { fallback: "other" });
       }
       fillPanelText(panel, "gradeAverage", entry.gpa, fillers, handled, record, `${tag} - GPA`);
       fillEducationYear(panel, "firstYearAttended", entry.startDate, fillers, handled, record, `${tag} - Start Year`);
@@ -384,7 +391,10 @@
     const { fillers, record, handled } = ctx;
     if (!document.querySelector(SKILLS_SECTION_SELECTOR)) return;
     const skills = await chooseSkills(profile);
-    if (!skills.length) return;
+    if (!skills.length) {
+      record("Skills", "none saved or matching this job", "skipped");
+      return;
+    }
     for (const skill of skills) {
       const section = document.querySelector(SKILLS_SECTION_SELECTOR);
       const control =

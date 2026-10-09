@@ -511,6 +511,45 @@ test("fillPage adds and fills the first Workday education panel", async () => {
   );
 });
 
+test("education falls back to Other when the saved field of study is not an option", async () => {
+  const win = blankWindow();
+  const { document, AvidAutofill: A } = win;
+  document.body.innerHTML = `
+    <div data-automation-id="applyFlowPage">
+      <div role="group" aria-labelledby="Education-section">
+        <h4 id="Education-section">Education</h4>
+        <div role="group" aria-labelledby="Education-1-panel">
+          <h5 id="Education-1-panel">Education 1</h5>
+          <div data-automation-id="formField-fieldOfStudy"><label>Field of Study</label><input data-uxi-widget-type="selectinput"></div>
+        </div>
+      </div>
+    </div>`;
+  const input = document.querySelector('[data-automation-id="formField-fieldOfStudy"] input');
+  input.addEventListener("click", () => {
+    document.querySelectorAll('[data-automation-id="promptOption"]').forEach((n) => n.remove());
+    for (const text of ["Biology", "Other"]) {
+      const option = document.createElement("div");
+      option.dataset.automationId = "promptOption";
+      option.textContent = text;
+      Object.defineProperty(option, "offsetParent", { configurable: true, get: () => document.body });
+      option.addEventListener("click", () => { input.dataset.selected = text; });
+      option.hidden = false;
+      document.body.append(option);
+    }
+  });
+  input.addEventListener("input", () => {
+    document.querySelectorAll('[data-automation-id="promptOption"]').forEach((o) => {
+      o.style.display = o.textContent.toLowerCase().includes(input.value.toLowerCase()) ? "" : "none";
+      Object.defineProperty(o, "offsetParent", { configurable: true, get: () => (o.style.display === "none" ? null : document.body) });
+    });
+  });
+  A.fillers.sleep = async () => {};
+  const p = testProfile(A);
+  p.education = [{ school: "", degree: "", field: "Data Science" }];
+  await A.engine.fillPage(p, { overwriteFilled: false, fillEEO: false, highlightFilled: false }, null);
+  assert.equal(input.dataset.selected, "Other");
+});
+
 test("fillPage adds saved skills through Workday's skills picker", async () => {
   const win = blankWindow();
   const { document, AvidAutofill: A } = win;
