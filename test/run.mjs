@@ -1160,3 +1160,14 @@ test("workday.yearSpinPlan computes the monthPicker spinner clicks to reach the 
   // Already on the target year -> no clicks (direction is a no-op either way).
   assert.deepEqual({ ...yearSpinPlan(2025, 2025) }, { direction: "right", clicks: 0 });
 });
+
+test("preferred first name uses the saved preferred name, not the first name", () => {
+  const { window: win } = blankWindow();
+  const A = win.AvidAutofill, profile = testProfile(A), helpers = A.matcher.makeHelpers(profile);
+  for (const signal of ["preferred first name*", "preferred_name | preferred first name*", "preferred name"]) {
+    assert.equal(A.matcher.match(signal, profile, helpers).value, "Al", signal);
+  }
+  assert.equal(A.matcher.match("first name*", profile, helpers).value, "Alex");
+  profile.personal.preferredName = "";
+  assert.equal(A.matcher.match("preferred first name*", profile, helpers).value, "Alex");
+});

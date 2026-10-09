@@ -98,9 +98,9 @@
   // `kind` hints the filler (text | yesno | select). Default text.
   const RULES = [
     // --- Name ---
-    { any: [/first name/, /given name/, /^fname$/, /legal first/], get: (p, h) => h.firstName() },
+    { any: [/first name/, /given name/, /^fname$/, /legal first/], not: [/preferred/], get: (p, h) => h.firstName() },
     { any: [/last name/, /family name/, /surname/, /^lname$/, /legal last/], get: (p, h) => h.lastName() },
-    { any: [/preferred name/, /nick ?name/, /goes by/], get: (p) => p.personal.preferredName || p.personal.firstName },
+    { any: [/preferred (first )?name/, /nick ?name/, /goes by/], get: (p) => p.personal.preferredName || p.personal.firstName },
     { any: [/legal name/, /full name/, /^name$/, /(^|\| )name(\*| \||$)/, /your name/, /candidate name/], not: [/company|user|file|first|last|middle|event|account|maiden|screen/], get: (p) => p.personal.fullName || `${p.personal.firstName} ${p.personal.lastName}`.trim() },
 
     // --- Contact ---
