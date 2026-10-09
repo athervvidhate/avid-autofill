@@ -81,5 +81,55 @@
     return response.answers;
   }
   function accepted(answer) { return answer.choice !== NEEDS_USER && answer.probabilities[answer.choice] >= MIN_PROBABILITY; }
-  A.jev = { MODEL, KEY, ORIGIN, MAX_FIELDS, sourcesFor, cleanFields, requestFor, validate, accepted, scopeMatches };
+  // One validated provider call. Usage is returned so callers can meter cost.
+  async function post(request, key, fetcher = fetch) {
+    const body = JSON.stringify(request);
+    if (new TextEncoder().encode(body).length > 60000) throw new Error("Jev context is too large. Use fewer or shorter question-bank entries.");
+    const abort = new AbortController(), timer = setTimeout(() => abort.abort(), 12000);
+    try {
+      const response = await fetcher("https://api.typesafe.ai/v1/systemone", {
+        method: "POST", headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+        body, signal: abort.signal, credentials: "omit", redirect: "error",
+      });
+      if (!response.ok) throw new Error(response.status === 401 ? "Jev rejected the API key. Re-enter it in My Info." : [429, 529].includes(response.status) ? "Jev is busy or rate limited. Try filling again shortly." : "Jev could not complete the request. Try filling again.");
+      let payload;
+      try { payload = await response.json(); } catch { throw new Error("Jev returned invalid JSON. No AI answers were applied."); }
+      return { answers: validate(request, payload), usage: payload.usage };
+    } catch (error) {
+      if (error.name === "AbortError") throw new Error("Jev timed out. Try filling again.");
+      if (error instanceof TypeError) throw new Error("Could not reach Jev. Check your connection and TypeSafe page access.");
+      throw error;
+    } finally { clearTimeout(timer); }
+  }
+  // Two-stage match: pick a saved source per field, then map native choices to
+  // a real option. `send(request)` performs one validated call; `fresh()` throws
+  // when the profile or connection changed while a request was pending.
+  async function match(fields, sources, send, fresh = async () => {}) {
+    const usage = { input_tokens: 0, output_tokens: 0, calls: 0 };
+    const meter = async request => {
+      const reply = await send(request);
+      usage.input_tokens += reply.usage.input_tokens; usage.output_tokens += reply.usage.output_tokens; usage.calls++;
+      return reply.answers;
+    };
+    const answers = await meter(requestFor(fields, sources)), selections = {};
+    const optionFields = fields.filter(field => {
+      const answer = answers[`answer_${field.id}`];
+      if (accepted(answer)) selections[field.id] = answer.choice;
+      return field.options && selections[field.id];
+    });
+    let optionAnswers = {};
+    if (optionFields.length) {
+      await fresh();
+      optionAnswers = await meter(requestFor(optionFields, sources, selections));
+    }
+    await fresh();
+    const results = fields.map(field => {
+      const source = sources[selections[field.id]], answer = field.options ? optionAnswers[`answer_${field.id}`] : answers[`answer_${field.id}`];
+      if (!source || !answer || !accepted(answer)) return { id: field.id, status: "ai-needs-answer" };
+      if (field.type === "email" && source.kind !== "email" || field.type === "tel" && source.kind !== "tel" || field.type === "url" && source.kind !== "url") return { id: field.id, status: "ai-incompatible" };
+      return { id: field.id, status: "fill", sourceId: selections[field.id], sourceQuestion: source.description, value: source.value, ...(field.options ? { optionId: answer.choice } : {}) };
+    });
+    return { results, usage };
+  }
+  A.jev = { MODEL, KEY, ORIGIN, MAX_FIELDS, sourcesFor, cleanFields, requestFor, validate, accepted, scopeMatches, post, match };
 })();
