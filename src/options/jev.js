@@ -8,7 +8,7 @@
   }
   function render(state) {
     $("jev-enabled").checked = state.enabled;
-    $("jev-status").textContent = state.enabled && state.hasKey && state.hasAccess ? "Jev is enabled for this browser session." : state.enabled ? "Jev needs your key or TypeSafe page access. Re-enter the key and save." : "Jev is off. Saved answers still stay available in your profile.";
+    $("jev-status").textContent = !state.enabled ? "Jev is off. Saved answers still stay available in your profile." : !state.hasKey ? "Jev has no key for this browser session. Enter your key and save." : !state.hasAccess ? "Jev needs TypeSafe page access. Save again and allow it." : "Jev is enabled for this browser session.";
     $("jev-clear").disabled = !state.hasKey && !state.enabled;
   }
   async function run(action) {

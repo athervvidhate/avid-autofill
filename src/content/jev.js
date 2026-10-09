@@ -94,7 +94,9 @@
       } catch { record("error"); }
     }
     const count = report.results.filter(result => result.method === "jev" && result.status === "filled").length;
-    report.aiMessage = `Jev filled ${count} extra ${count === 1 ? "field" : "fields"}. Review every AI-filled answer before submitting.`;
+    report.aiMessage = count
+      ? `Jev filled ${count} extra ${count === 1 ? "field" : "fields"}. Review every AI-filled answer before submitting.`
+      : "Jev found no saved answer for the remaining fields. Answers you save to your question bank can be reused.";
     return report;
   }
   const inner = el => el.matches("input") ? el : el.querySelector("input") || el;
