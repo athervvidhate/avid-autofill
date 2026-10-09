@@ -356,7 +356,7 @@ test("acceptance gate is the live-calibrated probability of 0.80", () => {
 
 test("custom dropdowns reach Jev with their real options and fill by exact label", async () => {
   let sent;
-  const p = await page('<form><label for="clearance">Do you hold an active security clearance?</label><input id="clearance" role="combobox" aria-controls="clearance-list"></form>', async msg => {
+  const p = await page('<form><label for="clearance">Have you used our product before?</label><input id="clearance" role="combobox" aria-controls="clearance-list"></form>', async msg => {
     sent = msg.fields;
     return { ok: true, results: [{ id: msg.fields[0].id, status: "fill", value: "Yes", optionId: "o1", sourceQuestion: "Do you hold a clearance?" }] };
   });
@@ -377,7 +377,7 @@ test("custom dropdowns reach Jev with their real options and fill by exact label
     input.addEventListener("keydown", event => { if (event.key === "Escape") close(); });
     const report = await p.A.engine.fillPage(p.profile, p.settings, null);
     assert.equal(sent.length, 1);
-    assert.deepEqual(JSON.parse(JSON.stringify(sent[0])), { id: sent[0].id, label: "do you hold an active security clearance? | clearance", type: "select", options: { o0: "No", o1: "Yes", o2: "Prefer not to say" } });
+    assert.deepEqual(JSON.parse(JSON.stringify(sent[0])), { id: sent[0].id, label: "have you used our product before? | clearance", type: "select", options: { o0: "No", o1: "Yes", o2: "Prefer not to say" } });
     assert.equal(input.value, "Yes");
     assert.equal(report.results.find(r => r.method === "jev").status, "filled");
   } finally { p.close(); }

@@ -183,6 +183,7 @@
     // --- Links ---
     { any: [/linkedin/], get: (p) => p.links.linkedin },
     { any: [/github/], not: [/contribution|repositor|project|describe|example/], get: (p) => p.links.github },
+    { any: [/work samples?/, /samples? of (your )?work/, /examples? of (your )?work/], not: [/describe|explain|tell us/], get: (p) => p.links.portfolio || p.links.website || p.links.github },
     { any: [/portfolio/, /personal (web)?site/, /^website$/, /web ?site url/], get: (p) => p.links.portfolio || p.links.website },
     { any: [/twitter|(^| )x( |$)/], get: (p) => p.links.twitter },
 
@@ -205,11 +206,17 @@
 
     // --- Logistics ---
     { any: [/salary/, /compensation expectation/, /desired (pay|salary|compensation)/, /expected salary/], get: (p) => p.misc.salaryExpectation },
+    // Notice period first: it is a length of time, unlike an earliest start date.
+    { any: [/notice period/], duration: true, get: (p) => p.misc.noticePeriod || p.misc.earliestStartDate },
     { any: [/notice period/, /availability to start/, /when can you start/, /earliest start/, /start date/], get: (p) => p.misc.earliestStartDate || p.misc.noticePeriod },
     // General willingness only: a named destination or relocation assistance is a different question.
     { any: [/willing to relocate/, /open to relocat/, /relocat/], not: [/relocat\w* to \w/, /assistance|package|stipend|support/], kind: "yesno", get: (p) => p.misc.willingToRelocate },
     // In-office attendance ("This role is onsite ... willing to work from our local office?").
     { any: [/on-?site/, /in[- ]person/, /(work|working|come|commute|report)\w* (from|in|into|to|at)\b.{0,60}\boffice\b/], not: [/relocat/, /remote(ly)? (work|position|role)? ?only/], kind: "yesno", get: (p) => p.questions.willingOnsite },
+    { any: [/on-?call/], kind: "yesno", get: (p) => p.questions.willingOnCall },
+    { any: [/outside (work|employment|business|activit)/, /advisory (commitment|role|disclosure|position)/, /other (employment|jobs?) (commitments|outside)/, /moonlight/], kind: "yesno", get: (p) => p.questions.outsideEmployment },
+    { any: [/security clearance/, /active clearance/, /\bclearance (level|status)\b/], alts: ["No", "N/A", "Not applicable", "I do not hold", "I don't hold"], get: (p) => p.questions.securityClearance },
+    { any: [/work(ed|ing)? (in )?(a )?(fully )?remote/, /remote or hybrid/, /hybrid (work )?environment/], not: [/willing|open to|prefer/], get: (p) => p.questions.remoteExperience },
     { any: [/how did you (hear|find)/, /referral source/, /source/], not: [/open ?source/], get: (p) => p.misc.howHeard },
     { any: [/cover letter/], get: (p) => p.misc.coverLetter },
     { any: [/graduation date/, /anticipated graduation/, /expected graduation/, /grad(uation)? date/], get: (p, h) => p.misc.graduationDate || h.edu0().endDate },
@@ -300,6 +307,33 @@
     return "No";
   }
 
+  // A length of time as a [low, high] range in weeks: "2 weeks" -> [2, 2],
+  // "3-4 weeks" -> [3, 4], "3+ months" -> [13, Infinity], "Immediately" -> [0, 0].
+  const WORD_NUMBERS = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, eight: 8, twelve: 12, a: 1, an: 1 };
+  const UNIT_WEEKS = { day: 1 / 7, week: 1, month: 52 / 12, year: 52 };
+  function durationWeeks(text) {
+    const t = norm(text).replace(/\b(one|two|three|four|five|six|eight|twelve|an?)\b(?= ?(\+|or more)? ?(days?|weeks?|months?|years?))/g, (w) => WORD_NUMBERS[w]);
+    if (/\b(immediate(ly)?|right away|asap|none|no notice|n\/a)\b/.test(t)) return [0, 0];
+    const m = t.match(/(\d+(?:\.\d+)?)(?:\s*(?:-|–|to)\s*(\d+(?:\.\d+)?))?\s*(\+|or more)?\s*(day|week|month|year)s?/);
+    if (!m) return null;
+    const unit = UNIT_WEEKS[m[4]];
+    const low = Number(m[1]) * unit;
+    return [low, m[3] ? Infinity : (m[2] ? Number(m[2]) : Number(m[1])) * unit];
+  }
+  // Index of the option whose time range sits nearest the profile's, or -1.
+  function nearestDuration(value, labels) {
+    const want = durationWeeks(value);
+    if (!want) return -1;
+    let best = -1, bestGap = Infinity;
+    labels.forEach((label, i) => {
+      const range = durationWeeks(label);
+      if (!range) return;
+      const gap = Math.max(0, range[0] - want[1], want[0] - range[1]);
+      if (gap < bestGap - 1e-9) { best = i; bestGap = gap; }
+    });
+    return bestGap <= 1 ? best : -1;
+  }
+
   // "If yes, please provide details ..." follows a yes/no question but is free text.
   const FOLLOW_UP = /^if (yes|so|you answered|applicable)\b|\b(provide|explain|describe|list|specify)\b.{0,30}\b(details|detail|explanation|more)\b/;
 
@@ -311,13 +345,14 @@
         if (rule.kind === "yesno" && FOLLOW_UP.test(signal)) continue;
         const value = rule.get(profile, helpers, signal);
         if (value == null || value === "") return null;
-        const alts = rule.expand === "usState" ? stateAlternates(value) : rule.expand === "place" ? placeAlternates(value, profile) : [];
-        return { value: String(value), alts, kind: rule.kind || "text", eeo: !!rule.eeo, assumed: !!rule.assumed, place: rule.expand === "place" };
+        // "None" clearance reads as "No" on a yes/no control, and so on.
+        const alts = rule.expand === "usState" ? stateAlternates(value) : rule.expand === "place" ? placeAlternates(value, profile) : /^none$/i.test(value) ? rule.alts || [] : [];
+        return { value: String(value), alts, duration: !!rule.duration, kind: rule.kind || "text", eeo: !!rule.eeo, assumed: !!rule.assumed, place: rule.expand === "place" };
       }
     }
     return null;
   }
 
   AvidAutofill.labelTextFor = labelTextFor;
-  AvidAutofill.matcher = { signalFor, groupSignal, choiceSignal, match, makeHelpers: P, norm, deCamel };
+  AvidAutofill.matcher = { signalFor, groupSignal, choiceSignal, match, nearestDuration, makeHelpers: P, norm, deCamel };
 })();

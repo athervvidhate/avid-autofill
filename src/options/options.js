@@ -36,6 +36,10 @@ const LAYOUT = {
     ["consentToOtherRoles", "Consider me for other roles?", "select:Yes|No"],
     ["over18", "Are you 18 or older?", "select:Yes|No"],
     ["willingOnsite", "Willing to work onsite?", "select:Yes|No"],
+    ["willingOnCall", "Willing to be on call?", "select:Yes|No"],
+    ["outsideEmployment", "Outside work or advisory roles?", "select:No|Yes"],
+    ["securityClearance", "Active security clearance", "select:None|Confidential|Secret|Top Secret|TS/SCI"],
+    ["remoteExperience", "Worked remote or hybrid before?", "select:|Yes, fully remote|Yes, hybrid|No"],
   ],
   eeo: [
     ["gender", "Gender"], ["hispanicLatino", "Hispanic/Latino?", "select:|Yes|No"],

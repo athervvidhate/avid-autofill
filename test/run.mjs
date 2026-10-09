@@ -1683,9 +1683,13 @@ test("fillPage fills a second captured Ashby form without misreading long questi
     })
   );
   // Ashby comboboxes list their options in a popup once typed into.
-  const optionsFor = { "What is your work location": ["Austin, TX", "Portland, OR"] };
+  const optionsFor = {
+    "What is your work location": ["Austin, TX", "Portland, OR"],
+    "If this role requires a security clearance": ["None", "Secret", "Top Secret"],
+  };
   document.querySelectorAll('[role="combobox"]').forEach((input) => {
-    const title = input.closest("[data-field-path]").querySelector("label").textContent;
+    const label = input.closest("[data-field-path]").querySelector("label").textContent;
+    const title = Object.keys(optionsFor).find((t) => label.startsWith(t));
     input.addEventListener("input", () => {
       document.querySelectorAll("[data-popup]").forEach((n) => n.remove());
       const popup = document.createElement("div");
@@ -1703,6 +1707,9 @@ test("fillPage fills a second captured Ashby form without misreading long questi
   const profile = testProfile(A);
   Object.assign(profile.personal, { city: "Austin", state: "TX" });
   profile.misc.salaryExpectation = "100,000-130,000";
+  profile.misc.noticePeriod = "one month";
+  profile.questions.remoteExperience = "Yes, hybrid";
+  profile.links.portfolio = "https://alex.example.dev";
   await A.engine.fillPage(profile, { overwriteFilled: false, fillEEO: false, highlightFilled: false }, null);
 
   const entryFor = (title) =>
@@ -1712,11 +1719,30 @@ test("fillPage fills a second captured Ashby form without misreading long questi
   assert.equal(pressedFor("Are you able and willing to work from our Los Angeles"), "Yes", "office attendance");
   assert.equal(pressedFor("Are you legally authorized"), "Yes");
   assert.equal(pressedFor("Will you now or in the future require visa sponsorship"), "No");
-  assert.equal(pressedFor("On-Call Requirements"), undefined, "unknown yes/no questions are left for Jev");
+  assert.equal(pressedFor("On-Call Requirements"), "Yes");
+  assert.equal(pressedFor("Outside Work and Advisory Disclosure"), "No");
+  assert.equal(pressedFor("Have you heard of TRM"), undefined, "unknown yes/no questions are left for Jev");
+  const chosen = (title) => entryFor(title).querySelector('input[type="radio"]:checked')?.id;
+  assert.match(chosen("What is your current notice period"), /radio-2$/, "one month -> the 1 month option");
+  assert.match(chosen("Have you previously worked in a remote or hybrid"), /radio-1$/);
+  assert.equal(answer("If this role requires a security clearance"), "None");
+  assert.equal(answer("Please provide relevant work samples"), "https://alex.example.dev");
   assert.equal(answer("What is your work location"), "Austin, TX");
   assert.equal(answer("Please list your most recent employer"), "Globex");
   assert.equal(answer("Please share your base compensation"), "100000", "a number input gets the first number of a salary range");
   assert.equal(answer("Why are you considering leaving"), "", "a 'why leaving' question is not the job title");
   assert.equal(answer("If yes, please provide details"), "", "a follow-up for details is not the sponsorship answer");
   assert.equal(document.querySelector('input[type="radio"][name*="b8b84bc4"]:checked'), null, "a lone policy radio is left alone");
+});
+
+test("notice periods match the option covering the same length of time", () => {
+  const { A } = loadFixture("ashby-application-2.html");
+  const options = ["1-2 weeks", "3-4 weeks", "1 month", "2 months", "3+ months"];
+  const pick = (v) => options[A.matcher.nearestDuration(v, options)];
+  assert.equal(pick("2 weeks"), "1-2 weeks");
+  assert.equal(pick("4 weeks"), "3-4 weeks");
+  assert.equal(pick("30 days"), "1 month");
+  assert.equal(pick("six months"), "3+ months");
+  assert.equal(pick("Immediately"), "1-2 weeks");
+  assert.equal(A.matcher.nearestDuration("June 1, 2027", options), -1);
 });

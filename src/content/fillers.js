@@ -276,6 +276,13 @@
     // Options render in a portal. When the opener names its listbox, look only
     // there, so hidden lists elsewhere on the page (phone country codes) are ignored.
     const listboxId = typeInput && typeInput.getAttribute("aria-controls");
+    // Other questions' answer buttons and radio rows have "option" in their
+    // class names too (Ashby): never pick from a different form field.
+    const ownField = control.closest("[data-field-path]");
+    const inOtherField = (o) => {
+      const field = o.closest("[data-field-path]");
+      return !!field && field !== ownField;
+    };
     const findOption = () => {
       const listbox = listboxId && document.getElementById(listboxId);
       const visible = Array.from(
@@ -284,7 +291,11 @@
           listbox || undefined
         )
       ).filter(
-        (o) => o.offsetParent !== null || o.getClientRects().length > 0
+        (o) =>
+          (o.offsetParent !== null || o.getClientRects().length > 0) &&
+          !inOtherField(o) &&
+          !o.matches("button[aria-pressed], input") &&
+          !o.querySelector("input")
       );
       // A wrapper whose class mentions "option" holds every option's text, so it
       // would match any target and a click on it lands on whichever option the

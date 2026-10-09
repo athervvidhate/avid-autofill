@@ -45,7 +45,7 @@ test("My Info keeps the field hosts separate from section cards", async () => {
   assert.equal(document.querySelectorAll("#personal [data-path]").length, 13);
   assert.equal(document.querySelectorAll("#links [data-path]").length, 5);
   assert.equal(document.querySelectorAll("#workAuth [data-path]").length, 2);
-  assert.equal(document.querySelectorAll("#questions [data-path]").length, 8);
+  assert.equal(document.querySelectorAll("#questions [data-path]").length, 12);
   assert.equal(document.querySelectorAll("#eeo [data-path]").length, 5);
   dom.window.close();
 });

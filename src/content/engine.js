@@ -118,8 +118,14 @@
       const m = group.length > 1 ? matcher.match(signal, profile, helpers) : null;
       if (!m) { unmatched.push({ el: group[0], group, signal }); continue; }
       if (m.eeo && !settings.fillEEO) continue;
-      const ok = fillers.setRadio(group, m.value);
+      let ok = [m.value, ...(m.alts || [])].some((v) => fillers.setRadio(group, v));
+      if (!ok && m.duration) {
+        const i = matcher.nearestDuration(m.value, group.map((r) => AvidAutofill.labelTextFor(r) || r.value));
+        if (i >= 0) ok = fillers.setRadio([group[i]], group[i].value || AvidAutofill.labelTextFor(group[i]));
+      }
       record(signal, m.value, ok ? (m.assumed ? "assumed" : "filled") : "skipped");
+      // None of the options reads like the profile value: leave the question to Jev.
+      if (!ok) unmatched.push({ el: group[0], group, signal });
     }
 
     // --- 2b. Yes/No button pairs: a parent whose only buttons read "Yes" and "No".
@@ -144,7 +150,7 @@
         record(signal, m.value, "kept-existing");
         continue;
       }
-      const ok = fillers.setButtonChoice(buttons, m.value);
+      const ok = [m.value, ...(m.alts || [])].some((v) => fillers.setButtonChoice(buttons, v));
       record(signal, m.value, ok ? (m.assumed ? "assumed" : "filled") : "skipped");
     }
 
@@ -188,7 +194,12 @@
 
       try {
         if (el.tagName === "SELECT") {
-          const ok = fillers.setNativeSelect(el, [m.value, ...(m.alts || [])]);
+          let ok = fillers.setNativeSelect(el, [m.value, ...(m.alts || [])]);
+          if (!ok && m.duration) {
+            const options = Array.from(el.options);
+            const i = matcher.nearestDuration(m.value, options.map((o) => o.value ? o.textContent : ""));
+            if (i >= 0) ok = fillers.setNativeSelect(el, [options[i].value]);
+          }
           record(signal, m.value, ok ? (m.assumed ? "assumed" : "filled") : "no-option-match");
         } else if (type === "checkbox") {
           // Affirmative yes/no answers tick the box; negatives leave it.
