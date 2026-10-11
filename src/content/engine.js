@@ -270,6 +270,10 @@
       const ai = await AvidAutofill.jevContent.fill(unmatched, profile, run);
       results.push(...ai.results);
       aiMessage = ai.aiMessage;
+    } else if (AvidAutofill.jevContent?.draftOnly && (settings.draftAnswers || (AvidAutofill.drafts?.PROVIDERS[settings.draftProvider]))) {
+      const drafted = await AvidAutofill.jevContent.draftOnly(unmatched, profile, run);
+      results.push(...drafted.results);
+      aiMessage = drafted.aiMessage;
     }
     return {
       ats: adapter.name,

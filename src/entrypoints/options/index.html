@@ -96,16 +96,16 @@
         </section>
 
         <section id="drafts-section" class="section-card">
-          <div class="section-heading"><div><h2>Written answers <small>Experimental</small></h2><p>Polish "why this company" style answers for free. Off by default.</p></div></div>
-          <p>When Jev picks a template or work-history summary for a long text box, Avid can rewrite it so it reads naturally. It may only use facts already in that answer, and anything that adds a name or number is thrown away in favor of your saved text. Review every answer before submitting.</p>
-          <label class="tracker-toggle"><input id="polish-enabled" type="checkbox"><span><b>Use Chrome's built-in AI</b><small>Runs on your device and sends nothing anywhere. Needs a recent desktop Chrome with about 22 GB free disk, 16 GB RAM and a GPU with more than 4 GB of video memory.</small></span></label>
-          <div class="io-actions"><button class="btn" id="polish-download">Download Chrome's model</button></div>
-          <p id="polish-status" role="status" aria-live="polite"></p>
-          <label class="field">Or use your own free key<select id="draft-provider"><option value="off">Off</option><option value="groq">Groq (free tier)</option><option value="gemini">Google AI Studio (free tier)</option></select></label>
+          <div class="section-heading"><div><h2>Written answers <small>Experimental</small></h2><p>Draft answers to open-ended questions from your experience and the job posting. Off by default.</p></div></div>
+          <p>For long text boxes such as "Why do you want to work here?", Avid can write a draft that connects your work history and skills to what the posting asks for. It picks the most relevant jobs and skills from your profile, may reuse the tone of answers you already saved, and is told to use only those facts. A draft that adds a number or name not found in your profile or the posting is thrown away. Review every draft before submitting.</p>
+          <label class="field">Use your own free key (better writing)<select id="draft-provider"><option value="off">Off</option><option value="groq">Groq (free tier)</option><option value="gemini">Google AI Studio (free tier)</option></select></label>
           <label class="field">API key<input id="draft-key" type="password" autocomplete="off" spellcheck="false" placeholder="Paste your own key" aria-describedby="draft-note"></label>
-          <p id="draft-note">Optional. The draft text, question, company and role are sent to the provider you pick. Google's free tier may use prompts to improve its products. The key is stored on this device apart from your profile and never exported.</p>
+          <p id="draft-note">Each draft sends the question, company, role, part of the job posting and a few relevant lines from your profile (jobs, skills, education, similar saved answers) to the provider you pick. Not your resume file, contact details or the rest of your profile. Google's free tier may use prompts to improve its products. The key is stored on this device apart from your profile and never exported.</p>
           <div class="io-actions"><button class="btn primary" id="draft-save">Save</button><button class="btn danger-quiet" id="draft-clear">Remove key and turn off</button></div>
           <p id="draft-status" role="status" aria-live="polite"></p>
+          <label class="tracker-toggle"><input id="draft-nano" type="checkbox"><span><b>Use Chrome's built-in AI instead</b><small>Runs on your device and sends nothing anywhere, but it is a small model and drafts will be plainer. Needs a recent desktop Chrome with about 22 GB free disk, 16 GB RAM and a GPU with more than 4 GB of video memory. Used after your own key, if both are on.</small></span></label>
+          <div class="io-actions"><button class="btn" id="draft-download">Download Chrome's model</button></div>
+          <p id="draft-nano-status" role="status" aria-live="polite"></p>
         </section>
 
         <div class="save-bar"><div><b>Save your profile changes</b><span id="save-msg" class="io-msg" role="status" aria-live="polite"></span></div><button class="btn primary" id="save">Save changes</button></div>

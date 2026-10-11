@@ -68,18 +68,58 @@
     const response = await chrome.runtime.sendMessage({ type: "AVID_JEV_SAVE_ANSWER", question: current.question, answer, anySite });
     if (!response?.ok) throw new Error(response?.error || "Avid could not save the answer.");
   }
-  // Polishing is opt-in: Chrome's built-in model first (when already
-  // downloaded), then the applicant's own free-tier key if one is set.
-  async function polishProviders() {
+  // Drafting is opt-in. The applicant's own free-tier key goes first (better
+  // prose), then Chrome's built-in model if it is already downloaded.
+  async function draftProviders() {
     const settings = await A.getSettings(), providers = [];
     if (!A.drafts) return providers;
-    if (settings.polishAnswers) providers.push(A.drafts.nanoProvider());
     if (A.drafts.PROVIDERS[settings.draftProvider]) providers.push({ id: settings.draftProvider, rewrite: async prompt => {
       const reply = await chrome.runtime.sendMessage({ type: "AVID_DRAFT_REWRITE", prompt });
       if (!reply?.ok) throw new Error(reply?.error || "Drafting failed.");
       return reply.text;
     } });
+    if (settings.draftAnswers) providers.push(A.drafts.nanoProvider());
     return providers;
+  }
+  // One drafter per fill: writes an answer for a textarea from the profile and
+  // the posting, or returns null so the caller keeps its saved text.
+  const MAX_DRAFTS = 5;
+  function makeDrafter(profile, job) {
+    let providers, used = 0;
+    return async candidate => {
+      const { el } = candidate;
+      if (el.tagName !== "TEXTAREA" || used >= MAX_DRAFTS || !A.drafts) return null;
+      providers ||= await draftProviders();
+      if (!providers.length) return null;
+      used++;
+      const description = await A.posting?.load?.().catch(() => "") || "";
+      const out = await A.drafts.draft({ question: questionText(candidate), company: job?.company, role: job?.role, description, profile, maxLength: el.maxLength >= 0 ? el.maxLength : undefined }, providers);
+      return out?.text || null;
+    };
+  }
+  const DRAFT_META = { method: "draft", reason: "Drafted from your experience and the job posting. Review it." };
+  // Put a drafted answer in a textarea if the page accepts it.
+  async function setDrafted(el, text) {
+    const probe = el.cloneNode(false); probe.value = text;
+    if (probe.value !== text || (el.maxLength >= 0 && text.length > el.maxLength) || (el.minLength > 0 && text.length < el.minLength) || !probe.checkValidity()) return false;
+    A.fillers.setTextValue(el, text);
+    return el.value === text && el.checkValidity();
+  }
+  // Drafting without Jev: long text boxes the rules left unmatched.
+  async function draftOnly(candidates, profile, run) {
+    const report = { results: [], aiMessage: "" };
+    let job; try { job = A.jobDetector?.inspect()?.job; } catch { /* the posting text is still used */ }
+    const draftFor = makeDrafter(profile, job), url = location.href, root = document.documentElement;
+    for (const candidate of candidates) {
+      const field = describe(candidate, "d");
+      if (!field || field.type !== "textarea") continue;
+      const text = await draftFor(candidate).catch(() => null);
+      const fresh = text && location.href === url && document.documentElement === root && A._fillRun === run && !answered(candidate);
+      if (fresh && await setDrafted(candidate.el, text)) report.results.push({ label: field.label, value: text, status: "filled", ...DRAFT_META });
+    }
+    const count = report.results.length;
+    if (count) report.aiMessage = `Drafted ${count === 1 ? "an answer" : `${count} answers`} from your experience and the posting. Review every drafted answer before submitting.`;
+    return report;
   }
   async function fill(candidates, profile, run) {
     const url = location.href, root = document.documentElement;
@@ -110,19 +150,24 @@
       report.results.push(...batch.map(candidate => ({ label: candidate.field.label, value: "", status: "ai-unavailable", field: candidate.field.id })));
       return report;
     }
-    let polishers;
+    const draftFor = makeDrafter(profile, job);
     const fresh = location.href === url && document.documentElement === root && A._fillRun === run && JSON.stringify(await A.getProfile()) === JSON.stringify(profile) && (await A.getSettings()).jevEnabled;
     for (const candidate of batch) {
       const { field, el, group, custom, buttons } = candidate, result = response.results.find(result => result.id === field.id);
-      const record = (status, value = "") => {
+      const record = (status, value = "", meta = {}) => {
         if (NEEDS_APPLICANT.includes(status)) unanswered.set(field.id, candidate);
-        report.results.push({ label: field.label, value, status, method: "jev", reason: result.sourceQuestion || "", ...(NEEDS_APPLICANT.includes(status) ? { field: field.id } : {}) });
+        report.results.push({ label: field.label, value, status, method: "jev", reason: result.sourceQuestion || "", ...meta, ...(NEEDS_APPLICANT.includes(status) ? { field: field.id } : {}) });
       };
+      const stillHere = () => location.href === url && document.documentElement === root && A._fillRun === run && !answered(candidate);
       if (!fresh || location.href !== url || document.documentElement !== root || A._fillRun !== run) { record("ai-stale"); continue; }
       const live = describe({ ...candidate, signal: buttons ? A.matcher.choiceSignal(buttons[0].parentElement) : group ? A.matcher.groupSignal(group) : A.matcher.signalFor(custom ? inner(el) : el) }, field.id);
       if (!live) { record(answered(candidate) ? "kept-existing" : "ai-stale"); continue; }
       if (JSON.stringify(live) !== JSON.stringify(field) || fingerprint(candidate) !== candidate.fingerprint) { record("ai-stale"); continue; }
-      if (result.status !== "fill") { record(result.status === "ai-incompatible" ? result.status : "ai-needs-answer"); continue; }
+      if (result.status !== "fill") {
+        const text = result.status === "ai-incompatible" ? null : await draftFor(candidate).catch(() => null);
+        if (text && stillHere() && await setDrafted(el, text)) { record("filled", text, DRAFT_META); continue; }
+        record(result.status === "ai-incompatible" ? result.status : "ai-needs-answer"); continue;
+      }
       if (typeof result.value !== "string" || !result.value.trim()) { record("ai-incompatible"); continue; }
       try {
         if (field.options) {
@@ -148,26 +193,28 @@
             record(ok && el.selectedIndex === index ? "filled" : "skipped", field.options[result.optionId]);
           }
         } else {
-          let value = result.value;
-          // Written answers chosen from a template or work history can be
-          // polished; any failure leaves the saved text as it was.
-          if (el.tagName === "TEXTAREA" && /^(template_|history_summary)/.test(result.sourceId || "") && (polishers ||= await polishProviders()).length) {
-            const polished = await A.drafts.polish(value, { question: field.label, company: job?.company, role: job?.role, maxLength: el.maxLength >= 0 ? el.maxLength : undefined }, polishers);
-            if (polished.provider && location.href === url && document.documentElement === root && A._fillRun === run && !answered(candidate)) value = polished.text;
+          let value = result.value, meta = {};
+          // A template or work-history line chosen for a long text box is replaced
+          // by an answer drafted from the profile and posting, when drafting is on.
+          if (el.tagName === "TEXTAREA" && /^(template_|history_summary)/.test(result.sourceId || "")) {
+            const text = await draftFor(candidate).catch(() => null);
+            if (text && stillHere()) { value = text; meta = DRAFT_META; }
           }
           const probe = el.cloneNode(false); probe.value = value;
           if (probe.value !== value || (el.maxLength >= 0 && value.length > el.maxLength) || (el.minLength > 0 && value.length < el.minLength) || !probe.checkValidity()) { record("ai-incompatible"); continue; }
           A.fillers.setTextValue(el, value);
-          record(el.value === value && el.checkValidity() ? "filled" : "skipped", value);
+          record(el.value === value && el.checkValidity() ? "filled" : "skipped", value, meta);
         }
       } catch { record("error"); }
     }
     const count = report.results.filter(result => result.method === "jev" && result.status === "filled").length;
-    report.aiMessage = count
+    const drafts = report.results.filter(result => result.method === "draft" && result.status === "filled").length;
+    report.aiMessage = (count
       ? `Jev filled ${count} extra ${count === 1 ? "field" : "fields"}. Review every AI-filled answer before submitting.`
-      : "Jev found no saved answer for the remaining fields. Answers you save to your question bank can be reused.";
+      : "Jev found no saved answer for the remaining fields. Answers you save to your question bank can be reused.")
+      + (drafts ? ` ${drafts === 1 ? "One answer was" : `${drafts} answers were`} drafted from your experience and the posting; read ${drafts === 1 ? "it" : "them"} closely.` : "");
     return report;
   }
   const inner = el => el.matches("input") ? el : el.querySelector("input") || el;
-  A.jevContent = { fill, answerFor, saveAnswer };
+  A.jevContent = { fill, draftOnly, answerFor, saveAnswer };
 })();

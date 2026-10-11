@@ -583,28 +583,46 @@ test("Ashby yes/no buttons reach Jev with their options and are answered by clic
   } finally { p.close(); }
 });
 
-const essayForm = '<form><div><label for="why">Why do you want to work at Acme?</label><textarea id="why"></textarea></div></form>';
+const essayForm = `<html><head><script type="application/ld+json">${JSON.stringify({ "@type": "JobPosting", description: "<p>Acme builds payments infrastructure used by thousands of merchants. You will design Go services, run them on Kubernetes and work with Postgres. We value ownership and small teams, and you will work closely with product and support teams across the company.</p>" })}</script></head><body><form><div><label for="why">Why do you want to work at Acme?</label><textarea id="why"></textarea></div></form></body></html>`;
 const templateText = "I'm interested in the Backend Engineer role at Acme. My experience as Engineer at Globex matches the work, and I'd like to bring it to Acme.";
-const polishedText = "I'm excited about the Backend Engineer role at Acme. My time as Engineer at Globex lines up with the work, and I'd like to bring that experience to Acme.";
-async function essay(settings, output, tweak = () => {}) {
-  const p = await page(essayForm, async msg => ({ ok: true, results: [{ id: msg.fields[0].id, status: "fill", value: templateText, sourceId: "template_why_company", sourceQuestion: "Why do you want to work at this company?" }] }));
-  p.dom.window.eval(read("src/shared/drafts.js"));
-  p.dom.window.LanguageModel = { availability: async () => "available", create: async () => ({ prompt: async () => output, destroy() {} }) };
+const drafted = "I want to work at Acme because it builds payments infrastructure, which is the kind of work I do at Globex as a Backend Engineer. I built payment APIs in Go and led our migration to Kubernetes, so owning Go services on Kubernetes at Acme is a natural next step for me.";
+async function essay({ settings = {}, output = drafted, jev = "template", tweak = () => {} } = {}) {
+  const p = await page(essayForm, async msg => ({ ok: true, results: [jev === "template"
+    ? { id: msg.fields[0].id, status: "fill", value: templateText, sourceId: "template_why_company", sourceQuestion: "Why do you want to work at this company?" }
+    : { id: msg.fields[0].id, status: "ai-needs-answer" }] }));
+  for (const file of ["src/shared/candidates.js", "src/shared/drafts.js", "src/content/posting.js"]) p.dom.window.eval(read(file));
+  const prompts = [];
+  p.dom.window.LanguageModel = { availability: async () => "available", create: async () => ({ prompt: async text => { prompts.push(text); return output; }, destroy() {} }) };
+  p.profile.work = [{ title: "Backend Engineer", company: "Globex", startDate: "2021", current: true, description: "Built payment APIs in Go. Led migration to Kubernetes." }];
+  p.profile.misc.skills = "Go, Kubernetes, Postgres";
   tweak(p);
   const merged = { ...p.settings, ...settings };
-  await p.A.saveSettings(merged);
+  await p.A.saveProfile(p.profile); await p.A.saveSettings(merged);
   const report = await p.A.engine.fillPage(p.profile, merged, null);
-  return { p, report, value: p.dom.window.document.getElementById("why").value };
+  return { p, report, prompts, value: p.dom.window.document.getElementById("why").value };
 }
-test("a chosen template is polished by the built-in model only when the applicant opted in", async () => {
-  const on = await essay({ polishAnswers: true }, polishedText);
-  try { assert.equal(on.value, polishedText); } finally { on.p.close(); }
-  const off = await essay({}, polishedText);
-  try { assert.equal(off.value, templateText); } finally { off.p.close(); }
+test("a long text box is drafted from the profile and the posting when drafting is on, and the prompt is grounded in both", async () => {
+  const r = await essay({ settings: { draftAnswers: true } });
+  try {
+    assert.equal(r.value, drafted);
+    assert.equal(r.prompts.length, 1);
+    for (const part of ["QUESTION: Why do you want to work at Acme?", "Acme builds payments infrastructure", "Backend Engineer at Globex (2021 to present): Built payment APIs in Go", "Skills: Go, Kubernetes, Postgres"]) assert.ok(r.prompts[0].includes(part), part);
+    assert.ok(!r.prompts[0].includes("alex@example.test"));
+    const result = r.report.results.find(item => item.method === "draft");
+    assert.equal(result.status, "filled"); assert.match(r.report.aiMessage, /drafted from your experience/);
+  } finally { r.p.close(); }
 });
-test("a polished answer that invents facts or does not fit keeps the saved text", async () => {
-  const invented = await essay({ polishAnswers: true }, polishedText + " I led 40 engineers.");
+test("a field Jev leaves for the applicant is drafted too, and drafting works with Jev off", async () => {
+  const left = await essay({ settings: { draftAnswers: true }, jev: "needs-answer" });
+  try { assert.equal(left.value, drafted); } finally { left.p.close(); }
+  const off = await essay({ settings: { draftAnswers: true, jevEnabled: false }, jev: "never-called" });
+  try { assert.equal(off.value, drafted); assert.equal(off.report.results.filter(item => item.method === "draft").length, 1); } finally { off.p.close(); }
+});
+test("drafting off, or an ungrounded or unavailable draft, leaves the saved text or the field for the applicant", async () => {
+  const off = await essay();
+  try { assert.equal(off.value, templateText); assert.equal(off.prompts.length, 0); } finally { off.p.close(); }
+  const invented = await essay({ settings: { draftAnswers: true }, output: drafted + " I led 40 engineers at Hooli." });
   try { assert.equal(invented.value, templateText); } finally { invented.p.close(); }
-  const unavailable = await essay({ polishAnswers: true }, polishedText, p => { p.dom.window.LanguageModel.availability = async () => "downloadable"; });
-  try { assert.equal(unavailable.value, templateText); } finally { unavailable.p.close(); }
+  const unavailable = await essay({ settings: { draftAnswers: true }, jev: "needs-answer", tweak: p => { p.dom.window.LanguageModel.availability = async () => "downloadable"; } });
+  try { assert.equal(unavailable.value, ""); assert.ok(unavailable.report.results.some(item => item.status === "ai-needs-answer")); } finally { unavailable.p.close(); }
 });

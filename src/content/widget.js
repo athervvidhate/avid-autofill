@@ -481,7 +481,7 @@
       const value = document.createElement("span");
       value.className = "result-value";
       value.textContent = completed ? r.value : r.status === "assumed" ? `Assumed: ${r.value}` : statusLabel(r.status);
-      value.title = `${r.value || ""} · ${statusLabel(r.status)}${r.method === "jev" ? ` · Jev: ${r.reason || "saved answer"}` : ""}`;
+      value.title = `${r.value || ""} · ${statusLabel(r.status)}${r.method === "jev" ? ` · Jev: ${r.reason || "saved answer"}` : r.method === "draft" ? ` · ${r.reason}` : ""}`;
       li.append(rail, label, value);
       if (r.field && AvidAutofill.jevContent && AvidAutofill.jevContent.answerFor(r.field)) addSave(li, r.field, r.label);
       list.append(li);

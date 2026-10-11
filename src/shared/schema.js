@@ -98,7 +98,7 @@
     tickAcknowledgements: true, // tick "I agree" / "I have read and understand" boxes
     highlightFilled: true, // briefly outline fields we touched
     jevEnabled: false, // optional matching of approved saved answers
-    polishAnswers: false, // rewrite chosen written answers with Chrome's built-in AI
+    draftAnswers: false, // draft written answers with Chrome's built-in AI
     draftProvider: "off", // "groq" or "gemini": rewrite with the user's own free-tier key
   };
 

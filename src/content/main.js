@@ -25,6 +25,7 @@
       };
     }
     if (!captured && AvidAutofill.workday && AvidAutofill.workday.captureDescription) AvidAutofill.workday.captureDescription().catch(() => {});
+    if (!captured && AvidAutofill.posting) AvidAutofill.posting.load().catch(() => {});
     captured = true;
     const requested = !!g.__avidOpenDrawer;
     const known = adapter.name !== "Generic" && !AvidAutofill.adapters.markupOnly(adapter);

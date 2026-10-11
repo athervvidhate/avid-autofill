@@ -8,28 +8,28 @@
   const nano = D.nanoProvider();
   async function renderNano() {
     const settings = await A.getSettings();
-    $("polish-enabled").checked = settings.polishAnswers === true;
+    $("draft-nano").checked = settings.draftAnswers === true;
     const ready = await nano.available(), has = !!globalThis.LanguageModel;
-    $("polish-download").hidden = ready || !has;
-    $("polish-status").textContent = ready ? "Chrome's model is ready." : has ? "Chrome's model is not downloaded yet." : "This browser has no built-in AI, so written answers are used as saved.";
+    $("draft-download").hidden = ready || !has;
+    $("draft-nano-status").textContent = ready ? "Chrome's model is ready." : has ? "Chrome's model is not downloaded yet." : "This browser has no built-in AI, so written answers are used as saved.";
   }
   function render(state) {
     $("draft-provider").value = state.provider;
     $("draft-status").textContent = state.provider === "off" ? "No drafting key in use." : !state.hasKey ? "Enter your key and save." : !state.hasAccess ? "Allow access to the provider and save again." : "Your own key is in use for written answers.";
     $("draft-clear").disabled = state.provider === "off" && !state.hasKey;
   }
-  $("polish-enabled").onchange = async () => {
-    await A.saveSettings({ ...await A.getSettings(), polishAnswers: $("polish-enabled").checked });
+  $("draft-nano").onchange = async () => {
+    await A.saveSettings({ ...await A.getSettings(), draftAnswers: $("draft-nano").checked });
     renderNano();
   };
-  $("polish-download").onclick = async () => {
-    $("polish-download").disabled = true;
+  $("draft-download").onclick = async () => {
+    $("draft-download").disabled = true;
     try {
       const session = await globalThis.LanguageModel.create({ expectedInputs: [{ type: "text", languages: ["en"] }], expectedOutputs: [{ type: "text", languages: ["en"] }],
-        monitor(m) { m.addEventListener("downloadprogress", e => { $("polish-status").textContent = `Downloading Chrome's model: ${Math.round(e.loaded * 100)}%`; }); } });
+        monitor(m) { m.addEventListener("downloadprogress", e => { $("draft-nano-status").textContent = `Downloading Chrome's model: ${Math.round(e.loaded * 100)}%`; }); } });
       session.destroy?.();
-    } catch { $("polish-status").textContent = "Chrome could not download its model on this device."; }
-    $("polish-download").disabled = false;
+    } catch { $("draft-nano-status").textContent = "Chrome could not download its model on this device."; }
+    $("draft-download").disabled = false;
     renderNano();
   };
   $("draft-save").onclick = async () => {
