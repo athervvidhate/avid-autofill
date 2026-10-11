@@ -5,14 +5,26 @@
   "type": "module",
   "description": "Chrome extension that autofills job applications from your saved profile.",
   "scripts": {
-    "test": "node --test test/run.mjs test/ui.mjs test/tracker.mjs test/jev.mjs test/unfamiliar.mjs test/sites.mjs",
+    "dev": "wxt",
+    "build": "wxt build",
+    "zip": "wxt zip",
+    "postinstall": "wxt prepare",
+    "typecheck": "tsc -p .",
+    "lint": "biome check .",
+    "test": "vitest run",
+    "test:browser": "wxt build && node test/extension-browser.mjs && node test/tracker-browser.mjs",
     "import": "node build/import-from-career-ops.mjs"
   },
   "dependencies": {
     "js-yaml": "^4.1.0"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.5.15",
+    "@types/chrome": "^0.3.5",
     "jsdom": "^29.1.1",
-    "playwright-core": "^1.64.0"
+    "playwright-core": "^1.64.0",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.3",
+    "wxt": "^0.21.4"
   }
 }

@@ -268,7 +268,7 @@
     }
   }
   function privileged(sender) {
-    const root = chrome.runtime.getURL("src/options/options.html");
+    const root = chrome.runtime.getURL("options.html");
     return sender.url?.split(/[?#]/)[0] === root;
   }
   async function handle(msg, sender) {
@@ -278,7 +278,7 @@
     if (!admin && !content) throw new Error("This tracker request is not allowed.");
     switch (msg.type) {
       case "AVID_TRACKER_STATE": return publicState(s, admin);
-      case "AVID_TRACKER_OPEN_CONNECTIONS": await chrome.tabs.create({ url: chrome.runtime.getURL("src/options/options.html#connections") }); return {};
+      case "AVID_TRACKER_OPEN_CONNECTIONS": await chrome.tabs.create({ url: chrome.runtime.getURL("options.html#connections") }); return {};
       case "AVID_TRACKER_CAPTURE": if (content) return capture(s, msg, sender); break;
       case "AVID_TRACKER_PREVIEW": if (content) return manual(s, msg, sender); break;
       case "AVID_TRACKER_ADD": if (content) return add(s, msg); break;

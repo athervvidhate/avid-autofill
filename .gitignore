@@ -6,3 +6,5 @@ profile.json
 
 # Live Jev evaluation reports
 test/live/results/
+.output/
+.wxt/

@@ -113,7 +113,7 @@ References: [Chromium identity](https://developer.chrome.com/docs/extensions/ref
 ## Verification and limits
 
 Run `npm test` for the existing autofill tests and tracker regression checks.
-Run `node test/tracker-browser.mjs` for the isolated Brave test, or set
+Run `npm run build && node test/tracker-browser.mjs` for the isolated Brave test, or set
 `AVID_BROWSER` to another Chromium executable. The browser test grants host
 access in a temporary extension copy because headless mode cannot operate the
 native permission dialog. It checks actual registration, full-page submission

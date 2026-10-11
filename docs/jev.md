@@ -41,7 +41,7 @@ disconnects Jev.
 | `src/content/widget.js` | Extra fill count, provenance tooltips, review/error messages, Save to question bank |
 | `src/options/options.js` | Approved question-bank editor |
 | `src/options/jev.js` | Opt-in connection UI |
-| `manifest.json` | Loads the fallback on automatic and toolbar-triggered injections |
+| `src/entrypoints/content.ts` | Loads the fallback on automatic and toolbar-triggered injections |
 | `test/jev.mjs` | Contract, worker, DOM, complete two-stage flow, key and export tests |
 
 The page sends `AVID_JEV_FILL` with field descriptions. The worker reads the

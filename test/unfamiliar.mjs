@@ -1,5 +1,5 @@
 // Sites Avid has no adapter for: application-form detection and generic matching.
-import { test } from "node:test";
+import { test } from "vitest";
 import assert from "node:assert/strict";
 import { JSDOM } from "jsdom";
 import fs from "node:fs";

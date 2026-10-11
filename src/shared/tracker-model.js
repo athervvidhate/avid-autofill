@@ -5,7 +5,7 @@
   const HEADERS = ["Company", "Role", "Job URL", "Location", "Date applied", "Status", "Follow-up date", "Notes", "Application ID", "Job key"];
   const STATUSES = ["Saved", "In progress", "Applied", "Interview", "Offer", "Rejected", "Withdrawn"];
   const ORIGINS = ["http://*/*", "https://*/*"];
-  const SCRIPTS = ["src/shared/tracker-model.js", "src/content/job-detector.js", "src/content/tracker.js"];
+  const SCRIPTS = ["content-scripts/tracker.js"];
   const clean = (value, max = 500) => typeof value === "string" ? value.replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, max) : "";
   function today() {
     const d = new Date();
