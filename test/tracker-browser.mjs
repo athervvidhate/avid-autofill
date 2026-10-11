@@ -57,6 +57,7 @@ try {
   if (!(await optionsOpen())) await fetch(`http://127.0.0.1:${port}/json/new?${base}/options.html`, { method: "PUT" });
   const optionsTarget = await until(optionsOpen, "Connections page");
   const options = await cdp(optionsTarget.webSocketDebuggerUrl);
+  await until(() => options.evaluate('document.readyState === "complete" && !!globalThis.chrome?.runtime?.sendMessage'), "Connections page load");
   await options.send("Emulation.setDeviceMetricsOverride", { width: 1100, height: 900, deviceScaleFactor: 1, mobile: false });
   const state = await options.evaluate('chrome.runtime.sendMessage({type:"AVID_TRACKER_STATE"})');
   assert.equal(state.ok, true); assert.equal(state.configured, false); assert.match(state.redirectUrl, /chromiumapp\.org\/google$/);
