@@ -180,7 +180,7 @@
     { any: [/confirm.*e-?mail/, /e-?mail.*confirm/], not: [/company/], get: (p) => p.personal.email },
     { any: [/e-?mail/, /^email address$/], not: [/confirm|company/], get: (p) => p.personal.email },
     { any: [/phone device type/], kind: "select", get: (p) => p.personal.phoneDeviceType || "Mobile" },
-    { any: [/phone/, /mobile/, /telephone/, /contact number/, /\bcell\b/], not: [/extension/, /device type/, /\bsms\b/, /opt.?in/, /phone code/, /country.*code/, /phonetic/], get: (p) => p.personal.phone },
+    { any: [/phone/, /mobile/, /telephone/, /contact number/, /\bcell\b/], not: [/extension/, /device type/, /\bsms\b/, /opt.?in/, /phone code/, /(?<!\b(the|your|include|including|with|plus) )country.*code/, /phonetic/], get: (p) => p.personal.phone },
     { any: [/\bpronouns?\b/], not: [/pronounc|pronunciation|phonetic/], get: (p) => p.personal.pronouns },
 
     // --- Address ---
@@ -222,7 +222,7 @@
     { any: [/authoriz(ed|ation) to work/, /legally authorized/, /eligible to work/, /work authorization/], not: [/temporary/, /\bopt\b/, /\bcpt\b/, /practical training/], kind: "yesno", get: (p) => p.workAuth.authorizedToWork },
 
     // --- Logistics ---
-    { any: [/salary/, /compensation expectation/, /desired (pay|salary|compensation)/, /expected salary/, /expected (annual |total )?(package|pay|compensation|ctc)/, /annual (package|compensation|pay)\b/, /(pay|compensation) (range|expectations?)/, /\bctc\b/], not: [/relocat|bonus eligib/], get: (p) => p.misc.salaryExpectation },
+    { any: [/salary/, /compensation expectation/, /desired (pay|salary|compensation)/, /expected salary/, /expected (annual |total )?(package|pay|compensation|ctc)/, /annual (package|compensation|pay)\b/, /(pay|compensation) (range|expectations?)/, /\bctc\b/], not: [/relocat|bonus eligib/], get: (p, h, signal) => salaryPart(p.misc.salaryExpectation, signal) },
     // Notice period first: it is a length of time, unlike an earliest start date.
     { any: [/notice period/], duration: true, get: (p) => p.misc.noticePeriod || p.misc.earliestStartDate },
     { any: [/notice period/, /availability to start/, /when can you start/, /earliest start/, /start date/], get: (p) => p.misc.earliestStartDate || p.misc.noticePeriod },
@@ -394,6 +394,21 @@
       if (gap < bestGap - 1e-9) { best = i; bestGap = gap; }
     });
     return bestGap <= 1 ? best : -1;
+  }
+
+  // A salary range split over two boxes ("Minimum" and "Maximum", Paylocity)
+  // gets one end of the saved range in each, so "$120K-160K" fills 120,000 and
+  // 160,000. A single salary box keeps the saved text as written.
+  function salaryPart(value, signal) {
+    const lower = /\b(min(imum)?|lowest|lower)\b/.test(signal), upper = /\b(max(imum)?|highest|upper)\b/.test(signal);
+    if (lower === upper) return value;
+    const amounts = Array.from(String(value || "").replace(/(\d),(?=\d{3})/g, "$1").matchAll(/(\d+(?:\.\d+)?)\s*([km])?\b/gi));
+    if (!amounts.length) return value;
+    // "120-160K" writes the suffix once for both ends.
+    const suffix = amounts[amounts.length - 1][2];
+    const nums = amounts.map(([, n, unit]) => Number(n) * ({ k: 1e3, m: 1e6 }[(unit || (Number(n) < 1000 ? suffix : "") || "").toLowerCase()] || 1));
+    const pick = lower ? Math.min(...nums) : Math.max(...nums);
+    return Math.round(pick).toLocaleString("en-US");
   }
 
   // "If yes, please provide details ..." follows a yes/no question but is free text.
