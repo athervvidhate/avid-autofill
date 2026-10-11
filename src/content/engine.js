@@ -120,6 +120,15 @@
       if (!r.name) return;
       (radioGroups[r.name] = radioGroups[r.name] || []).push(r);
     });
+    // Yes/No written as two checkboxes (Lever) are one choice, like radios.
+    const choiceLabel = /^(yes|no|prefer not to say|decline to answer|n\/a)$/;
+    const boxes = {};
+    F().queryAll('input[type="checkbox"]').forEach((c) => {
+      if (c.name) (boxes[c.name] = boxes[c.name] || []).push(c);
+    });
+    for (const [name, group] of Object.entries(boxes)) {
+      if (group.length >= 2 && group.length <= 3 && group.every((c) => choiceLabel.test(matcher.norm(AvidAutofill.labelTextFor(c) || c.value)))) radioGroups[`checkbox:${name}`] = group;
+    }
     for (const name of Object.keys(radioGroups)) {
       const group = radioGroups[name].filter(isVisible);
       if (!group.length) continue;
@@ -211,7 +220,7 @@
       if (!m) { unmatched.push({ el, signal }); continue; }
       if (m.eeo && !settings.fillEEO) continue;
       // A yes/no answer cannot answer a free-text question.
-      if (m.kind === "yesno" && el.tagName === "TEXTAREA") { unmatched.push({ el, signal }); continue; }
+      if (m.kind === "yesno" && (el.tagName === "TEXTAREA" || (el.tagName === "INPUT" && /^(text|)$/.test(type) && !matcher.looksYesNo(signal)))) { unmatched.push({ el, signal }); continue; }
 
       // Respect existing content unless overwrite is on.
       const hasValue =

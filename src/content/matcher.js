@@ -186,6 +186,7 @@
     { any: [/\bpronouns?\b/], not: [/pronounc|pronunciation|phonetic/], get: (p) => p.personal.pronouns },
 
     // --- Address ---
+    { any: [/(primary |permanent |current )?(residence|residential|home) address/, /address of (your )?(primary )?residence/], get: (p) => fullAddress(p.personal) },
     { any: [/street address/, /address line ?1/, /(^|\| )address( \||$)/, /mailing address/], not: [/email/], get: (p) => p.personal.address },
     { any: [/\bcity\b/, /\btown\b/, /(^|\| )(current )?location( \||$)/, /(^|\| )current location\b/, /\bwork location\b/, /where (are you|do you) (located|based|live)/], not: [/velocity|capacity|ethnic/], expand: "place", get: (p) => p.personal.city },
     { any: [/\bstate\b/, /\bprovince\b/, /\bregion\b/], not: [/statement|estate|united states|work/], expand: "usState", get: (p) => p.personal.state },
@@ -219,7 +220,7 @@
     // --- Work authorization (yes/no) ---
     // Sponsorship before authorization: sponsorship questions often say "work
     // authorization", while "authorized ... without sponsorship" asks about authorization.
-    { any: [/require sponsor/, /need sponsor/, /visa sponsor/, /sponsorship( now| in the future)?/], not: [/without (\w+ )?sponsor/], kind: "yesno", get: (p) => p.workAuth.requireSponsorship },
+    { any: [/require\b.{0,40}\bsponsor/, /\bsponsor (you|me)\b/, /require sponsor/, /need sponsor/, /visa sponsor/, /sponsorship( now| in the future)?/], not: [/without (\w+ )?sponsor/], kind: "yesno", get: (p) => p.workAuth.requireSponsorship },
     { any: [/authoriz(ed|ation) to work/, /legally authorized/, /eligible to work/, /work authorization/], not: [/temporary/, /\bopt\b/, /\bcpt\b/, /practical training/], kind: "yesno", get: (p) => p.workAuth.authorizedToWork },
 
     // --- Logistics ---
@@ -249,9 +250,12 @@
     { any: [/consider me for other/, /other (job )?opportunities/, /other (roles|positions)/, /additional (roles|positions|opportunities)/], kind: "yesno", get: (p) => p.questions.consentToOtherRoles },
     { any: [/at least 18/, /over 18/, /\b18 (years|or older)/, /age of majority/, /legally an adult/], kind: "yesno", get: (p) => p.questions.over18 },
 
+    // A signature date on a form is the day it is filled in.
+    { any: [/signature date/, /(^|\| )date( \||$)/], not: [/birth|start|end|graduat|availab|expir|issue/], get: (p, h, signal) => todayFor(signal) },
+
     // --- Voluntary self-ID (only fired when settings.fillEEO) ---
     { eeo: true, any: [/gender/, /gender identity/, /\bsex\b/], get: (p) => p.eeo.gender },
-    { eeo: true, any: [/hispanic|latino/], kind: "yesno", get: (p) => p.eeo.hispanicLatino },
+    { eeo: true, any: [/hispanic|latino/], not: [/\brace\b/], kind: "yesno", get: (p) => p.eeo.hispanicLatino },
     { eeo: true, any: [/race|ethnicit/], get: (p) => p.eeo.race },
     { eeo: true, any: [/veteran/], expand: "veteran", get: (p) => p.eeo.veteranStatus },
     { eeo: true, any: [/disabilit/], expand: "disability", get: (p) => p.eeo.disabilityStatus },
@@ -339,6 +343,23 @@
     return "No";
   }
 
+  // Today's date in the order the field's placeholder shows (default month/day/year).
+  function todayFor(signal) {
+    const d = new Date(), y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, "0"), day = String(d.getDate()).padStart(2, "0");
+    if (/yyyy-mm-dd/.test(signal)) return `${y}-${m}-${day}`;
+    if (/dd\/mm\/yyyy/.test(signal)) return `${day}/${m}/${y}`;
+    return `${m}/${day}/${y}`;
+  }
+  function fullAddress(personal) {
+    const stateZip = [personal.state, personal.postalCode].filter(Boolean).join(" ");
+    return [personal.address, personal.city, stateZip, personal.country].filter(Boolean).join(", ");
+  }
+  // True for a question a yes/no answer can answer: it opens with an auxiliary
+  // verb in some line of its text and does not ask where, which, what, when or how.
+  function looksYesNo(signal) {
+    return /(^|\| )(are|do|does|did|have|has|will|would|can|could|is|was|were)\b/.test(signal) && !/\b(where|which|what|when|how)\b/.test(signal);
+  }
+
   // "Yes" when the question names the applicant's state, "No" when it names
   // only other states, null when it names none or the profile has no state.
   function residentOfState(signal, state) {
@@ -397,5 +418,5 @@
   }
 
   AvidAutofill.labelTextFor = labelTextFor;
-  AvidAutofill.matcher = { signalFor, groupSignal, choiceSignal, match, nearestDuration, makeHelpers: P, norm, deCamel };
+  AvidAutofill.matcher = { signalFor, groupSignal, choiceSignal, match, looksYesNo, nearestDuration, makeHelpers: P, norm, deCamel };
 })();

@@ -153,3 +153,24 @@ test("Breezy work and education rows take their own profile entries, with dates"
     assert.equal(at("candidateSchool", "date_end", 0), "2020-12-01");
   } finally { close(); }
 });
+
+test("Lever self-ID and screening: signature date, race, sponsorship wording, home address, Yes/No checkboxes, follow-up questions", async () => {
+  const { doc, close } = await withProfile(`<form>
+    <div><label for="addr">Primary Residence Address</label><input id="addr"></div>
+    <div><label for="sp">Will you now or in the future require ACME to sponsor you for employment authorization?</label><input id="sp"></div>
+    <div><label for="where">If so, where would you be open to relocating?</label><input id="where"></div>
+    <div><div>Are you currently legally authorized to work in the United States? (Y/N)</div><ul><li><label><input type="checkbox" name="auth" value="Yes"><span>Yes</span></label></li><li><label><input type="checkbox" name="auth" value="No"><span>No</span></label></li></ul></div>
+    <label>Race<select id="race"><option value="">Select ...</option><option>Hispanic or Latino</option><option>White (Not Hispanic or Latino)</option><option>Asian (Not Hispanic or Latino)</option></select></label>
+    <label>Disability status<select id="dis"><option value="">Select</option><option>Yes, I have a disability</option><option>No, I do not have a disability</option></select></label>
+    <input id="sigdate" placeholder="mm/dd/yyyy" name="eeo[disabilitySignatureDate]" aria-label="Date">
+  </form>`, "https://jobs.lever.co/x/1/apply", (p) => { p.personal.address = "1 Market St"; p.personal.city = "San Diego"; p.eeo.race = "Asian"; p.misc.willingToRelocate = "Yes"; });
+  try {
+    assert.equal(doc.getElementById("addr").value, "1 Market St, San Diego, CA, United States");
+    assert.equal(doc.getElementById("sp").value, "No");
+    assert.equal(doc.getElementById("where").value, "", "a where-question is not answered Yes");
+    assert.deepEqual([...doc.querySelectorAll('input[name="auth"]:checked')].map((c) => c.value), ["Yes"]);
+    assert.equal(doc.getElementById("race").value, "Asian (Not Hispanic or Latino)");
+    assert.match(doc.getElementById("sigdate").value, /^\d\d\/\d\d\/\d{4}$/);
+    assert.notEqual(doc.getElementById("sigdate").value, "No");
+  } finally { close(); }
+});
