@@ -9,7 +9,7 @@ const LAYOUT = {
     ["email", "Email"], ["phone", "Phone"],
     ["phoneDeviceType", "Phone device type", "select:Mobile|Home|Other"],
     ["address", "Street address", "wide"], ["city", "City"], ["state", "State/Province"],
-    ["postalCode", "Zip/Postal"], ["country", "Country"], ["pronouns", "Pronouns"],
+    ["postalCode", "Zip/Postal"], ["country", "Country"], ["citizenship", "Citizenship (if not Country)"], ["pronouns", "Pronouns"],
   ],
   links: [
     ["linkedin", "LinkedIn"], ["github", "GitHub"],

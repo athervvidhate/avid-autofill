@@ -14,6 +14,11 @@
     el.type !== "hidden";
 
   const isAffirmative = (v) => /^(yes|y|true|1)$/i.test(String(v).trim());
+  // An option that agrees to or acknowledges something ("I agree", "I have read
+  // and understand ..."), ticked when settings.tickAcknowledgements is on.
+  const ACKNOWLEDGES = /^(yes,? )?i (have read|(hereby )?(agree|acknowledge|accept|understand|confirm|certify|consent|attest))\b|^(agree|accept|acknowledge(d)?|i agree)\b/i;
+  const acknowledgement = (el, settings) =>
+    settings.tickAcknowledgements !== false && ACKNOWLEDGES.test((AvidAutofill.labelTextFor(el) || "").trim());
 
   async function fillPage(profile, settings, resume) {
     const run = AvidAutofill._fillRun = (AvidAutofill._fillRun || 0) + 1;
@@ -47,6 +52,9 @@
 
     // --- 0. Resume upload (if a resume is stored). ---
     if (resume) await uploadResume(resume, matcher, fillers, record);
+    // Ashby parses an uploaded resume and then rewrites the form from it,
+    // erasing anything filled before the parse finished. Wait it out.
+    if (resume && adapter.resumeParse) await adapter.resumeParse(fillers.sleep);
 
     // Workday work-history repeater (Add Another + per-panel fill) runs before
     // the generic date sweep so its date sections are marked handled first and
@@ -116,6 +124,11 @@
       // A lone radio is an acknowledgement ("I agree"), never a profile question,
       // however much policy text its title carries.
       const m = group.length > 1 ? matcher.match(signal, profile, helpers) : null;
+      if (!m && group.length === 1 && acknowledgement(group[0], settings)) {
+        if (!group[0].checked) fillers.setCheckbox(group[0], true);
+        record(signal, AvidAutofill.labelTextFor(group[0]), group[0].checked ? "filled" : "skipped");
+        continue;
+      }
       if (!m) { unmatched.push({ el: group[0], group, signal }); continue; }
       if (m.eeo && !settings.fillEEO) continue;
       let ok = [m.value, ...(m.alts || [])].some((v) => fillers.setRadio(group, v));
@@ -152,6 +165,7 @@
       }
       const ok = [m.value, ...(m.alts || [])].some((v) => fillers.setButtonChoice(buttons, v));
       record(signal, m.value, ok ? (m.assumed ? "assumed" : "filled") : "skipped");
+      if (!ok) unmatched.push({ el: buttons[0], buttons, signal });
     }
 
     // --- 3. Everything else: text inputs, textareas, native selects, checkboxes.
@@ -180,6 +194,11 @@
 
       const signal = matcher.signalFor(el);
       const m = matcher.match(signal, profile, helpers);
+      if (!m && type === "checkbox" && acknowledgement(el, settings)) {
+        fillers.setCheckbox(el, true);
+        record(signal, "checked", el.checked ? "filled" : "skipped");
+        continue;
+      }
       if (!m) { unmatched.push({ el, signal }); continue; }
       if (m.eeo && !settings.fillEEO) continue;
 

@@ -1604,7 +1604,7 @@ test("location questions naming countries are answered from the profile country"
   assert.equal(answer("are you located in the united states?"), "No");
 });
 
-test("consent and attestation checkboxes are left for the applicant", async () => {
+test("acknowledgement boxes are ticked unless the applicant turns that off", async () => {
   const { document, AvidAutofill: A } = blankWindow();
   const profile = testProfile(A), helpers = A.matcher.makeHelpers(profile);
   for (const signal of ["i agree", "i certify that the information provided is true", "i acknowledge the privacy notice", "i have read and understand the terms", "accept terms and conditions"]) {
@@ -1612,8 +1612,10 @@ test("consent and attestation checkboxes are left for the applicant", async () =
   }
   document.body.innerHTML = '<form><label><input type="checkbox" id="agree"> I agree to the processing of my data</label></form>';
   document.getElementById("agree").getClientRects = () => [{}];
-  await A.engine.fillPage(profile, A.DEFAULT_SETTINGS, null);
+  await A.engine.fillPage(profile, { ...A.DEFAULT_SETTINGS, tickAcknowledgements: false }, null);
   assert.equal(document.getElementById("agree").checked, false);
+  await A.engine.fillPage(profile, A.DEFAULT_SETTINGS, null);
+  assert.equal(document.getElementById("agree").checked, true);
 });
 
 test("Lever location search picks the suggestion in the profile's state", async () => {
@@ -1686,6 +1688,8 @@ test("fillPage fills a second captured Ashby form without misreading long questi
   const optionsFor = {
     "What is your work location": ["Austin, TX", "Portland, OR"],
     "If this role requires a security clearance": ["None", "Secret", "Top Secret"],
+    "Please select the country you hold citizenship in": ["Canada", "United States", "United States Minor Outlying Islands"],
+    "If you hold citizenship in a second country": ["None", "Canada", "United States"],
   };
   document.querySelectorAll('[role="combobox"]').forEach((input) => {
     const label = input.closest("[data-field-path]").querySelector("label").textContent;
@@ -1726,13 +1730,17 @@ test("fillPage fills a second captured Ashby form without misreading long questi
   assert.match(chosen("What is your current notice period"), /radio-2$/, "one month -> the 1 month option");
   assert.match(chosen("Have you previously worked in a remote or hybrid"), /radio-1$/);
   assert.equal(answer("If this role requires a security clearance"), "None");
+  assert.equal(answer("Please select the country you hold citizenship in"), "United States");
+  assert.equal(answer("If you hold citizenship in a second country"), "None");
   assert.equal(answer("Please provide relevant work samples"), "https://alex.example.dev");
   assert.equal(answer("What is your work location"), "Austin, TX");
   assert.equal(answer("Please list your most recent employer"), "Globex");
   assert.equal(answer("Please share your base compensation"), "100000", "a number input gets the first number of a salary range");
   assert.equal(answer("Why are you considering leaving"), "", "a 'why leaving' question is not the job title");
   assert.equal(answer("If yes, please provide details"), "", "a follow-up for details is not the sponsorship answer");
-  assert.equal(document.querySelector('input[type="radio"][name*="b8b84bc4"]:checked'), null, "a lone policy radio is left alone");
+  for (const id of ["764b6651", "b8b84bc4", "5a49f203"]) {
+    assert.ok(document.querySelector(`input[type="radio"][name*="${id}"]:checked`), `acknowledgement ${id} is ticked`);
+  }
 });
 
 test("notice periods match the option covering the same length of time", () => {
@@ -1745,4 +1753,19 @@ test("notice periods match the option covering the same length of time", () => {
   assert.equal(pick("six months"), "3+ months");
   assert.equal(pick("Immediately"), "1-2 weeks");
   assert.equal(A.matcher.nearestDuration("June 1, 2027", options), -1);
+});
+
+test("Ashby fill waits for Ashby's own resume parse to finish before filling", async () => {
+  const { document, A, dom } = loadFixture("ashby-application-2.html", "https://jobs.ashbyhq.com/example/job/application");
+  const adapter = A.adapters.detect();
+  assert.equal(adapter.name, "Ashby");
+  const layer = document.querySelector(".ashby-application-form-autofill-input-pending-layer");
+  const fast = () => new Promise((resolve) => dom.window.setTimeout(resolve, 5));
+  let parsed = false;
+  dom.window.setTimeout(() => layer.setAttribute("data-state", "visible"), 20);
+  dom.window.setTimeout(() => { layer.setAttribute("data-state", "hidden"); parsed = true; }, 150);
+  await adapter.resumeParse(fast);
+  assert.equal(parsed, true, "returns only after the parsing layer hides again");
+  // No parse started: returns after the short start window.
+  await adapter.resumeParse(fast);
 });

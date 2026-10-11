@@ -178,6 +178,9 @@
     { any: [/\bstate\b/, /\bprovince\b/, /\bregion\b/], not: [/statement|estate|united states|work/], expand: "usState", get: (p) => p.personal.state },
     { any: [/zip/, /postal code/, /post code/], get: (p) => p.personal.postalCode },
     { any: [/\b(located|location|based|living|reside|residing) in\b/], not: [/relocat|willing|commut|authoriz|work|time ?zone|hours/], kind: "yesno", get: (p, h, signal) => inListedCountry(signal, p.personal.country) },
+    // A second citizenship question offers "None" for the usual single one.
+    { any: [/(second|dual|additional|other) (country of )?citizenship/, /citizenship in a second/], get: () => "None" },
+    { any: [/citizenship/, /citizen of/, /nationality/], not: [/authoriz|sponsor|\bare you (a )?(u\.?s\.? )?citizen\b/], get: (p) => p.personal.citizenship || p.personal.country },
     { any: [/country/, /nationality/], not: [/authoriz/, /eligible to work/, /sponsor/, /work in the country/, /citizen/], get: (p) => p.personal.country },
 
     // --- Links ---

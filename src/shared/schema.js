@@ -21,6 +21,7 @@
       state: "",
       postalCode: "",
       country: "United States",
+      citizenship: "", // country of citizenship; blank = same as country
       pronouns: "",
     },
     links: {
@@ -92,6 +93,7 @@
     overwriteFilled: false, // if true, replace values already present in a field
     fillEEO: false, // opt-in: only fill voluntary self-ID when explicitly enabled
     fillSkills: true, // add skills to Workday skills sections
+    tickAcknowledgements: true, // tick "I agree" / "I have read and understand" boxes
     highlightFilled: true, // briefly outline fields we touched
     jevEnabled: false, // optional matching of approved saved answers
   };
