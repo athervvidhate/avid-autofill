@@ -41,6 +41,17 @@
       (el.offsetParent !== null || el.getClientRects().length > 0);
   }
 
+  // What the field says about itself. Text from surrounding containers is left
+  // out: a wrapper that mentions name, email and phone would otherwise make one
+  // unrelated input look like a whole application form.
+  function own(el, matcher) {
+    const attr = (n) => (el.getAttribute && el.getAttribute(n)) || "";
+    return matcher.norm([
+      A.labelTextFor(el), attr("aria-label"), el.placeholder,
+      matcher.deCamel(el.name), matcher.deCamel(el.id), hints(el),
+    ].filter(Boolean).join(" | "));
+  }
+
   // Score the page's form fields. An application needs the basics a candidate
   // always gives (two of name, email, phone) plus something only a job form asks
   // for (a resume upload or a job question), or a resume upload with page cues.
@@ -57,12 +68,15 @@
       if (el.closest("#avid-autofill-root, #avid-tracker-root")) continue;
       const type = String(el.type || "").toLowerCase();
       if (type === "password") { password = true; continue; }
-      const signal = matcher.signalFor(el) + (type === "file" ? " " + (el.accept || "") : "");
+      if (el.closest('[role="search"], search')) continue;
+      const signal = own(el, matcher) + (type === "file" ? " " + (el.accept || "") : "");
       if (type === "file") {
         if (/resume|\bcv\b|curriculum vitae/.test(signal) || /\.pdf|\.docx?/.test(signal)) resume = true;
         continue;
       }
-      for (const [key, re] of Object.entries(IDENTITY)) if (re.test(signal)) found.add(key);
+      // One field answers one question, so a field cannot count as both name and email.
+      const key = Object.keys(IDENTITY).find((k) => IDENTITY[k].test(signal));
+      if (key) found.add(key);
       if (JOB_FIELD.test(signal)) jobFields++;
     }
     const heading = [...document.querySelectorAll("h1, h2, title")].map((n) => n.textContent).join(" ");

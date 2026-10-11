@@ -79,3 +79,29 @@ test("placeholder-only fields are matched", async () => {
   assert.deepEqual([v("n"), v("e"), v("p"), v("w"), v("g")], ["Ada Lovelace", "ada@example.com", "2025550123", "https://ada.dev", "https://github.com/ada"]);
   win.close();
 });
+
+test("a video site is not an application and does not match a platform by its CSS-module classes", () => {
+  const win = load("video-site.html", "https://videos.example.com/watch?v=abc");
+  const A = win.AvidAutofill;
+  assert.equal(A.generic.detect().isApplication, false);
+  assert.equal(A.adapters.detect().name, "Generic");
+  win.close();
+});
+
+test("a generic #application_form id on another host must still look like an application", () => {
+  const win = load("video-site.html", "https://videos.example.com/watch?v=abc");
+  win.document.body.insertAdjacentHTML("beforeend", '<form id="application_form"><input name="q"></form>');
+  const A = win.AvidAutofill;
+  const adapter = A.adapters.detect();
+  assert.equal(adapter.name, "Greenhouse");
+  assert.equal(A.adapters.markupOnly(adapter), true);
+  assert.equal(A.generic.detect().isApplication, false);
+  win.close();
+});
+
+test("only a field's own label, not surrounding text, counts toward application detection", () => {
+  const win = load("video-site.html", "https://videos.example.com/jobs/apply");
+  win.document.body.innerHTML = '<div>Name Email Phone Resume<input name="x" placeholder="Search"><input name="y" placeholder="Filter"></div>';
+  assert.equal(win.AvidAutofill.generic.detect().isApplication, false);
+  win.close();
+});

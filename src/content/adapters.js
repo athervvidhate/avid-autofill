@@ -18,6 +18,7 @@
     },
     {
       name: "Greenhouse",
+      host: /greenhouse\.io|grnh\.se/,
       detect: () =>
         /greenhouse\.io|grnh\.se/.test(location.host) ||
         /boards\.greenhouse/.test(location.href) ||
@@ -33,6 +34,7 @@
     },
     {
       name: "Lever",
+      host: /lever\.co|jobs\.lever/,
       detect: () =>
         /lever\.co|jobs\.lever/.test(location.host) ||
         !!document.querySelector(".application-form, [data-qa='application-form']"),
@@ -45,7 +47,7 @@
       name: "Ashby",
       detect: () =>
         /ashbyhq\.com|jobs\.ashby/.test(location.host) ||
-        !!document.querySelector('[class*="_container_"] form, [data-highlight="ashby"]'),
+        !!document.querySelector('[class*="ashby-application-form"], [data-highlight="ashby"]'),
       // Ashby uses ARIA comboboxes.
       customSelectSelectors: ['[role="combobox"]', '[class*="_select_"]'],
       // An uploaded resume starts Ashby's own parse, which rewrites the form when
@@ -148,5 +150,12 @@
     return { name: "Generic", customSelectSelectors: ['[class*="select__control"]', '[role="combobox"]'] };
   }
 
-  AvidAutofill.adapters = { detect, ADAPTERS };
+  // True when the adapter was picked from the page's markup alone, on a host that
+  // is not the platform's own. Generic class names and ids can appear on any site,
+  // so such a match still has to look like a job application.
+  function markupOnly(adapter) {
+    return !!adapter.host && !adapter.host.test(location.host + location.href);
+  }
+
+  AvidAutofill.adapters = { detect, markupOnly, ADAPTERS };
 })();

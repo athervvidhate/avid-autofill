@@ -27,7 +27,8 @@
     if (!captured && AvidAutofill.workday && AvidAutofill.workday.captureDescription) AvidAutofill.workday.captureDescription().catch(() => {});
     captured = true;
     const requested = !!g.__avidOpenDrawer;
-    if (adapter.name !== "Generic" || requested || AvidAutofill.generic.detect().isApplication) {
+    const known = adapter.name !== "Generic" && !AvidAutofill.adapters.markupOnly(adapter);
+    if (known || requested || AvidAutofill.generic.detect().isApplication) {
       AvidAutofill.widget.mount(adapter);
       if (requested) {
         delete g.__avidOpenDrawer;
