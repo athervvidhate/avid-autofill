@@ -74,6 +74,10 @@
       await AvidAutofill.workday.popoverDatePass(profile, { matcher, helpers, fillers, record });
     }
 
+    // Breezy renders every work and education entry up front as `li.experience`
+    // rows, so each row takes the matching profile entry instead of entry 0.
+    if (adapter.name === "Breezy") breezyEntries(profile, fillers, record, handled);
+
     // --- 1. Custom (react-select / combobox / Workday) dropdowns first, so their
     //        inner <input> is marked handled before the text pass sees it.
     //        Runs twice: selecting Country reveals the State dropdown, etc. ---
@@ -266,6 +270,38 @@
       results,
       aiMessage,
     };
+  }
+
+  // "Jun 2025" -> "2025-06-01", "2023" -> "2023-01-01" (or -12-01 as an end date),
+  // for date inputs. Open-ended values such as "Present" give "".
+  function isoMonth(text, end) {
+    const t = String(text || "").trim().toLowerCase();
+    const year = t.match(/\b(19|20)\d{2}\b/);
+    if (!year) return "";
+    const monthIndex = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"].findIndex((m) => t.includes(m));
+    const numeric = t.match(/^(\d{1,2})[\/-](?:19|20)\d{2}$/);
+    const month = monthIndex >= 0 ? monthIndex + 1 : numeric ? Number(numeric[1]) : end ? 12 : 1;
+    return month >= 1 && month <= 12 ? `${year[0]}-${String(month).padStart(2, "0")}-01` : "";
+  }
+
+  function breezyEntries(profile, fillers, record, handled) {
+    const SECTIONS = [
+      { model: "candidatePosition", entries: profile.work, fields: { company_name: (e) => e.company, title: (e) => e.title, summary: (e) => e.description, date_start: (e) => isoMonth(e.startDate, false), date_end: (e) => (e.current ? "" : isoMonth(e.endDate, true)) } },
+      { model: "candidateSchool", entries: profile.education, fields: { school_name: (e) => e.school, field_of_study: (e) => e.field || e.degree, date_start: (e) => isoMonth(e.startDate, false), date_end: (e) => isoMonth(e.endDate, true) } },
+    ];
+    for (const { model, entries, fields } of SECTIONS) {
+      const rows = fillers.queryAll("li").filter((li) => li.querySelector(`[ng-model^="${model}."]`));
+      rows.forEach((row, i) => {
+        for (const input of row.querySelectorAll(`[ng-model^="${model}."]`)) {
+          handled.add(input);
+          const entry = entries[i], get = fields[input.getAttribute("ng-model").slice(model.length + 1)];
+          const value = entry && get ? get(entry) : "";
+          if (!value || input.value) continue;
+          fillers.setTextValue(input, value);
+          record(`${model.replace("candidate", "").toLowerCase()} ${i + 1} ${input.getAttribute("ng-model").split(".")[1].replace(/_/g, " ")}`, value, input.value ? "filled" : "skipped");
+        }
+      });
+    }
   }
 
   // A box in a "languages" checklist whose label names a language the profile lists.

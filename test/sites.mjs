@@ -134,3 +134,22 @@ test("a yes/no rule never writes into a free-text question", async () => {
   const { doc, close } = await withProfile('<form><label for="t">Have you worked with distributed systems? Briefly explain.</label><textarea id="t"></textarea></form>', "https://example.test/");
   try { assert.equal(doc.getElementById("t").value, ""); } finally { close(); }
 });
+
+test("Breezy work and education rows take their own profile entries, with dates", async () => {
+  const row = (model, fields) => `<li class="experience">${fields.map((f) => `<input ng-model="${model}.${f}" ${f.startsWith("date") ? 'type="date"' : 'type="text"'} placeholder="Company">`).join("")}</li>`;
+  const html = `<form><ul>${row("candidatePosition", ["company_name", "title", "date_start", "date_end"]).repeat(3)}</ul><ul>${row("candidateSchool", ["school_name", "field_of_study", "date_start", "date_end"])}</ul></form>`;
+  const { doc, close } = await withProfile(html, "https://acme.breezy.hr/p/abc", (p) => {
+    p.work = [{ company: "Globex", title: "Engineer", startDate: "Jun 2021", endDate: "Present", current: true }, { company: "Initech", title: "Intern", startDate: "2019", endDate: "Aug 2020" }];
+    p.education = [{ school: "University of California, San Diego", field: "Computer Science", startDate: "Sep 2016", endDate: "2020" }];
+  });
+  try {
+    const at = (model, field, i) => doc.querySelectorAll(`[ng-model="${model}.${field}"]`)[i].value;
+    assert.deepEqual([0, 1, 2].map((i) => at("candidatePosition", "company_name", i)), ["Globex", "Initech", ""]);
+    assert.equal(at("candidatePosition", "date_start", 0), "2021-06-01");
+    assert.equal(at("candidatePosition", "date_end", 0), "", "a current role has no end date");
+    assert.equal(at("candidatePosition", "date_start", 1), "2019-01-01");
+    assert.equal(at("candidatePosition", "date_end", 1), "2020-08-01");
+    assert.equal(at("candidateSchool", "school_name", 0), "University of California, San Diego");
+    assert.equal(at("candidateSchool", "date_end", 0), "2020-12-01");
+  } finally { close(); }
+});
