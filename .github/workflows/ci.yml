@@ -9,8 +9,8 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -22,8 +22,12 @@ jobs:
       - name: Install Chromium for the browser smoke tests
         run: npx playwright-core install --with-deps chromium
       - name: Browser smoke tests
+        # Ubuntu runners block Chromium's sandbox; tracker-browser launches it directly.
         run: |
-          export AVID_BROWSER="$(node -e "console.log(require('playwright-core').chromium.executablePath())")"
+          chrome="$(node -e "console.log(require('playwright-core').chromium.executablePath())")"
+          printf '#!/bin/sh\nexec "%s" --no-sandbox "$@"\n' "$chrome" > "$RUNNER_TEMP/chrome"
+          chmod +x "$RUNNER_TEMP/chrome"
+          export AVID_BROWSER="$RUNNER_TEMP/chrome"
           node test/extension-browser.mjs
           node test/tracker-browser.mjs
       - run: npm run zip
