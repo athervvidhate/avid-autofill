@@ -45,7 +45,7 @@
     else bank.push({ id: crypto.randomUUID(), question, answer, scopeUrl, anySite: entry.anySite, approved: true });
     return { ...profile, questionBank: bank };
   }
-  function sourcesFor(profile, pageUrl) {
+  function sourcesFor(profile, pageUrl, job) {
     const sources = {};
     for (const [section, fields] of Object.entries(PROFILE_SOURCES)) for (const [key, description] of Object.entries(fields)) {
       const value = profile[section]?.[key];
@@ -59,6 +59,9 @@
       if (Object.hasOwn(sources, id)) throw new Error("Question bank contains duplicate IDs. Edit and save it again.");
       sources[id] = { description: entry.question, value: entry.answer, kind: "text" };
     }
+    // Lines from the saved history and filled templates ride on top of the
+    // 80-source cap; both are built locally from the profile and job page.
+    if (A.candidates) for (const [id, source] of Object.entries({ ...A.candidates.historySources(profile), ...A.candidates.templateSources(profile, job) })) if (!Object.hasOwn(sources, id)) sources[id] = source;
     return sources;
   }
   function cleanFields(fields) {
@@ -79,7 +82,7 @@
     const state = { fields: {} }, questions = {};
     for (const field of fields) {
       state.fields[field.id] = { label: field.label, type: field.type, ...(field.options ? { options: field.options } : {}) };
-      let criteria = Object.fromEntries(Object.entries(sources).map(([id, source]) => [id, source.description]));
+      let criteria = Object.fromEntries(Object.entries(selections || !A.candidates ? sources : A.candidates.narrow(field, sources)).map(([id, source]) => [id, source.description]));
       if (selections) {
         const source = sources[selections[field.id]];
         if (!source) throw new Error("No approved source for option mapping.");
