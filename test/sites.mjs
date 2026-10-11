@@ -134,27 +134,3 @@ test("a yes/no rule never writes into a free-text question", async () => {
   const { doc, close } = await withProfile('<form><label for="t">Have you worked with distributed systems? Briefly explain.</label><textarea id="t"></textarea></form>', "https://example.test/");
   try { assert.equal(doc.getElementById("t").value, ""); } finally { close(); }
 });
-
-test("Workable opens Education and Experience once and fills the fields that appear", async () => {
-  const html = `<form data-ui="application-form"><div data-ui="education"><p>Education</p><button data-ui="add-section" type="button">+ Add</button></div><div data-ui="experience"><p>Experience</p><button data-ui="add-section" type="button">+ Add</button></div></form>`;
-  const dom = new JSDOM(html, { runScripts: "outside-only", pretendToBeVisual: true, url: "https://apply.workable.com/acme/j/1/apply/" });
-  const win = dom.window, store = {};
-  win.chrome = { storage: { local: { async get(k) { return k == null ? { ...store } : { [k]: store[k] }; }, async set(o) { Object.assign(store, o); }, async remove(k) { delete store[k]; } } } };
-  for (const src of SCRIPTS) win.eval(src);
-  win.HTMLElement.prototype.getClientRects = () => [{ width: 100, height: 20 }];
-  const doc = win.document, A = win.AvidAutofill;
-  A.fillers.sleep = async () => {};
-  let opened = 0;
-  doc.querySelector('[data-ui="education"] button').addEventListener("click", () => { opened++; doc.querySelector('[data-ui="education"]').insertAdjacentHTML("beforeend", '<label for="sc">School</label><input id="sc"><label for="fs">Field of study</label><input id="fs">'); });
-  doc.querySelector('[data-ui="experience"] button').addEventListener("click", () => { opened++; doc.querySelector('[data-ui="experience"]').insertAdjacentHTML("beforeend", '<label for="ti">Title</label><input id="ti"><label for="co">Company</label><input id="co">'); });
-  try {
-    const profile = A.mergeDefaults(A.DEFAULT_PROFILE, { education: [{ school: "State University", field: "Computer Science" }], work: [{ company: "Globex", title: "Software Engineer" }] });
-    await A.engine.fillPage(profile, A.DEFAULT_SETTINGS, null);
-    await A.engine.fillPage(profile, A.DEFAULT_SETTINGS, null);
-    assert.equal(opened, 2, "each section opens once, however many times Autofill runs");
-    assert.equal(doc.getElementById("sc").value, "State University");
-    assert.equal(doc.getElementById("fs").value, "Computer Science");
-    assert.equal(doc.getElementById("ti").value, "Software Engineer");
-    assert.equal(doc.getElementById("co").value, "Globex");
-  } finally { win.close(); }
-});

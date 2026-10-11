@@ -66,17 +66,6 @@
       await AvidAutofill.workday.popoverDatePass(profile, { matcher, helpers, fillers, record });
     }
 
-    // Collapsed repeater sections (Workable education and experience) open
-    // once, so the passes below find their fields.
-    for (const { selector, has } of adapter.addSections || []) {
-      const box = document.querySelector(selector);
-      const button = box && box.querySelector('[data-ui="add-section"]');
-      if (!has(profile) || !button || button.dataset.avidOpened || box.querySelector("input, textarea, select")) continue;
-      button.dataset.avidOpened = "1";
-      button.click();
-      for (let i = 0; i < 10 && !box.querySelector("input, textarea, select"); i++) await fillers.sleep(150);
-    }
-
     // --- 1. Custom (react-select / combobox / Workday) dropdowns first, so their
     //        inner <input> is marked handled before the text pass sees it.
     //        Runs twice: selecting Country reveals the State dropdown, etc. ---
