@@ -55,8 +55,7 @@ try {
   const options = await cdp(optionsTarget.webSocketDebuggerUrl);
   await options.send("Emulation.setDeviceMetricsOverride", { width: 1100, height: 900, deviceScaleFactor: 1, mobile: false });
   const state = await options.evaluate('chrome.runtime.sendMessage({type:"AVID_TRACKER_STATE"})');
-  assert.equal(state.ok, true); assert.equal(state.configured, false); assert.match(state.redirectUrl, /chromiumapp\.org\/google$/);
-  await until(() => options.evaluate('document.querySelector("#google-setup").open'), "setup instructions");
+  assert.equal(state.ok, true); assert.equal(state.configured, true); assert.equal(state.redirectUrl, "https://hlakbjlejclnadcmikjpinjkagkkjgpn.chromiumapp.org/google");
   await options.evaluate('document.documentElement.style.scrollBehavior="auto"; document.querySelector("#connections").scrollIntoView({behavior:"instant"})');
   await until(() => options.evaluate('document.querySelector("#connections").getBoundingClientRect().top < 50'), "Connections in viewport");
   await fs.writeFile(path.join(scratch, "connections.png"), Buffer.from((await options.send("Page.captureScreenshot")).data, "base64"));
