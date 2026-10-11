@@ -51,9 +51,11 @@ try {
   const workerTarget = await until(async () => (await targets()).find(t => t.type === "service_worker" && t.url.endsWith("/background.js")), "extension service worker");
   const worker = await cdp(workerTarget.webSocketDebuggerUrl);
   const base = `chrome-extension://${new URL(workerTarget.url).host}`;
-  // The worker opens My Info on install; ask again in case this browser has not yet (it focuses an open one).
-  await worker.evaluate("chrome.runtime.openOptionsPage()");
-  const optionsTarget = await until(async () => (await targets()).find(t => t.url.startsWith(base) && t.url.includes("options.html")), "Connections page");
+  // The worker opens My Info on install, but newer headless builds may not; open it directly if so.
+  const optionsOpen = async () => (await targets()).find(t => t.url.startsWith(base) && t.url.includes("options.html"));
+  for (let i = 0; i < 30 && !(await optionsOpen()); i++) await delay(100);
+  if (!(await optionsOpen())) await fetch(`http://127.0.0.1:${port}/json/new?${base}/options.html`, { method: "PUT" });
+  const optionsTarget = await until(optionsOpen, "Connections page");
   const options = await cdp(optionsTarget.webSocketDebuggerUrl);
   await options.send("Emulation.setDeviceMetricsOverride", { width: 1100, height: 900, deviceScaleFactor: 1, mobile: false });
   const state = await options.evaluate('chrome.runtime.sendMessage({type:"AVID_TRACKER_STATE"})');
@@ -64,7 +66,7 @@ try {
   await fs.writeFile(path.join(scratch, "connections.png"), Buffer.from((await options.send("Page.captureScreenshot")).data, "base64"));
   const enabled = await options.evaluate('chrome.runtime.sendMessage({type:"AVID_TRACKER_ENABLE",enabled:true})');
   assert.equal(enabled.ok, true, enabled.error);
-  const registrations = await worker.evaluate("chrome.scripting.getRegisteredContentScripts()");
+  const registrations = await until(() => worker.evaluate("chrome.scripting.getRegisteredContentScripts()"), "worker scripting API");
   assert.ok(registrations.some(s => s.id === "avid-job-tracker"));
   const newPage = await (await fetch(`http://127.0.0.1:${port}/json/new?${encodeURIComponent(`${origin}/careers/engineer`)}`, { method: "PUT" })).json();
   const page = await cdp(newPage.webSocketDebuggerUrl);
@@ -79,7 +81,7 @@ try {
   await fs.writeFile(path.join(scratch, "submission-prompt.png"), Buffer.from((await page.send("Page.captureScreenshot")).data, "base64"));
   await page.evaluate('document.querySelector("#avid-tracker-root").shadowRoot.querySelector(".add").click()');
   await until(() => page.evaluate('document.querySelector("#avid-tracker-root").shadowRoot.querySelector(".message").textContent.includes("Not synced yet")'), "durable local save");
-  const records = await worker.evaluate('chrome.storage.local.get("avidTracker").then(v => v.avidTracker.entries)');
+  const records = await until(() => worker.evaluate('chrome.storage.local.get("avidTracker").then(v => v.avidTracker.entries)'), "worker storage");
   assert.equal(records.length, 1); assert.equal(records[0].entry.company, "Acme"); assert.equal(records[0].state, "pending");
   await page.send("Page.reload");
   await delay(800);
