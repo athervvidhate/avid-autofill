@@ -223,8 +223,8 @@
         } else if (type === "checkbox") {
           // Affirmative yes/no answers tick the box; negatives leave it.
           const want = m.kind === "yesno" ? isAffirmative(m.value) : true;
-          fillers.setCheckbox(el, want);
-          record(signal, want ? "checked" : "unchecked", "filled");
+          const ok = fillers.setCheckbox(el, want);
+          record(signal, want ? "checked" : "unchecked", ok ? "filled" : "skipped");
         } else if (m.place && adapter.locationSearch && el.matches(adapter.locationSearch)) {
           const picked = await fillers.setLocationSearch(el, m.value, m.alts);
           record(signal, picked || m.value, picked ? "filled" : "no-option-match");
@@ -235,7 +235,7 @@
           record(signal, first ? first[0] : m.value, first && el.value ? "filled" : "skipped");
         } else {
           fillers.setTextValue(el, m.value);
-          record(signal, m.value, "filled");
+          record(signal, m.value, el.value ? "filled" : "skipped");
         }
       } catch (_) {
         record(signal, m.value, "error");

@@ -1789,3 +1789,29 @@ test("the resume goes to Ashby's Resume field, not its Autofill from resume box"
   await A.engine.fillPage(testProfile(A), { overwriteFilled: false, fillEEO: false, highlightFilled: false }, { name: "resume.pdf", type: "application/pdf", dataUrl: "data:application/pdf;base64,AA==" });
   assert.deepEqual(targets.map((t) => t.id), ["_systemfield_resume"]);
 });
+
+test("native selects and radios match whole words, so Man does not pick Woman or No pick Not", () => {
+  const { document, AvidAutofill: A } = blankWindow();
+  document.body.innerHTML = `
+    <select id="g"><option value="">Select</option><option>Woman</option><option>Man</option></select>
+    <select id="v"><option value="">Select</option><option>I am not a protected veteran</option><option>Prefer not to say</option></select>
+    <input type="radio" name="x" id="r1"><label for="r1">Woman</label>
+    <input type="radio" name="x" id="r2"><label for="r2">Man (he/him)</label>`;
+  assert.equal(A.fillers.setNativeSelect(document.getElementById("g"), ["Man"]), true);
+  assert.equal(document.getElementById("g").value, "Man");
+  assert.equal(A.fillers.setNativeSelect(document.getElementById("v"), ["No"]), false);
+  assert.equal(document.getElementById("v").value, "");
+  assert.equal(A.fillers.setRadio([document.getElementById("r1"), document.getElementById("r2")], "Man"), true);
+  assert.equal(document.getElementById("r2").checked, true);
+  assert.equal(document.getElementById("r1").checked, false);
+});
+
+test("setRadio and setCheckbox report false when the click does not take", () => {
+  const { document, AvidAutofill: A } = blankWindow();
+  document.body.innerHTML = `<input type="radio" name="y" id="a" value="Yes"><input type="checkbox" id="c">`;
+  const stuck = (el) => el.addEventListener("click", (e) => e.preventDefault());
+  stuck(document.getElementById("a"));
+  stuck(document.getElementById("c"));
+  assert.equal(A.fillers.setRadio([document.getElementById("a")], "Yes"), false);
+  assert.equal(A.fillers.setCheckbox(document.getElementById("c"), true), false);
+});
