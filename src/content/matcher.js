@@ -144,6 +144,7 @@
     { any: [/\bcity\b/, /\btown\b/, /(^|\| )(current )?location( \||$)/, /(^|\| )current location\b/], not: [/velocity|capacity|ethnic/], expand: "place", get: (p) => p.personal.city },
     { any: [/\bstate\b/, /\bprovince\b/, /\bregion\b/], not: [/statement|estate|united states|work/], expand: "usState", get: (p) => p.personal.state },
     { any: [/zip/, /postal code/, /post code/], get: (p) => p.personal.postalCode },
+    { any: [/\bresident of\b/, /\bdo you (live|reside) in\b/], not: [/relocat|willing/], kind: "yesno", get: (p, h, signal) => residentOfState(signal, p.personal.state) },
     { any: [/\b(located|location|based|living|reside|residing) in\b/], not: [/relocat|willing|commut|authoriz|work|time ?zone|hours/], kind: "yesno", get: (p, h, signal) => inListedCountry(signal, p.personal.country) },
     { any: [/country/, /nationality/], not: [/authoriz/, /eligible to work/, /sponsor/, /work in the country/, /citizen/], get: (p) => p.personal.country },
 
@@ -154,10 +155,11 @@
     { any: [/twitter|(^| )x( |$)/], get: (p) => p.links.twitter },
 
     // --- Current role / employer ---
-    { any: [/current company/, /current employer/, /present employer/, /^company$/, /employer/], not: [/why|reason|previous|agreement|restriction/], get: (p, h) => h.work0().company },
-    { any: [/current title/, /current role/, /job title/, /^title$/, /current position/], not: [/mr\.?|mrs\.?|salutation/], get: (p, h) => h.work0().title },
+    { any: [/current company/, /current employer/, /present employer/, /(^|\| )company( \||$)/, /employer/], not: [/why|reason|previous|agreement|restriction/], get: (p, h) => h.work0().company },
+    { any: [/current title/, /current role/, /job title/, /(^|\| )title( \||$)/, /current position/], not: [/mr\.?|mrs\.?|salutation/], get: (p, h) => h.work0().title },
 
     // --- Education ---
+    { any: [/which (university|college|school)/, /(university|college|school) (did|do) you (last )?(attend|graduate)/, /last attended/], get: (p, h) => h.edu0().school },
     { any: [/school/, /university/, /college/, /institution/], not: [/high school diploma\?/, /are you/, /current.*student/, /enrolled/, /graduation/, /anticipated/], get: (p, h) => h.edu0().school },
     { any: [/degree/], get: (p, h) => h.edu0().degree },
     { any: [/major/, /field of study/, /discipline/], get: (p, h) => h.edu0().field || h.edu0().degree },
@@ -171,7 +173,7 @@
     { any: [/authoriz(ed|ation) to work/, /legally authorized/, /eligible to work/, /work authorization/], not: [/temporary/, /\bopt\b/, /\bcpt\b/, /practical training/], kind: "yesno", get: (p) => p.workAuth.authorizedToWork },
 
     // --- Logistics ---
-    { any: [/salary/, /compensation expectation/, /desired (pay|salary|compensation)/, /expected salary/], get: (p) => p.misc.salaryExpectation },
+    { any: [/salary/, /compensation expectation/, /desired (pay|salary|compensation)/, /expected salary/, /expected (annual |total )?(package|pay|compensation|ctc)/, /annual (package|compensation|pay)\b/, /(pay|compensation) (range|expectations?)/, /\bctc\b/], not: [/relocat|bonus eligib/], get: (p) => p.misc.salaryExpectation },
     { any: [/notice period/, /availability to start/, /when can you start/, /earliest start/, /start date/], get: (p) => p.misc.earliestStartDate || p.misc.noticePeriod },
     // General willingness only: a named destination or relocation assistance is a different question.
     { any: [/willing to relocate/, /open to relocat/, /relocat/], not: [/relocat\w* to \w/, /assistance|package|stipend|support/], kind: "yesno", get: (p) => p.misc.willingToRelocate },
@@ -181,9 +183,10 @@
 
     // --- Common yes/no application questions (Tesla-style legal/consent step) ---
     { any: [/(relatives?|family|friends?|close personal relationships?).*(employed|work(s|ing)?) (by|at|for|with)/, /(employed|work(s|ing)?) (by|at|for|with).*(relatives?|family members?)/, /related to (anyone|an employee|any employee)/], kind: "yesno", assumed: true, get: (p) => p.questions.relativesAtCompany },
-    { any: [/previously (been )?employed/, /\bhave you (ever )?worked (at|for|with)\b/, /currently or have you worked (at|for)/, /previously worked (here|for|at)/, /former employee/, /worked (here|for us) before/, /previous worker/], kind: "yesno", assumed: true, get: (p) => p.questions.previouslyEmployedHere },
+    { any: [/previously (been )?employed/, /\bhave you (ever )?worked (at|for)\b/, /\bhave you (ever )?worked with (us|our company|this company)\b/, /currently or have you worked (at|for)/, /previously worked (here|for|at)/, /former employee/, /worked (here|for us) before/, /previous worker/], kind: "yesno", assumed: true, get: (p) => p.questions.previouslyEmployedHere },
     { any: [/intern or contractor/, /current or former (intern|contractor)/, /former\/current (intern|contractor)/, /contractor/], kind: "yesno", get: (p) => p.questions.formerContractorOrIntern },
     { any: [/current(ly)? (a )?(university |college )?student/, /currently enrolled/, /enrolled in an academic/, /pursuing a degree/], kind: "yesno", get: (p) => p.questions.currentStudent },
+    { any: [/note ?taker/, /(record|transcrib)\w*.*(interview|conversation|call)/, /(interview|conversation|call).*(record|transcrib)\w*/], kind: "yesno", get: (p) => p.questions.consentToRecording },
     { any: [/text message/, /sms/, /consent to receiv/, /receive.*(notification|message)/], kind: "yesno", get: (p) => p.questions.consentToContact },
     { any: [/consider me for other/, /other (job )?opportunities/, /other (roles|positions)/, /additional (roles|positions|opportunities)/], kind: "yesno", get: (p) => p.questions.consentToOtherRoles },
     { any: [/at least 18/, /over 18/, /\b18 (years|or older)/, /age of majority/, /legally an adult/], kind: "yesno", get: (p) => p.questions.over18 },
@@ -192,8 +195,8 @@
     { eeo: true, any: [/gender/, /gender identity/, /\bsex\b/], get: (p) => p.eeo.gender },
     { eeo: true, any: [/hispanic|latino/], kind: "yesno", get: (p) => p.eeo.hispanicLatino },
     { eeo: true, any: [/race|ethnicit/], get: (p) => p.eeo.race },
-    { eeo: true, any: [/veteran/], get: (p) => p.eeo.veteranStatus },
-    { eeo: true, any: [/disabilit/], get: (p) => p.eeo.disabilityStatus },
+    { eeo: true, any: [/veteran/], expand: "veteran", get: (p) => p.eeo.veteranStatus },
+    { eeo: true, any: [/disabilit/], expand: "disability", get: (p) => p.eeo.disabilityStatus },
   ];
 
   // US state <-> abbreviation, so a "CA" profile fills a "California" dropdown
@@ -225,6 +228,19 @@
     }
     const ab = US_STATES[v.toLowerCase()];
     return ab ? [ab] : [];
+  }
+
+  // Self-ID dropdowns word their options as sentences ("I am not a protected
+  // veteran"), so a short saved answer also tries the common sentence forms.
+  function selfIdAlternates(kind, value) {
+    const v = norm(value);
+    const no = /^(no|none|not|non)\b/.test(v) || /\bnot\b/.test(v) && !/decline|prefer/.test(v);
+    const decline = /decline|prefer not|do not wish|don't wish|not to (answer|say|disclose)/.test(v);
+    const noun = kind === "veteran" ? "veteran" : "disability";
+    if (decline) return ["i decline to self-identify", "i do not wish to answer", "i do not want to answer", "i prefer not to answer", "i choose not to disclose", "decline to self-identify", "prefer not to answer"];
+    if (no) return kind === "veteran" ? ["i am not a protected veteran", "not a protected veteran", "i am not a veteran", "no"] : ["no, i do not have a disability", "i do not have a disability", "no"];
+    if (/^(yes|y)$/.test(v) || v.includes("protected") || v.includes("have a")) return kind === "veteran" ? ["i am a protected veteran", "i identify as one or more of the classifications of protected veteran", "yes"] : ["yes, i have a disability", "yes, i have a disability, or have had one in the past", "yes"];
+    return [];
   }
 
   // "City, State" spellings for location autocompletes, full state name first,
@@ -265,6 +281,17 @@
     return "No";
   }
 
+  // "Yes" when the question names the applicant's state, "No" when it names
+  // only other states, null when it names none or the profile has no state.
+  function residentOfState(signal, state) {
+    const v = norm(state);
+    const own = US_STATES[v] ? v : Object.keys(US_STATES).find((name) => US_STATES[name].toLowerCase() === v);
+    if (!own) return null;
+    const named = Object.keys(US_STATES).filter((name) => new RegExp(`\\b${name}\\b`).test(signal));
+    if (!named.length) return null;
+    return named.includes(own) ? "Yes" : "No";
+  }
+
   // Return { value, alts, kind, eeo, place } for a signal, or null if no rule matches.
   function match(signal, profile, helpers) {
     for (const rule of RULES) {
@@ -272,7 +299,7 @@
       if (rule.any.some((re) => re.test(signal))) {
         const value = rule.get(profile, helpers, signal);
         if (value == null || value === "") return null;
-        const alts = rule.expand === "usState" ? stateAlternates(value) : rule.expand === "place" ? placeAlternates(value, profile) : [];
+        const alts = rule.expand === "veteran" || rule.expand === "disability" ? selfIdAlternates(rule.expand, value) : rule.expand === "usState" ? stateAlternates(value) : rule.expand === "place" ? placeAlternates(value, profile) : [];
         return { value: String(value), alts, kind: rule.kind || "text", eeo: !!rule.eeo, assumed: !!rule.assumed, place: rule.expand === "place" };
       }
     }

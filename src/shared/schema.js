@@ -54,6 +54,7 @@
     misc: {
       skills: "",
       salaryExpectation: "",
+      languages: "English", // comma-separated; ticks matching boxes in language skill lists
       noticePeriod: "",
       earliestStartDate: "",
       graduationDate: "",
@@ -72,6 +73,7 @@
       currentStudent: "",
       consentToContact: "Yes",
       consentToOtherRoles: "Yes",
+      consentToRecording: "Yes", // AI note-taker or interview recording consent
       over18: "Yes",
     },
     meta: {

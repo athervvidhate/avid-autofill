@@ -66,6 +66,17 @@
       await AvidAutofill.workday.popoverDatePass(profile, { matcher, helpers, fillers, record });
     }
 
+    // Collapsed repeater sections (Workable education and experience) open
+    // once, so the passes below find their fields.
+    for (const { selector, has } of adapter.addSections || []) {
+      const box = document.querySelector(selector);
+      const button = box && box.querySelector('[data-ui="add-section"]');
+      if (!has(profile) || !button || button.dataset.avidOpened || box.querySelector("input, textarea, select")) continue;
+      button.dataset.avidOpened = "1";
+      button.click();
+      for (let i = 0; i < 10 && !box.querySelector("input, textarea, select"); i++) await fillers.sleep(150);
+    }
+
     // --- 1. Custom (react-select / combobox / Workday) dropdowns first, so their
     //        inner <input> is marked handled before the text pass sees it.
     //        Runs twice: selecting Country reveals the State dropdown, etc. ---
@@ -143,9 +154,16 @@
         continue;
 
       const signal = matcher.signalFor(el);
+      if (type === "checkbox" && languageBox(el, profile, matcher)) {
+        const ok = fillers.setCheckbox(el, true);
+        record(signal, "checked", ok ? "filled" : "skipped");
+        continue;
+      }
       const m = matcher.match(signal, profile, helpers);
       if (!m) { unmatched.push({ el, signal }); continue; }
       if (m.eeo && !settings.fillEEO) continue;
+      // A yes/no answer cannot answer a free-text question.
+      if (m.kind === "yesno" && el.tagName === "TEXTAREA") { unmatched.push({ el, signal }); continue; }
 
       // Respect existing content unless overwrite is on.
       const hasValue =
@@ -194,6 +212,16 @@
       results,
       aiMessage,
     };
+  }
+
+  // A box in a "languages" checklist whose label names a language the profile lists.
+  function languageBox(el, profile, matcher) {
+    const wanted = String(profile.misc.languages || "").toLowerCase().split(/[,;]/).map((l) => l.trim()).filter(Boolean);
+    if (!wanted.length || !el.name) return false;
+    const group = Array.from(el.getRootNode().querySelectorAll('input[type="checkbox"]')).filter((c) => c.name === el.name);
+    if (group.length < 2 || !/language/.test(matcher.groupSignal(group))) return false;
+    const label = (AvidAutofill.labelTextFor(el) || el.value).toLowerCase();
+    return wanted.some((l) => new RegExp(`\\b${l.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`).test(label));
   }
 
   // Find the resume file input and inject the stored resume. File inputs are

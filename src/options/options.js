@@ -22,6 +22,7 @@ const LAYOUT = {
   misc: [
     ["skills", "Skills (comma-separated)", "wide"],
     ["salaryExpectation", "Salary expectation"], ["noticePeriod", "Notice period"],
+    ["languages", "Languages (comma-separated)", "wide"],
     ["earliestStartDate", "Earliest start date"], ["graduationDate", "Graduation date"],
     ["willingToRelocate", "Willing to relocate?", "select:Yes|No"],
     ["howHeard", "How did you hear about us?", "wide"],
@@ -34,6 +35,7 @@ const LAYOUT = {
     ["currentStudent", "Currently a student?", "select:|Yes|No"],
     ["consentToContact", "Consent to text/email updates?", "select:Yes|No"],
     ["consentToOtherRoles", "Consider me for other roles?", "select:Yes|No"],
+    ["consentToRecording", "Consent to AI note-taker/recording?", "select:Yes|No"],
     ["over18", "Are you 18 or older?", "select:Yes|No"],
   ],
   eeo: [

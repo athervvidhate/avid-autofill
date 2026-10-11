@@ -116,6 +116,11 @@
     {
       name: "Workable",
       stub: true,
+      // Education and experience start collapsed behind "+ Add" buttons.
+      addSections: [
+        { selector: '[data-ui="education"]', has: (p) => p.education.length > 0 },
+        { selector: '[data-ui="experience"]', has: (p) => p.work.length > 0 },
+      ],
       detect: () =>
         /workable\.com|apply\.workable/.test(location.host) ||
         !!document.querySelector('[data-ui="application-form"]'),

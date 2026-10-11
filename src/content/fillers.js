@@ -171,6 +171,12 @@
         break;
       }
     }
+    // Same words ignoring punctuation: "University of California, Berkeley"
+    // is "University of California - Berkeley".
+    if (!matched) {
+      const loose = (x) => x.replace(/[^a-z0-9]+/g, " ").trim();
+      matched = Array.from(el.options).find((opt) => targets.some((tg) => loose(tg) && (loose(normalize(opt.textContent)) === loose(tg) || loose(normalize(opt.value)) === loose(tg)))) || null;
+    }
     if (!matched) {
       for (const opt of el.options) {
         const t = normalize(opt.textContent);

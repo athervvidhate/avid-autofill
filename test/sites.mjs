@@ -76,3 +76,85 @@ test("a radio question written beside its choices is read, not the neighbouring 
   const { doc, close } = await fill('<form><div><span>First name</span><input id="n"></div><div><span>Are you legally authorized to work in this country?</span><label><input type="radio" name="w" value="y"> Yes</label><label><input type="radio" name="w" value="n"> No</label></div></form>', "https://example.test/");
   try { assert.equal(doc.querySelector('input[name="w"]:checked')?.value, "y"); } finally { close(); }
 });
+
+const withProfile = async (html, url, edit) => {
+  const dom = new JSDOM(html, { runScripts: "outside-only", pretendToBeVisual: true, url });
+  const win = dom.window, store = {};
+  win.chrome = { storage: { local: { async get(k) { return k == null ? { ...store } : { [k]: store[k] }; }, async set(o) { Object.assign(store, o); }, async remove(k) { delete store[k]; } } } };
+  for (const src of SCRIPTS) win.eval(src);
+  win.HTMLElement.prototype.getClientRects = () => [{ width: 100, height: 20 }];
+  const A = win.AvidAutofill;
+  A.fillers.sleep = async () => {};
+  const profile = A.mergeDefaults(A.DEFAULT_PROFILE, { personal: { state: "CA", country: "United States" }, education: [{ school: "University of California, Berkeley", degree: "BS", field: "Computer Science" }], work: [{ company: "Globex", title: "Software Engineer" }], misc: { salaryExpectation: "$150,000 - $180,000 USD", languages: "English, Spanish" }, eeo: { veteranStatus: "No", disabilityStatus: "Decline to self-identify" } });
+  if (edit) edit(profile);
+  const report = await A.engine.fillPage(profile, { ...A.DEFAULT_SETTINGS, fillEEO: true }, null);
+  return { report, doc: win.document, close: () => win.close() };
+};
+
+test("expected annual package is answered with the saved pay range", async () => {
+  const { doc, close } = await withProfile('<form><label for="p">Expected annual package (please indicate currency)</label><input id="p"></form>', "https://example.test/");
+  try { assert.equal(doc.getElementById("p").value, "$150,000 - $180,000 USD"); } finally { close(); }
+});
+
+test("a how-many-years or relocation package question is not read as pay", async () => {
+  const { doc, close } = await withProfile('<form><label for="p">Do you need a relocation package?</label><input id="p"></form>', "https://example.test/");
+  try { assert.equal(doc.getElementById("p").value, ""); } finally { close(); }
+});
+
+test("resident-of-state, AI note-taker consent and language lists", async () => {
+  const { doc, close } = await withProfile(`<form>
+    <div><div class="q">Are you a resident of California?</div><label><input type="radio" name="r" value="Yes"> Yes</label><label><input type="radio" name="r" value="No"> No</label></div>
+    <div><div class="q">Are you a resident of New York?</div><label><input type="radio" name="s" value="Yes"> Yes</label><label><input type="radio" name="s" value="No"> No</label></div>
+    <div><div class="q">We may use AI notetakers to transcribe conversations. Do you consent?</div><label><input type="radio" name="n" value="Yes, I consent"> Yes, I consent</label><label><input type="radio" name="n" value="No, I do not consent"> No, I do not consent</label></div>
+    <div><div class="q">Language Skill(s) (Check all that apply)</div><ul><li><label><input type="checkbox" name="l" value="English (ENG)"> English (ENG)</label></li><li><label><input type="checkbox" name="l" value="Spanish (SPA)"> Spanish (SPA)</label></li><li><label><input type="checkbox" name="l" value="French (FRA)"> French (FRA)</label></li></ul></div>
+  </form>`, "https://jobs.lever.co/x/1/apply");
+  try {
+    const checked = (n) => [...doc.querySelectorAll(`input[name="${n}"]:checked`)].map((e) => e.value);
+    assert.deepEqual(checked("r"), ["Yes"]);
+    assert.deepEqual(checked("s"), ["No"]);
+    assert.deepEqual(checked("n"), ["Yes, I consent"]);
+    assert.deepEqual(checked("l"), ["English (ENG)", "Spanish (SPA)"]);
+  } finally { close(); }
+});
+
+test("which-university dropdowns, veteran and disability sentences, and punctuation differences in options", async () => {
+  const { doc, close } = await withProfile(`<form>
+    <label for="u">Which university are you currently attending or did you last attend?</label><select id="u"><option value="">Select</option><option>University of California - Davis</option><option>University of California - Berkeley</option></select>
+    <label for="v">Veteran status</label><select id="v"><option value="">Select ...</option><option value="a">I identify as one or more of the classifications of protected veteran listed above</option><option value="b">I am not a protected veteran</option><option value="c">I decline to self-identify for protected veteran status</option></select>
+    <label for="d">Disability status</label><select id="d"><option value="">Select ...</option><option value="y">Yes, I have a disability, or have had one in the past</option><option value="n">No, I do not have a disability and have not had one in the past</option><option value="x">I do not want to answer</option></select>
+  </form>`, "https://example.test/");
+  try {
+    assert.equal(doc.getElementById("u").value, "University of California - Berkeley");
+    assert.equal(doc.getElementById("v").value, "b");
+    assert.equal(doc.getElementById("d").value, "x");
+  } finally { close(); }
+});
+
+test("a yes/no rule never writes into a free-text question", async () => {
+  const { doc, close } = await withProfile('<form><label for="t">Have you worked with distributed systems? Briefly explain.</label><textarea id="t"></textarea></form>', "https://example.test/");
+  try { assert.equal(doc.getElementById("t").value, ""); } finally { close(); }
+});
+
+test("Workable opens Education and Experience once and fills the fields that appear", async () => {
+  const html = `<form data-ui="application-form"><div data-ui="education"><p>Education</p><button data-ui="add-section" type="button">+ Add</button></div><div data-ui="experience"><p>Experience</p><button data-ui="add-section" type="button">+ Add</button></div></form>`;
+  const dom = new JSDOM(html, { runScripts: "outside-only", pretendToBeVisual: true, url: "https://apply.workable.com/acme/j/1/apply/" });
+  const win = dom.window, store = {};
+  win.chrome = { storage: { local: { async get(k) { return k == null ? { ...store } : { [k]: store[k] }; }, async set(o) { Object.assign(store, o); }, async remove(k) { delete store[k]; } } } };
+  for (const src of SCRIPTS) win.eval(src);
+  win.HTMLElement.prototype.getClientRects = () => [{ width: 100, height: 20 }];
+  const doc = win.document, A = win.AvidAutofill;
+  A.fillers.sleep = async () => {};
+  let opened = 0;
+  doc.querySelector('[data-ui="education"] button').addEventListener("click", () => { opened++; doc.querySelector('[data-ui="education"]').insertAdjacentHTML("beforeend", '<label for="sc">School</label><input id="sc"><label for="fs">Field of study</label><input id="fs">'); });
+  doc.querySelector('[data-ui="experience"] button').addEventListener("click", () => { opened++; doc.querySelector('[data-ui="experience"]').insertAdjacentHTML("beforeend", '<label for="ti">Title</label><input id="ti"><label for="co">Company</label><input id="co">'); });
+  try {
+    const profile = A.mergeDefaults(A.DEFAULT_PROFILE, { education: [{ school: "State University", field: "Computer Science" }], work: [{ company: "Globex", title: "Software Engineer" }] });
+    await A.engine.fillPage(profile, A.DEFAULT_SETTINGS, null);
+    await A.engine.fillPage(profile, A.DEFAULT_SETTINGS, null);
+    assert.equal(opened, 2, "each section opens once, however many times Autofill runs");
+    assert.equal(doc.getElementById("sc").value, "State University");
+    assert.equal(doc.getElementById("fs").value, "Computer Science");
+    assert.equal(doc.getElementById("ti").value, "Software Engineer");
+    assert.equal(doc.getElementById("co").value, "Globex");
+  } finally { win.close(); }
+});
