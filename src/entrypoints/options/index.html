@@ -4,7 +4,8 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Avid Autofill | My Info</title>
-    <link rel="stylesheet" href="options.css" />
+    <meta name="manifest.open_in_tab" content="true" />
+    <link rel="stylesheet" href="../../options/options.css" />
   </head>
   <body>
     <div class="app-shell">
@@ -94,13 +95,6 @@
         <div class="save-bar"><div><b>Save your profile changes</b><span id="save-msg" class="io-msg" role="status" aria-live="polite"></span></div><button class="btn primary" id="save">Save changes</button></div>
       </main>
     </div>
-
-    <script src="../shared/schema.js"></script>
-    <script src="../shared/jev.js"></script>
-    <script src="../shared/tracker-model.js"></script>
-    <script src="options.js"></script>
-    <script src="connections.js"></script>
-    <script src="jev.js"></script>
-    <script src="anysite.js"></script>
+    <script type="module" src="./main.ts"></script>
   </body>
 </html>

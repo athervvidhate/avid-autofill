@@ -1,4 +1,4 @@
-import { test } from "node:test";
+import { test } from "vitest";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import vm from "node:vm";
@@ -14,7 +14,7 @@ const postingHtml = `<h1>Software Engineer</h1><form><label for="resume">Resume<
 const job = { company: "Acme", role: "Software Engineer", location: "Denver", url: "https://acme.test/careers/engineer" };
 const entry = { ...job, status: "Applied", applied: "2026-09-04", followUp: "", notes: "" };
 const sender = { id: "test", tab: { id: 1 }, frameId: 0, url: job.url };
-const admin = { id: "test", url: "chrome-extension://test/src/options/options.html" };
+const admin = { id: "test", url: "chrome-extension://test/options.html" };
 const connection = { sub: "account1", email: "person@example.test", connected: true, spreadsheetId: "sheet1", sheetId: 0, templateVersion: 1 };
 function detector(html = postingHtml, url = job.url) {
   const dom = new JSDOM(html, { url, runScripts: "outside-only", pretendToBeVisual: true });

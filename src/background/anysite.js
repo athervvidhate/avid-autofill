@@ -30,7 +30,7 @@
   chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (!msg || (msg.type !== "AVID_ANYSITE_STATE" && msg.type !== "AVID_ANYSITE_SET")) return;
     // Only the options page may change this.
-    if (sender.url?.split(/[?#]/)[0] !== chrome.runtime.getURL("src/options/options.html")) {
+    if (sender.url?.split(/[?#]/)[0] !== chrome.runtime.getURL("options.html")) {
       sendResponse({ ok: false, error: "Not allowed." });
       return;
     }

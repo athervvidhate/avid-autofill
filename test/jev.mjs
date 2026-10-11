@@ -1,4 +1,4 @@
-import { test } from "node:test";
+import { test } from "vitest";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import vm from "node:vm";
@@ -6,7 +6,7 @@ import { JSDOM } from "jsdom";
 
 const read = file => fs.readFileSync(new URL(`../${file}`, import.meta.url), "utf8");
 const clone = value => JSON.parse(JSON.stringify(value));
-const admin = { id: "avid-test", url: "chrome-extension://avid-test/src/options/options.html" };
+const admin = { id: "avid-test", url: "chrome-extension://avid-test/options.html" };
 const content = { id: "avid-test", tab: { id: 7 }, frameId: 0, url: "https://jobs.ashbyhq.com/acme/application" };
 function reply(request, choices = {}) {
   return { model: request.model, usage: { input_tokens: 100, output_tokens: 20 }, answers: Object.fromEntries(Object.entries(request.questions).map(([id, question]) => {
@@ -292,7 +292,7 @@ test("off mode and sensitive, legal, or custom controls never call Jev", async (
 });
 
 test("My Info saves approved scoped bank entries and exports no Jev key", async () => {
-  const dom = new JSDOM(read("src/options/options.html"), { runScripts: "outside-only", pretendToBeVisual: true, url: admin.url });
+  const dom = new JSDOM(read("src/entrypoints/options/index.html"), { runScripts: "outside-only", pretendToBeVisual: true, url: admin.url });
   const local = {};
   dom.window.chrome = { storage: { local: { async get(key) { return { [key]: local[key] }; }, async set(values) { Object.assign(local, clone(values)); } } } };
   for (const file of ["src/shared/schema.js", "src/shared/candidates.js", "src/shared/jev.js", "src/options/options.js"]) dom.window.eval(read(file));

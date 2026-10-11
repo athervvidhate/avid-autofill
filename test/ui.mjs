@@ -1,4 +1,4 @@
-import { test } from "node:test";
+import { test } from "vitest";
 import assert from "node:assert/strict";
 import { JSDOM } from "jsdom";
 import fs from "node:fs";
@@ -28,7 +28,7 @@ function chromeShim(sendMessage = () => {}, addListener = () => {}) {
 }
 
 function loadOptions() {
-  const html = fs.readFileSync(path.join(ROOT, "src/options/options.html"), "utf8");
+  const html = fs.readFileSync(path.join(ROOT, "src/entrypoints/options/index.html"), "utf8");
   const dom = new JSDOM(html, { runScripts: "outside-only", pretendToBeVisual: true });
   dom.window.chrome = chromeShim();
   dom.window.eval(fs.readFileSync(path.join(ROOT, "src/shared/schema.js"), "utf8"));

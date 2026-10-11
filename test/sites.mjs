@@ -3,7 +3,7 @@
 // are hand-built to match each site's markup, not captures, so they pin down
 // the layout patterns (table rows, label-less placeholders, question spans)
 // rather than any one company's form.
-import { test } from "node:test";
+import { test } from "vitest";
 import assert from "node:assert/strict";
 import { JSDOM } from "jsdom";
 import fs from "node:fs";

@@ -1,7 +1,7 @@
 (function () {
   const A = globalThis.AvidAutofill, J = A.jev;
   const active = new Set();
-  const optionsSender = sender => sender.id === chrome.runtime.id && sender.url?.split(/[?#]/)[0] === chrome.runtime.getURL("src/options/options.html");
+  const optionsSender = sender => sender.id === chrome.runtime.id && sender.url?.split(/[?#]/)[0] === chrome.runtime.getURL("options.html");
   async function state() {
     const settings = await A.getSettings(), stored = await chrome.storage.local.get(J.KEY);
     return { enabled: settings.jevEnabled === true, hasKey: !!stored[J.KEY], hasAccess: await chrome.permissions.contains({ origins: [J.ORIGIN] }) };
