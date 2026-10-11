@@ -34,6 +34,19 @@
     return window.CSS && CSS.escape ? CSS.escape(s) : s.replace(/"/g, '\\"');
   }
 
+  const CONTROLS = new Set(["INPUT", "TEXTAREA", "SELECT", "BUTTON"]);
+  function textWithoutControls(root) {
+    let out = "";
+    const walk = (n) => {
+      for (const child of n.childNodes) {
+        if (child.nodeType === 3) out += child.textContent;
+        else if (child.nodeType === 1 && !CONTROLS.has(child.tagName)) walk(child);
+      }
+    };
+    walk(root);
+    return out.replace(/\s+/g, " ").trim();
+  }
+
   // Text of the closest preceding block that looks like a question/label.
   function nearbyText(el) {
     let node = el;
@@ -41,11 +54,9 @@
       node = node.parentElement;
       if (!node) break;
       // A field group container often holds the question text as its first text.
-      const clone = node.cloneNode(true);
-      clone.querySelectorAll("input, textarea, select, button").forEach((n) =>
-        n.remove()
-      );
-      const t = clone.textContent.replace(/\s+/g, " ").trim();
+      // Read text nodes directly: cloning a number input that holds an
+      // unparseable value logs a console error.
+      const t = textWithoutControls(node);
       if (t.length > 2 && t.length < 220) return t;
     }
     return "";
@@ -57,6 +68,8 @@
   function groupSignal(radios) {
     const legend = radios[0].closest("fieldset")?.querySelector("legend");
     if (legend && legend.textContent.trim()) return norm(legend.textContent);
+    const title = groupTitle(radios);
+    if (title) return title;
     let node = radios[0].parentElement;
     while (node && !radios.every((r) => node.contains(r))) node = node.parentElement;
     for (let i = 0; i < 4 && node && node.parentElement; i++, node = node.parentElement) {
@@ -67,6 +80,36 @@
       if (norm(text).length > 2) return norm(text).slice(0, 300);
     }
     return signalFor(radios[0]);
+  }
+
+  // The question label of a radio group wrapped in a fieldset or role=radiogroup
+  // with no <legend> (Ashby): the first label in the group that is not one of the
+  // options. Without it the sibling-text fallback below sweeps up neighbouring
+  // questions and the group is answered as the wrong one.
+  function groupTitle(radios) {
+    const box = radios[0].closest('fieldset, [role="radiogroup"], [role="group"]');
+    if (!box) return "";
+    const named = norm(attr(box, "aria-label")) || fieldTitle(box);
+    if (named) return named;
+    const ids = new Set(radios.map((r) => r.id).filter(Boolean));
+    const label = Array.from(box.querySelectorAll("label")).find(
+      (l) => !ids.has(l.getAttribute("for")) && !l.querySelector("input") && norm(l.textContent)
+    );
+    return label ? norm(label.textContent) : "";
+  }
+
+  // Title of the form field entry holding a control (Ashby's data-field-path
+  // wrapper). Comboboxes and button pairs have no label pointing at them, and
+  // long questions overrun nearbyText's length cap.
+  function fieldTitle(el) {
+    const label = el.closest("[data-field-path]")?.querySelector("label, legend");
+    return label ? norm(label.textContent) : "";
+  }
+
+  // Question text for a container of Yes/No buttons: the field title, else the
+  // text around the buttons.
+  function choiceSignal(container) {
+    return fieldTitle(container) || norm(nearbyText(container) || container.getAttribute("aria-label"));
   }
 
   // Turn camelCase / snake_case / kebab-case identifiers into spaced words so
@@ -84,8 +127,9 @@
   // Aggregate signal string used for matching. Human-readable sources are used
   // as-is; identifier-like attributes are de-camelCased first.
   function signalFor(el) {
+    const labelled = labelTextFor(el);
     const human = [
-      labelTextFor(el),
+      labelled || fieldTitle(el),
       attr(el, "aria-label"),
       el.placeholder,
       nearbyText(el),
@@ -128,25 +172,29 @@
     { any: [/e-?mail/, /^email address$/], not: [/confirm|company/], get: (p) => p.personal.email },
     { any: [/phone device type/], kind: "select", get: (p) => p.personal.phoneDeviceType || "Mobile" },
     { any: [/phone/, /mobile/, /telephone/, /contact number/, /\bcell\b/], not: [/extension/, /device type/, /\bsms\b/, /opt.?in/, /phone code/, /country.*code/, /phonetic/], get: (p) => p.personal.phone },
-    { any: [/pronoun/], get: (p) => p.personal.pronouns },
+    { any: [/\bpronouns?\b/], not: [/pronounc|pronunciation|phonetic/], get: (p) => p.personal.pronouns },
 
     // --- Address ---
     { any: [/street address/, /address line ?1/, /^address$/, /mailing address/], not: [/email/], get: (p) => p.personal.address },
-    { any: [/\bcity\b/, /\btown\b/, /(^|\| )(current )?location( \||$)/, /(^|\| )current location\b/], not: [/velocity|capacity|ethnic/], expand: "place", get: (p) => p.personal.city },
+    { any: [/\bcity\b/, /\btown\b/, /(^|\| )(current )?location( \||$)/, /(^|\| )current location\b/, /\bwork location\b/, /where (are you|do you) (located|based|live)/], not: [/velocity|capacity|ethnic/], expand: "place", get: (p) => p.personal.city },
     { any: [/\bstate\b/, /\bprovince\b/, /\bregion\b/], not: [/statement|estate|united states|work/], expand: "usState", get: (p) => p.personal.state },
     { any: [/zip/, /postal code/, /post ?code/], get: (p) => p.personal.postalCode },
     { any: [/\b(located|location|based|living|reside|residing) in\b/], not: [/relocat|willing|commut|authoriz|work|time ?zone|hours/], kind: "yesno", get: (p, h, signal) => inListedCountry(signal, p.personal.country) },
+    // A second citizenship question offers "None" for the usual single one.
+    { any: [/(second|dual|additional|other) (country of )?citizenship/, /citizenship in a second/], get: () => "None" },
+    { any: [/citizenship/, /citizen of/, /nationality/], not: [/authoriz|sponsor|\bare you (a )?(u\.?s\.? )?citizen\b/], get: (p) => p.personal.citizenship || p.personal.country },
     { any: [/country/, /nationality/], not: [/authoriz/, /eligible to work/, /sponsor/, /work in the country/, /citizen/], get: (p) => p.personal.country },
 
     // --- Links ---
     { any: [/linkedin/], get: (p) => p.links.linkedin },
     { any: [/github/], not: [/contribution|repositor|project|describe|example/], get: (p) => p.links.github },
+    { any: [/work samples?/, /samples? of (your )?work/, /examples? of (your )?work/], not: [/describe|explain|tell us/], get: (p) => p.links.portfolio || p.links.website || p.links.github },
     { any: [/portfolio/, /personal (web)?site/, /^website$/, /web ?site url/], get: (p) => p.links.portfolio || p.links.website },
     { any: [/twitter|(^| )x( |$)/], get: (p) => p.links.twitter },
 
     // --- Current role / employer ---
     { any: [/current company/, /current employer/, /present employer/, /^company$/, /employer/], not: [/why|reason|previous|agreement|restriction/], get: (p, h) => h.work0().company },
-    { any: [/current title/, /current role/, /job title/, /^title$/, /current position/], not: [/mr\.?|mrs\.?|salutation/], get: (p, h) => h.work0().title },
+    { any: [/current title/, /current role/, /job title/, /^title$/, /current position/], not: [/mr\.?|mrs\.?|salutation/, /why|reason|leav|consider|looking for|seeking/], get: (p, h) => h.work0().title },
 
     // --- Education ---
     { any: [/school/, /university/, /college/, /institution/], not: [/high school diploma\?/, /are you/, /current.*student/, /enrolled/, /graduation/, /anticipated/], get: (p, h) => h.edu0().school },
@@ -163,9 +211,17 @@
 
     // --- Logistics ---
     { any: [/salary/, /compensation expectation/, /desired (pay|salary|compensation)/, /expected salary/], get: (p) => p.misc.salaryExpectation },
+    // Notice period first: it is a length of time, unlike an earliest start date.
+    { any: [/notice period/], duration: true, get: (p) => p.misc.noticePeriod || p.misc.earliestStartDate },
     { any: [/notice period/, /availability to start/, /when can you start/, /earliest start/, /start date/], get: (p) => p.misc.earliestStartDate || p.misc.noticePeriod },
     // General willingness only: a named destination or relocation assistance is a different question.
     { any: [/willing to relocate/, /open to relocat/, /relocat/], not: [/relocat\w* to \w/, /assistance|package|stipend|support/], kind: "yesno", get: (p) => p.misc.willingToRelocate },
+    // In-office attendance ("This role is onsite ... willing to work from our local office?").
+    { any: [/on-?site/, /in[- ]person/, /(work|working|come|commute|report)\w* (from|in|into|to|at)\b.{0,60}\boffice\b/], not: [/relocat/, /remote(ly)? (work|position|role)? ?only/], kind: "yesno", get: (p) => p.questions.willingOnsite },
+    { any: [/on-?call/], kind: "yesno", get: (p) => p.questions.willingOnCall },
+    { any: [/outside (work|employment|business|activit)/, /advisory (commitment|role|disclosure|position)/, /other (employment|jobs?) (commitments|outside)/, /moonlight/], kind: "yesno", get: (p) => p.questions.outsideEmployment },
+    { any: [/security clearance/, /active clearance/, /\bclearance (level|status)\b/], alts: ["No", "N/A", "Not applicable", "I do not hold", "I don't hold"], get: (p) => p.questions.securityClearance },
+    { any: [/work(ed|ing)? (in )?(a )?(fully )?remote/, /remote or hybrid/, /hybrid (work )?environment/], not: [/willing|open to|prefer/], get: (p) => p.questions.remoteExperience },
     { any: [/how did you (hear|find)/, /referral source/, /source/], not: [/open ?source/], get: (p) => p.misc.howHeard },
     { any: [/cover letter/], get: (p) => p.misc.coverLetter },
     { any: [/graduation date/, /anticipated graduation/, /expected graduation/, /grad(uation)? date/], get: (p, h) => p.misc.graduationDate || h.edu0().endDate },
@@ -256,20 +312,52 @@
     return "No";
   }
 
+  // A length of time as a [low, high] range in weeks: "2 weeks" -> [2, 2],
+  // "3-4 weeks" -> [3, 4], "3+ months" -> [13, Infinity], "Immediately" -> [0, 0].
+  const WORD_NUMBERS = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, eight: 8, twelve: 12, a: 1, an: 1 };
+  const UNIT_WEEKS = { day: 1 / 7, week: 1, month: 52 / 12, year: 52 };
+  function durationWeeks(text) {
+    const t = norm(text).replace(/\b(one|two|three|four|five|six|eight|twelve|an?)\b(?= ?(\+|or more)? ?(days?|weeks?|months?|years?))/g, (w) => WORD_NUMBERS[w]);
+    if (/\b(immediate(ly)?|right away|asap|none|no notice|n\/a)\b/.test(t)) return [0, 0];
+    const m = t.match(/(\d+(?:\.\d+)?)(?:\s*(?:-|–|to)\s*(\d+(?:\.\d+)?))?\s*(\+|or more)?\s*(day|week|month|year)s?/);
+    if (!m) return null;
+    const unit = UNIT_WEEKS[m[4]];
+    const low = Number(m[1]) * unit;
+    return [low, m[3] ? Infinity : (m[2] ? Number(m[2]) : Number(m[1])) * unit];
+  }
+  // Index of the option whose time range sits nearest the profile's, or -1.
+  function nearestDuration(value, labels) {
+    const want = durationWeeks(value);
+    if (!want) return -1;
+    let best = -1, bestGap = Infinity;
+    labels.forEach((label, i) => {
+      const range = durationWeeks(label);
+      if (!range) return;
+      const gap = Math.max(0, range[0] - want[1], want[0] - range[1]);
+      if (gap < bestGap - 1e-9) { best = i; bestGap = gap; }
+    });
+    return bestGap <= 1 ? best : -1;
+  }
+
+  // "If yes, please provide details ..." follows a yes/no question but is free text.
+  const FOLLOW_UP = /^if (yes|so|you answered|applicable)\b|\b(provide|explain|describe|list|specify)\b.{0,30}\b(details|detail|explanation|more)\b/;
+
   // Return { value, alts, kind, eeo, place } for a signal, or null if no rule matches.
   function match(signal, profile, helpers) {
     for (const rule of RULES) {
       if (rule.not && rule.not.some((re) => re.test(signal))) continue;
       if (rule.any.some((re) => re.test(signal))) {
+        if (rule.kind === "yesno" && FOLLOW_UP.test(signal)) continue;
         const value = rule.get(profile, helpers, signal);
         if (value == null || value === "") return null;
-        const alts = rule.expand === "usState" ? stateAlternates(value) : rule.expand === "place" ? placeAlternates(value, profile) : [];
-        return { value: String(value), alts, kind: rule.kind || "text", eeo: !!rule.eeo, assumed: !!rule.assumed, place: rule.expand === "place" };
+        // "None" clearance reads as "No" on a yes/no control, and so on.
+        const alts = rule.expand === "usState" ? stateAlternates(value) : rule.expand === "place" ? placeAlternates(value, profile) : /^none$/i.test(value) ? rule.alts || [] : [];
+        return { value: String(value), alts, duration: !!rule.duration, kind: rule.kind || "text", eeo: !!rule.eeo, assumed: !!rule.assumed, place: rule.expand === "place" };
       }
     }
     return null;
   }
 
   AvidAutofill.labelTextFor = labelTextFor;
-  AvidAutofill.matcher = { signalFor, groupSignal, match, makeHelpers: P, norm, deCamel };
+  AvidAutofill.matcher = { signalFor, groupSignal, choiceSignal, match, nearestDuration, makeHelpers: P, norm, deCamel };
 })();

@@ -41,6 +41,20 @@
         !!document.querySelector('[class*="_container_"] form, [data-highlight="ashby"]'),
       // Ashby uses ARIA comboboxes.
       customSelectSelectors: ['[role="combobox"]', '[class*="_select_"]'],
+      // An uploaded resume starts Ashby's own parse, which rewrites the form when
+      // it finishes. Wait for the parse to start (if it does) and to end.
+      async resumeParse(sleep) {
+        // The "Parsing your resume" layer is data-state="hidden" while idle.
+        const pending = () => {
+          const layer = document.querySelector(".ashby-application-form-autofill-input-pending-layer");
+          return !!layer && layer.getAttribute("data-state") !== "hidden";
+        };
+        let started = false;
+        for (let i = 0; i < 15 && !started; i++) { await sleep(200); started = !!pending(); }
+        if (!started) return;
+        for (let i = 0; i < 150 && pending(); i++) await sleep(200);
+        await sleep(600);
+      },
     },
     {
       name: "Workday",
