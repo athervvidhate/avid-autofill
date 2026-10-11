@@ -322,11 +322,11 @@ test("My Info saves approved scoped bank entries and exports no Jev key", async 
 
 test("live evaluation cases have a consistent oracle and grading", () => {
   const context = vm.createContext({ URL, TextEncoder });
-  for (const file of ["src/shared/jev.js", "test/live/jev-cases.js", "test/live/jev-eval.js"]) vm.runInContext(read(file), context);
+  for (const file of ["src/shared/candidates.js", "src/shared/jev.js", "test/live/jev-cases.js", "test/live/jev-eval.js"]) vm.runInContext(read(file), context);
   const J = context.AvidAutofill.jev, grade = context.JEV_GRADE, ids = new Set();
   for (const c of context.JEV_CASES) {
     assert.ok(!ids.has(c.id), `duplicate case ${c.id}`); ids.add(c.id);
-    const sources = J.sourcesFor(c.profile || context.JEV_PROFILE, c.pageUrl);
+    const sources = J.sourcesFor(c.profile || context.JEV_PROFILE, c.pageUrl, c.job);
     J.cleanFields(c.fields);
     for (const field of c.fields) {
       if (field.expect === null) continue;
