@@ -35,12 +35,12 @@
   }
 
   const CONTROLS = new Set(["INPUT", "TEXTAREA", "SELECT", "BUTTON"]);
-  function textWithoutControls(root) {
+  function textWithoutControls(root, skipLabels) {
     let out = "";
     const walk = (n) => {
       for (const child of n.childNodes) {
         if (child.nodeType === 3) out += child.textContent;
-        else if (child.nodeType === 1 && !CONTROLS.has(child.tagName)) walk(child);
+        else if (child.nodeType === 1 && !CONTROLS.has(child.tagName) && !(skipLabels && child.tagName === "LABEL")) walk(child);
       }
     };
     walk(root);
@@ -53,6 +53,9 @@
     for (let i = 0; i < 4 && node; i++) {
       node = node.parentElement;
       if (!node) break;
+      // Text of a container shared with other fields belongs to all of them, so
+      // an ancestor holding several controls cannot name this one.
+      if (node.querySelectorAll("input:not([type=hidden]), textarea, select").length > 1) break;
       // A field group container often holds the question text as its first text.
       // Read text nodes directly: cloning a number input that holds an
       // unparseable value logs a console error.
@@ -72,6 +75,12 @@
     if (title) return title;
     let node = radios[0].parentElement;
     while (node && !radios.every((r) => node.contains(r))) node = node.parentElement;
+    // A question written beside its choices (a span before the radio labels)
+    // sits inside the smallest container, so read it before looking outward.
+    if (node) {
+      const inside = norm(textWithoutControls(node, true));
+      if (inside.length > 2 && inside.length < 300) return inside;
+    }
     for (let i = 0; i < 4 && node && node.parentElement; i++, node = node.parentElement) {
       const text = Array.from(node.parentElement.childNodes)
         .filter((child) => child !== node)
@@ -175,10 +184,12 @@
     { any: [/\bpronouns?\b/], not: [/pronounc|pronunciation|phonetic/], get: (p) => p.personal.pronouns },
 
     // --- Address ---
-    { any: [/street address/, /address line ?1/, /^address$/, /mailing address/], not: [/email/], get: (p) => p.personal.address },
+    { any: [/(primary |permanent |current )?(residence|residential|home) address/, /address of (your )?(primary )?residence/], get: (p) => fullAddress(p.personal) },
+    { any: [/street address/, /address line ?1/, /(^|\| )address( \||$)/, /mailing address/], not: [/email/], get: (p) => p.personal.address },
     { any: [/\bcity\b/, /\btown\b/, /(^|\| )(current )?location( \||$)/, /(^|\| )current location\b/, /\bwork location\b/, /where (are you|do you) (located|based|live)/], not: [/velocity|capacity|ethnic/], expand: "place", get: (p) => p.personal.city },
     { any: [/\bstate\b/, /\bprovince\b/, /\bregion\b/], not: [/statement|estate|united states|work/], expand: "usState", get: (p) => p.personal.state },
     { any: [/zip/, /postal code/, /post ?code/], get: (p) => p.personal.postalCode },
+    { any: [/\bresident of\b/, /\bdo you (live|reside) in\b/], not: [/relocat|willing/], kind: "yesno", get: (p, h, signal) => residentOfState(signal, p.personal.state) },
     { any: [/\b(located|location|based|living|reside|residing) in\b/], not: [/relocat|willing|commut|authoriz|work|time ?zone|hours/], kind: "yesno", get: (p, h, signal) => inListedCountry(signal, p.personal.country) },
     // A second citizenship question offers "None" for the usual single one.
     { any: [/(second|dual|additional|other) (country of )?citizenship/, /citizenship in a second/], get: () => "None" },
@@ -193,10 +204,11 @@
     { any: [/twitter|(^| )x( |$)/], get: (p) => p.links.twitter },
 
     // --- Current role / employer ---
-    { any: [/current company/, /current employer/, /present employer/, /^company$/, /employer/], not: [/why|reason|previous|agreement|restriction/], get: (p, h) => h.work0().company },
-    { any: [/current title/, /current role/, /job title/, /^title$/, /current position/], not: [/mr\.?|mrs\.?|salutation/, /why|reason|leav|consider|looking for|seeking/], get: (p, h) => h.work0().title },
+    { any: [/current company/, /current employer/, /present employer/, /(^|\| )company( \||$)/, /employer/], not: [/why|reason|previous|agreement|restriction/], get: (p, h) => h.work0().company },
+    { any: [/current title/, /current role/, /job title/, /(^|\| )title( \||$)/, /current position/], not: [/mr\.?|mrs\.?|salutation/, /why|reason|leav|consider|looking for|seeking/], get: (p, h) => h.work0().title },
 
     // --- Education ---
+    { any: [/which (university|college|school)/, /(university|college|school) (did|do) you (last )?(attend|graduate)/, /last attended/], get: (p, h) => h.edu0().school },
     { any: [/school/, /university/, /college/, /institution/], not: [/high school diploma\?/, /are you/, /current.*student/, /enrolled/, /graduation/, /anticipated/], get: (p, h) => h.edu0().school },
     { any: [/degree/], get: (p, h) => h.edu0().degree },
     { any: [/major/, /field of study/, /discipline/], get: (p, h) => h.edu0().field || h.edu0().degree },
@@ -206,11 +218,11 @@
     // --- Work authorization (yes/no) ---
     // Sponsorship before authorization: sponsorship questions often say "work
     // authorization", while "authorized ... without sponsorship" asks about authorization.
-    { any: [/require sponsor/, /need sponsor/, /visa sponsor/, /sponsorship( now| in the future)?/], not: [/without (\w+ )?sponsor/], kind: "yesno", get: (p) => p.workAuth.requireSponsorship },
+    { any: [/require\b.{0,40}\bsponsor/, /\bsponsor (you|me)\b/, /require sponsor/, /need sponsor/, /visa sponsor/, /sponsorship( now| in the future)?/], not: [/without (\w+ )?sponsor/], kind: "yesno", get: (p) => p.workAuth.requireSponsorship },
     { any: [/authoriz(ed|ation) to work/, /legally authorized/, /eligible to work/, /work authorization/], not: [/temporary/, /\bopt\b/, /\bcpt\b/, /practical training/], kind: "yesno", get: (p) => p.workAuth.authorizedToWork },
 
     // --- Logistics ---
-    { any: [/salary/, /compensation expectation/, /desired (pay|salary|compensation)/, /expected salary/], get: (p) => p.misc.salaryExpectation },
+    { any: [/salary/, /compensation expectation/, /desired (pay|salary|compensation)/, /expected salary/, /expected (annual |total )?(package|pay|compensation|ctc)/, /annual (package|compensation|pay)\b/, /(pay|compensation) (range|expectations?)/, /\bctc\b/], not: [/relocat|bonus eligib/], get: (p) => p.misc.salaryExpectation },
     // Notice period first: it is a length of time, unlike an earliest start date.
     { any: [/notice period/], duration: true, get: (p) => p.misc.noticePeriod || p.misc.earliestStartDate },
     { any: [/notice period/, /availability to start/, /when can you start/, /earliest start/, /start date/], get: (p) => p.misc.earliestStartDate || p.misc.noticePeriod },
@@ -228,19 +240,23 @@
 
     // --- Common yes/no application questions (Tesla-style legal/consent step) ---
     { any: [/(relatives?|family|friends?|close personal relationships?).*(employed|work(s|ing)?) (by|at|for|with)/, /(employed|work(s|ing)?) (by|at|for|with).*(relatives?|family members?)/, /related to (anyone|an employee|any employee)/], kind: "yesno", assumed: true, get: (p) => p.questions.relativesAtCompany },
-    { any: [/previously (been )?employed/, /\bhave you (ever )?worked (at|for|with)\b/, /currently or have you worked (at|for)/, /previously worked (here|for|at)/, /former employee/, /worked (here|for us) before/, /previous worker/], kind: "yesno", assumed: true, get: (p) => p.questions.previouslyEmployedHere },
+    { any: [/previously (been )?employed/, /\bhave you (ever )?worked (at|for)\b/, /\bhave you (ever )?worked with (us|our company|this company)\b/, /currently or have you worked (at|for)/, /previously worked (here|for|at)/, /former employee/, /worked (here|for us) before/, /previous worker/], kind: "yesno", assumed: true, get: (p) => p.questions.previouslyEmployedHere },
     { any: [/intern or contractor/, /current or former (intern|contractor)/, /former\/current (intern|contractor)/, /contractor/], kind: "yesno", get: (p) => p.questions.formerContractorOrIntern },
     { any: [/current(ly)? (a )?(university |college )?student/, /currently enrolled/, /enrolled in an academic/, /pursuing a degree/], kind: "yesno", get: (p) => p.questions.currentStudent },
+    { any: [/note ?taker/, /(record|transcrib)\w*.*(interview|conversation|call)/, /(interview|conversation|call).*(record|transcrib)\w*/], kind: "yesno", get: (p) => p.questions.consentToRecording },
     { any: [/text message/, /sms/, /consent to receiv/, /receive.*(notification|message)/], kind: "yesno", get: (p) => p.questions.consentToContact },
     { any: [/consider me for other/, /other (job )?opportunities/, /other (roles|positions)/, /additional (roles|positions|opportunities)/], kind: "yesno", get: (p) => p.questions.consentToOtherRoles },
     { any: [/at least 18/, /over 18/, /\b18 (years|or older)/, /age of majority/, /legally an adult/], kind: "yesno", get: (p) => p.questions.over18 },
 
+    // A signature date on a form is the day it is filled in.
+    { any: [/signature date/, /(^|\| )date( \||$)/], not: [/birth|start|end|graduat|availab|expir|issue/], get: (p, h, signal) => todayFor(signal) },
+
     // --- Voluntary self-ID (only fired when settings.fillEEO) ---
     { eeo: true, any: [/gender/, /gender identity/, /\bsex\b/], get: (p) => p.eeo.gender },
-    { eeo: true, any: [/hispanic|latino/], kind: "yesno", get: (p) => p.eeo.hispanicLatino },
+    { eeo: true, any: [/hispanic|latino/], not: [/\brace\b/], kind: "yesno", get: (p) => p.eeo.hispanicLatino },
     { eeo: true, any: [/race|ethnicit/], get: (p) => p.eeo.race },
-    { eeo: true, any: [/veteran/], get: (p) => p.eeo.veteranStatus },
-    { eeo: true, any: [/disabilit/], get: (p) => p.eeo.disabilityStatus },
+    { eeo: true, any: [/veteran/], expand: "veteran", get: (p) => p.eeo.veteranStatus },
+    { eeo: true, any: [/disabilit/], expand: "disability", get: (p) => p.eeo.disabilityStatus },
   ];
 
   // US state <-> abbreviation, so a "CA" profile fills a "California" dropdown
@@ -272,6 +288,19 @@
     }
     const ab = US_STATES[v.toLowerCase()];
     return ab ? [ab] : [];
+  }
+
+  // Self-ID dropdowns word their options as sentences ("I am not a protected
+  // veteran"), so a short saved answer also tries the common sentence forms.
+  function selfIdAlternates(kind, value) {
+    const v = norm(value);
+    const no = /^(no|none|not|non)\b/.test(v) || /\bnot\b/.test(v) && !/decline|prefer/.test(v);
+    const decline = /decline|prefer not|do not wish|don't wish|not to (answer|say|disclose)/.test(v);
+    const noun = kind === "veteran" ? "veteran" : "disability";
+    if (decline) return ["i decline to self-identify", "i do not wish to answer", "i do not want to answer", "i prefer not to answer", "i choose not to disclose", "decline to self-identify", "prefer not to answer"];
+    if (no) return kind === "veteran" ? ["i am not a protected veteran", "not a protected veteran", "i am not a veteran", "no"] : ["no, i do not have a disability", "i do not have a disability", "no"];
+    if (/^(yes|y)$/.test(v) || v.includes("protected") || v.includes("have a")) return kind === "veteran" ? ["i am a protected veteran", "i identify as one or more of the classifications of protected veteran", "yes"] : ["yes, i have a disability", "yes, i have a disability, or have had one in the past", "yes"];
+    return [];
   }
 
   // "City, State" spellings for location autocompletes, full state name first,
@@ -310,6 +339,34 @@
     if (named.has(own)) return "Yes";
     if (!named.size || /\bu\.?s\b/.test(text)) return null;
     return "No";
+  }
+
+  // Today's date in the order the field's placeholder shows (default month/day/year).
+  function todayFor(signal) {
+    const d = new Date(), y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, "0"), day = String(d.getDate()).padStart(2, "0");
+    if (/yyyy-mm-dd/.test(signal)) return `${y}-${m}-${day}`;
+    if (/dd\/mm\/yyyy/.test(signal)) return `${day}/${m}/${y}`;
+    return `${m}/${day}/${y}`;
+  }
+  function fullAddress(personal) {
+    const stateZip = [personal.state, personal.postalCode].filter(Boolean).join(" ");
+    return [personal.address, personal.city, stateZip, personal.country].filter(Boolean).join(", ");
+  }
+  // True for a question a yes/no answer can answer: it opens with an auxiliary
+  // verb in some line of its text and does not ask where, which, what, when or how.
+  function looksYesNo(signal) {
+    return /(^|\| )(are|do|does|did|have|has|will|would|can|could|is|was|were)\b/.test(signal) && !/\b(where|which|what|when|how)\b/.test(signal);
+  }
+
+  // "Yes" when the question names the applicant's state, "No" when it names
+  // only other states, null when it names none or the profile has no state.
+  function residentOfState(signal, state) {
+    const v = norm(state);
+    const own = US_STATES[v] ? v : Object.keys(US_STATES).find((name) => US_STATES[name].toLowerCase() === v);
+    if (!own) return null;
+    const named = Object.keys(US_STATES).filter((name) => new RegExp(`\\b${name}\\b`).test(signal));
+    if (!named.length) return null;
+    return named.includes(own) ? "Yes" : "No";
   }
 
   // A length of time as a [low, high] range in weeks: "2 weeks" -> [2, 2],
@@ -351,7 +408,7 @@
         const value = rule.get(profile, helpers, signal);
         if (value == null || value === "") return null;
         // "None" clearance reads as "No" on a yes/no control, and so on.
-        const alts = rule.expand === "usState" ? stateAlternates(value) : rule.expand === "place" ? placeAlternates(value, profile) : /^none$/i.test(value) ? rule.alts || [] : [];
+        const alts = rule.expand === "veteran" || rule.expand === "disability" ? selfIdAlternates(rule.expand, value) : rule.expand === "usState" ? stateAlternates(value) : rule.expand === "place" ? placeAlternates(value, profile) : /^none$/i.test(value) ? rule.alts || [] : [];
         return { value: String(value), alts, duration: !!rule.duration, kind: rule.kind || "text", eeo: !!rule.eeo, assumed: !!rule.assumed, place: rule.expand === "place" };
       }
     }
@@ -359,5 +416,5 @@
   }
 
   AvidAutofill.labelTextFor = labelTextFor;
-  AvidAutofill.matcher = { signalFor, groupSignal, choiceSignal, match, nearestDuration, makeHelpers: P, norm, deCamel };
+  AvidAutofill.matcher = { signalFor, groupSignal, choiceSignal, match, looksYesNo, nearestDuration, makeHelpers: P, norm, deCamel };
 })();
