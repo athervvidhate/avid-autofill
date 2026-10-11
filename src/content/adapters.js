@@ -5,7 +5,8 @@
 //
 // Greenhouse, Lever, Ashby, and SmartRecruiters add custom-dropdown selectors to
 // the generic engine. Workday is a beta adapter with its own date and repeater
-// passes. iCIMS, Taleo, and Workable are detection-only stubs.
+// passes. iCIMS, Taleo, Workable, Jobvite, BambooHR, Breezy, Recruitee, JazzHR,
+// Teamtailor, and Paylocity are detection-only stubs.
 (function () {
   const AvidAutofill = (globalThis.AvidAutofill = globalThis.AvidAutofill || {});
 
@@ -23,6 +24,12 @@
         !!document.querySelector('#application_form, [id^="job_application"]'),
       // Greenhouse uses react-select for department/location/custom dropdowns.
       customSelectSelectors: ['[class*="select__control"]'],
+    },
+    {
+      name: "Breezy",
+      stub: true,
+      detect: () => /breezy\.hr/.test(location.host),
+      customSelectSelectors: [],
     },
     {
       name: "Lever",
@@ -72,6 +79,42 @@
       hasDateSections: true,
     },
     // --- Detection-only stubs ---
+    {
+      name: "Jobvite",
+      stub: true,
+      detect: () => /jobvite\.com/.test(location.host),
+      customSelectSelectors: [],
+    },
+    {
+      name: "BambooHR",
+      stub: true,
+      detect: () => /bamboohr\.com/.test(location.host),
+      customSelectSelectors: [],
+    },
+    {
+      name: "Recruitee",
+      stub: true,
+      detect: () => /recruitee\.com/.test(location.host),
+      customSelectSelectors: [],
+    },
+    {
+      name: "JazzHR",
+      stub: true,
+      detect: () => /applytojob\.com|jazz\.co/.test(location.host),
+      customSelectSelectors: [],
+    },
+    {
+      name: "Teamtailor",
+      stub: true,
+      detect: () => /teamtailor\.com/.test(location.host),
+      customSelectSelectors: [],
+    },
+    {
+      name: "Paylocity",
+      stub: true,
+      detect: () => /paylocity\.com/.test(location.host),
+      customSelectSelectors: [],
+    },
     {
       name: "iCIMS",
       stub: true,

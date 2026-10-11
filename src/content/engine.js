@@ -74,6 +74,10 @@
       await AvidAutofill.workday.popoverDatePass(profile, { matcher, helpers, fillers, record });
     }
 
+    // Breezy renders every work and education entry up front as `li.experience`
+    // rows, so each row takes the matching profile entry instead of entry 0.
+    if (adapter.name === "Breezy") breezyEntries(profile, fillers, record, handled);
+
     // --- 1. Custom (react-select / combobox / Workday) dropdowns first, so their
     //        inner <input> is marked handled before the text pass sees it.
     //        Runs twice: selecting Country reveals the State dropdown, etc. ---
@@ -116,6 +120,15 @@
       if (!r.name) return;
       (radioGroups[r.name] = radioGroups[r.name] || []).push(r);
     });
+    // Yes/No written as two checkboxes (Lever) are one choice, like radios.
+    const choiceLabel = /^(yes|no|prefer not to say|decline to answer|n\/a)$/;
+    const boxes = {};
+    F().queryAll('input[type="checkbox"]').forEach((c) => {
+      if (c.name) (boxes[c.name] = boxes[c.name] || []).push(c);
+    });
+    for (const [name, group] of Object.entries(boxes)) {
+      if (group.length >= 2 && group.length <= 3 && group.every((c) => choiceLabel.test(matcher.norm(AvidAutofill.labelTextFor(c) || c.value)))) radioGroups[`checkbox:${name}`] = group;
+    }
     for (const name of Object.keys(radioGroups)) {
       const group = radioGroups[name].filter(isVisible);
       if (!group.length) continue;
@@ -193,6 +206,11 @@
         continue;
 
       const signal = matcher.signalFor(el);
+      if (type === "checkbox" && languageBox(el, profile, matcher)) {
+        const ok = fillers.setCheckbox(el, true);
+        record(signal, "checked", ok ? "filled" : "skipped");
+        continue;
+      }
       const m = matcher.match(signal, profile, helpers);
       if (!m && type === "checkbox" && acknowledgement(el, settings)) {
         fillers.setCheckbox(el, true);
@@ -201,6 +219,8 @@
       }
       if (!m) { unmatched.push({ el, signal }); continue; }
       if (m.eeo && !settings.fillEEO) continue;
+      // A yes/no answer cannot answer a free-text question.
+      if (m.kind === "yesno" && (el.tagName === "TEXTAREA" || (el.tagName === "INPUT" && /^(text|)$/.test(type) && !matcher.looksYesNo(signal)))) { unmatched.push({ el, signal }); continue; }
 
       // Respect existing content unless overwrite is on.
       const hasValue =
@@ -221,8 +241,11 @@
           }
           record(signal, m.value, ok ? (m.assumed ? "assumed" : "filled") : "no-option-match");
         } else if (type === "checkbox") {
+          // A text rule ("email", "phone") matching a checkbox's label is only
+          // a keyword hit, so such a box is left for the applicant.
+          if (m.kind !== "yesno") { unmatched.push({ el, signal }); continue; }
           // Affirmative yes/no answers tick the box; negatives leave it.
-          const want = m.kind === "yesno" ? isAffirmative(m.value) : true;
+          const want = isAffirmative(m.value);
           const ok = fillers.setCheckbox(el, want);
           record(signal, want ? "checked" : "unchecked", ok ? "filled" : "skipped");
         } else if (m.place && adapter.locationSearch && el.matches(adapter.locationSearch)) {
@@ -256,6 +279,48 @@
       results,
       aiMessage,
     };
+  }
+
+  // "Jun 2025" -> "2025-06-01", "2023" -> "2023-01-01" (or -12-01 as an end date),
+  // for date inputs. Open-ended values such as "Present" give "".
+  function isoMonth(text, end) {
+    const t = String(text || "").trim().toLowerCase();
+    const year = t.match(/\b(19|20)\d{2}\b/);
+    if (!year) return "";
+    const monthIndex = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"].findIndex((m) => t.includes(m));
+    const numeric = t.match(/^(\d{1,2})[\/-](?:19|20)\d{2}$/);
+    const month = monthIndex >= 0 ? monthIndex + 1 : numeric ? Number(numeric[1]) : end ? 12 : 1;
+    return month >= 1 && month <= 12 ? `${year[0]}-${String(month).padStart(2, "0")}-01` : "";
+  }
+
+  function breezyEntries(profile, fillers, record, handled) {
+    const SECTIONS = [
+      { model: "candidatePosition", entries: profile.work, fields: { company_name: (e) => e.company, title: (e) => e.title, summary: (e) => e.description, date_start: (e) => isoMonth(e.startDate, false), date_end: (e) => (e.current ? "" : isoMonth(e.endDate, true)) } },
+      { model: "candidateSchool", entries: profile.education, fields: { school_name: (e) => e.school, field_of_study: (e) => e.field || e.degree, date_start: (e) => isoMonth(e.startDate, false), date_end: (e) => isoMonth(e.endDate, true) } },
+    ];
+    for (const { model, entries, fields } of SECTIONS) {
+      const rows = fillers.queryAll("li").filter((li) => li.querySelector(`[ng-model^="${model}."]`));
+      rows.forEach((row, i) => {
+        for (const input of row.querySelectorAll(`[ng-model^="${model}."]`)) {
+          handled.add(input);
+          const entry = entries[i], get = fields[input.getAttribute("ng-model").slice(model.length + 1)];
+          const value = entry && get ? get(entry) : "";
+          if (!value || input.value) continue;
+          fillers.setTextValue(input, value);
+          record(`${model.replace("candidate", "").toLowerCase()} ${i + 1} ${input.getAttribute("ng-model").split(".")[1].replace(/_/g, " ")}`, value, input.value ? "filled" : "skipped");
+        }
+      });
+    }
+  }
+
+  // A box in a "languages" checklist whose label names a language the profile lists.
+  function languageBox(el, profile, matcher) {
+    const wanted = String(profile.misc.languages || "").toLowerCase().split(/[,;]/).map((l) => l.trim()).filter(Boolean);
+    if (!wanted.length || !el.name) return false;
+    const group = Array.from(el.getRootNode().querySelectorAll('input[type="checkbox"]')).filter((c) => c.name === el.name);
+    if (group.length < 2 || !/language/.test(matcher.groupSignal(group))) return false;
+    const label = (AvidAutofill.labelTextFor(el) || el.value).toLowerCase();
+    return wanted.some((l) => new RegExp(`\\b${l.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`).test(label));
   }
 
   // Find the resume file input and inject the stored resume. File inputs are
