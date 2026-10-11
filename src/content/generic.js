@@ -38,7 +38,7 @@
 
   function visible(el) {
     return !!el && !el.disabled && el.type !== "hidden" && el.getAttribute("aria-hidden") !== "true" &&
-      (el.offsetParent !== null || el.getClientRects().length > 0);
+      A.fillers.isRendered(el);
   }
 
   // Score the page's form fields. An application needs the basics a candidate
