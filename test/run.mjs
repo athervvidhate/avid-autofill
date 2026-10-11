@@ -11,7 +11,7 @@
 //
 // Where a real Workday field does not map under current rules, the suite records
 // that behavior explicitly. Calendar-popover-only dates remain tracked in #8.
-import { test } from "node:test";
+import { test } from "vitest";
 import assert from "node:assert/strict";
 import { JSDOM } from "jsdom";
 import fs from "node:fs";

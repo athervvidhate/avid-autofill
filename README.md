@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="icons/icon-128.png" width="88" height="88" alt="Avid Autofill" />
+<img src="public/icons/icon-128.png" width="88" height="88" alt="Avid Autofill" />
 
 # Avid Autofill
 
@@ -13,7 +13,7 @@ review, then submit. Your profile lives in your browser. An optional Google Shee
 connection tracks applications after you approve each entry.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Manifest V3](https://img.shields.io/badge/Manifest-V3-34a853.svg)](manifest.json)
+[![Manifest V3](https://img.shields.io/badge/Manifest-V3-34a853.svg)](wxt.config.ts)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-6b93ff.svg)](#contributing)
 ![Privacy: local profile](https://img.shields.io/badge/profile-local-12894a.svg)
 
@@ -90,12 +90,17 @@ Until the Chrome Web Store listing is live, load it unpacked:
 ```bash
 git clone https://github.com/athervvidhate/avid-autofill.git
 cd avid-autofill
+npm install
+npm run build
 ```
 
 1. Open `chrome://extensions`
 2. Toggle **Developer mode** (top right)
-3. **Load unpacked** and select the `avid-autofill` folder
+3. **Load unpacked** and select the `.output/chrome-mv3` folder
 4. The My Info page opens - add your details, or import a profile (below)
+
+For development, `npm run dev` rebuilds on save and reloads the extension.
+`npm run zip` produces the package to upload to the Chrome Web Store.
 
 ## Usage
 
@@ -244,12 +249,20 @@ version.
 - [x] Optional Jev matching of approved saved answers for native fields
 - [ ] Optional generation of new answers to open-ended questions
 - [ ] Per-site field-mapping overrides and multiple profiles
+- [ ] Redesigned drawer and My Info page, after the TypeScript migration
 - [ ] Chrome Web Store release
 
 See [open issues](https://github.com/athervvidhate/avid-autofill/issues) for the
 current queue.
 
 ## Contributing
+
+The extension builds with [WXT](https://wxt.dev) (Vite) and TypeScript. Entry
+points live in `src/entrypoints`, and the manifest is generated from
+`wxt.config.ts` and those entry points. Before a pull request, run
+`npm run typecheck`, `npm run lint` and `npm test` (Vitest). `npm run
+test:browser` builds the extension and runs the Chromium smoke tests; set
+`AVID_BROWSER` to a Chromium executable.
 
 Contributions are welcome. Adding an ATS adapter or a field-matching rule is a
 great first PR:

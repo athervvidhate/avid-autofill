@@ -1,5 +1,5 @@
 // Real Chromium smoke test, no Google account or personal browser profile used.
-// Run: AVID_BROWSER=/path/to/chromium node test/tracker-browser.mjs
+// Run: npm run build && AVID_BROWSER=/path/to/chromium node test/tracker-browser.mjs
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -12,8 +12,7 @@ const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const scratch = await fs.mkdtemp(path.join(os.tmpdir(), "avid-tracker-browser-"));
 const extension = path.join(scratch, "extension");
 const profile = path.join(scratch, "profile");
-await fs.mkdir(extension);
-for (const file of ["src", "icons", "manifest.json"]) await fs.cp(path.join(repo, file), path.join(extension, file), { recursive: true });
+await fs.cp(path.join(repo, ".output/chrome-mv3"), extension, { recursive: true });
 const manifest = JSON.parse(await fs.readFile(path.join(extension, "manifest.json"), "utf8"));
 // Headless Chromium cannot show the native host-permission consent dialog.
 // This temporary copy represents a user who already granted broad career-site access.
@@ -49,7 +48,7 @@ async function cdp(url) {
 try {
   const port = await until(async () => Number((await fs.readFile(path.join(profile, "DevToolsActivePort"), "utf8")).split("\n")[0]), "browser");
   const targets = async () => (await fetch(`http://127.0.0.1:${port}/json/list`)).json();
-  const workerTarget = await until(async () => (await targets()).find(t => t.type === "service_worker" && t.url.includes("src/background/service-worker.js")), "extension service worker");
+  const workerTarget = await until(async () => (await targets()).find(t => t.type === "service_worker" && t.url.endsWith("/background.js")), "extension service worker");
   const worker = await cdp(workerTarget.webSocketDebuggerUrl);
   const base = `chrome-extension://${new URL(workerTarget.url).host}`;
   const optionsTarget = await until(async () => (await targets()).find(t => t.url.startsWith(base) && t.url.includes("options.html")), "Connections page");
