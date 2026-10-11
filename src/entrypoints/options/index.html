@@ -65,12 +65,12 @@
           <label class="tracker-toggle"><input type="checkbox" id="anysite-enabled"><span><b>Offer autofill on any job site</b><small>Show the Avid drawer on company career pages and platforms Avid does not know, whenever the page looks like a job application. Enabling this asks for access to HTTP and HTTPS pages. Nothing is sent anywhere, and Avid still never submits for you.</small></span></label>
           <p id="anysite-msg" role="status" aria-live="polite"></p>
           <details id="google-setup" hidden>
-            <summary>Google connection setup for this unpacked build</summary>
-            <p>The extension needs a Google OAuth web client ID before sign-in can work. This is a one-time developer setup, not a client secret.</p>
+            <summary>Advanced: use your own Google client</summary>
+            <p id="google-setup-intro"></p>
             <ol><li>In <a href="https://console.cloud.google.com/apis/library" target="_blank" rel="noopener noreferrer">Google Cloud</a>, enable the Google Sheets API and Google Drive API.</li><li>Configure Google Auth Platform branding and audience. While the app is in testing, add the Google account you will use as a test user.</li><li>Create a Web application OAuth client and add the exact authorized redirect URI below. Allow the drive.file, openid, and email scopes.</li></ol>
             <label class="field">Authorized redirect URI<input id="google-redirect" readonly></label>
             <label class="field split-top">OAuth web client ID<input id="google-client-id" placeholder="...apps.googleusercontent.com" autocomplete="off"></label>
-            <button class="btn secondary split-top" id="google-client-save">Save client ID</button>
+            <div class="io-actions split-top"><button class="btn secondary" id="google-client-save">Save client ID</button><button class="btn danger-quiet" id="google-client-reset" hidden>Use built-in connection</button></div>
           </details>
         </section>
 

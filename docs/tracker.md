@@ -72,25 +72,33 @@ move to another Google account.
 
 ## Google connection setup
 
-A release needs one Google OAuth web client configured by its maintainer. End
-users then only connect their Google account. An unpacked build also supports
-saving that public client ID in Connections.
+**Users:** click **Connect Google and create tracker**. Nothing else. The
+extension ships with a project-owned OAuth client and a pinned extension ID
+(`manifest.key` in `wxt.config.ts`), so the redirect URI is always
+`https://hlakbjlejclnadcmikjpinjkagkkjgpn.chromiumapp.org/google` in dev, local
+builds and releases. The scopes (`drive.file`, `openid`, `email`) are
+non-sensitive, so the consent screen needs no Google verification review.
 
-1. Create or choose a project in [Google Cloud](https://console.cloud.google.com/).
-   Enable **Google Sheets API** and **Google Drive API**.
-2. Configure Google Auth Platform branding and audience. For a testing app, add
-   the account used for testing to its test users.
-3. Create an OAuth client of type **Web application**. Register the exact
-   **Authorized redirect URI** displayed in Connections. It has the form
-   `https://<extension-id>.chromiumapp.org/google`.
-4. Configure `https://www.googleapis.com/auth/drive.file`, `openid`, and `email`.
-   The file scope limits access to files used with this app. Identity scopes
-   identify the selected account so reconnection cannot switch the save target.
-5. Save the public client ID in Connections. For a release, put it in
-   `src/background/google-config.js` and keep the packaged extension ID stable.
-   Each separately distributed extension ID needs its redirect URI registered.
-6. Click **Connect Google and create tracker**, complete Google's consent, then
-   enable automatic tracking. Open the tracker to inspect the created sheet.
+**Maintainer, one time:**
+
+1. In [Google Cloud](https://console.cloud.google.com/), create a project and
+   enable **Google Sheets API** and **Google Drive API**.
+2. In Google Auth Platform, fill in branding, set the audience to **External**,
+   add the scopes `drive.file`, `openid`, `email`, and click **Publish app**
+   (move out of Testing so any Google account can connect).
+3. Create an OAuth client of type **Web application** with the authorized
+   redirect URI above.
+4. Put the client ID in `src/background/google-config.js` and release.
+5. Chrome Web Store: the first upload carries the pinned `key`, so the store
+   item gets the same ID. Confirm the ID shown in the dashboard matches before
+   publishing.
+
+**Advanced users** can paste their own OAuth web client ID in
+**Connections > Advanced: use your own Google client** (it overrides the built-in
+one until reset). Their client must register the redirect URI shown there.
+
+The private key for the pinned ID was discarded; only the public key is in the
+repo. Changing the `key` changes the ID and breaks the registered redirect URI.
 
 Do not put a client secret in the extension. Authentication uses
 `chrome.identity.launchWebAuthFlow` and Google's client-side OAuth flow, avoiding

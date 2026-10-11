@@ -8,6 +8,9 @@ export default defineConfig({
   imports: false,
   manifest: {
     name: "Avid Autofill for Job Applications",
+    // Pins the extension ID (hlakbjlejclnadcmikjpinjkagkkjgpn) for dev, local builds and releases,
+    // so the Google OAuth redirect URI https://<id>.chromiumapp.org/google never changes.
+    key: "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA88mo+BDlhOWZRc0lRECzoy6YMLsVhtD5a1+W6s/AMAdUFXC9MGGS61XdP1k5hSAgIt3BPO6BgflZYdd5GZ7faneFVBsjQI74CsfeXiF8v0Xg2RXuX1FPM69pPYPLYBgaiOGZPnoMP8NtG0vOo9G0FhZ7yx3kq5DoYTqgey47tsnhcND5+9Wq/wgLD5Hpr5GP5ZSNgHsbJpCUZRDR3Gqi8VNYwzew+IkNxpGQXOE5AzlAqUwgQPXRyp4eR+94hZg+O3N4dbK4eyDLxn9OzK1pDOHpLYtpjQqO3jIZ8y6TCGN96uCXQgn9gMGkItxGM3v7Vklx5Gk/WFiGTccqmurG+QIDAQAB",
     description:
       "Autofill job applications on Greenhouse, Lever, Ashby, Workday and more from your saved profile. You review before submitting.",
     permissions: ["storage", "activeTab", "scripting", "unlimitedStorage", "identity", "alarms"],

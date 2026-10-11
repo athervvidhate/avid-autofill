@@ -18,8 +18,10 @@
     if (s.sheetUrl) $("tracker-sheet").href = s.sheetUrl;
     $("google-setup").hidden = !s.canEditClient;
     $("google-setup").open = !s.configured;
+    $("google-setup-intro").textContent = s.shipped ? "Avid already includes a Google connection, so most people never need this. Use your own Google Cloud OAuth client only if you want to control the app that asks for access." : "This build has no built-in Google connection yet. Add your own Google Cloud OAuth client to use the tracker.";
     $("google-redirect").value = s.redirectUrl || "";
     if (!$('google-client-id').matches(":focus")) $("google-client-id").value = s.clientId || "";
+    $("google-client-reset").hidden = !s.clientId || !s.shipped;
     $("connection-msg").textContent = s.error || (s.connected && s.sheetUrl ? "Tracker ready. Connection changes save automatically." : "");
     $("tracker-pending").hidden = !s.pending;
     $("tracker-pending-count").textContent = `${s.pending} ${s.pending === 1 ? "application" : "applications"} not synced yet`;
@@ -48,6 +50,7 @@
   $("google-disconnect").onclick = () => run("DISCONNECT");
   $("tracker-retry").onclick = () => run("RETRY");
   $("google-client-save").onclick = () => run("CLIENT", { clientId: $("google-client-id").value.trim() });
+  $("google-client-reset").onclick = () => run("CLIENT", { clientId: "" });
   $("tracker-enabled").onchange = async event => {
     const enabled = event.target.checked;
     try {

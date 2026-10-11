@@ -16,12 +16,12 @@
   async function session() { return (await chrome.storage.session.get(SESSION))[SESSION] || { tabs: {} }; }
   const saveSession = value => chrome.storage.session.set({ [SESSION]: value });
   const sheetUrl = c => c?.spreadsheetId ? `https://docs.google.com/spreadsheets/d/${c.spreadsheetId}/edit#gid=${c.sheetId || 0}` : "";
-  const clientId = s => globalThis.AVID_GOOGLE_CLIENT_ID || s.clientId || "";
+  const clientId = s => s.clientId || globalThis.AVID_GOOGLE_CLIENT_ID || "";
   function publicState(s, privileged = false) {
     return {
       enabled: s.enabled, connected: !!s.connection?.connected, sheetUrl: sheetUrl(s.connection),
       pending: s.entries.filter(e => e.state !== "synced").length,
-      ...(privileged ? { email: s.connection?.email || "", configured: !!clientId(s), canEditClient: !globalThis.AVID_GOOGLE_CLIENT_ID && !s.connection?.sub, clientId: clientId(s), redirectUrl: chrome.identity.getRedirectURL("google"), error: s.connection?.error || "", entries: s.entries.filter(e => e.state !== "synced").map(e => ({ company: e.entry.company, role: e.entry.role, error: e.error || "Not synced yet" })) } : {}),
+      ...(privileged ? { email: s.connection?.email || "", configured: !!clientId(s), canEditClient: !s.connection?.sub, shipped: !!globalThis.AVID_GOOGLE_CLIENT_ID, clientId: s.clientId || "", redirectUrl: chrome.identity.getRedirectURL("google"), error: s.connection?.error || "", entries: s.entries.filter(e => e.state !== "synced").map(e => ({ company: e.entry.company, role: e.entry.role, error: e.error || "Not synced yet" })) } : {}),
     };
   }
   async function fetchJson(url, options = {}) {
@@ -292,7 +292,8 @@
     if (!admin) throw new Error("Open Connections to change Google settings.");
     switch (msg.type) {
       case "AVID_TRACKER_CLIENT":
-        if (globalThis.AVID_GOOGLE_CLIENT_ID || s.connection?.sub) throw new Error("The OAuth client cannot change while a tracker account is configured.");
+        if (s.connection?.sub) throw new Error("The OAuth client cannot change while a tracker account is configured.");
+        if (!msg.clientId) { delete s.clientId; await save(s); return publicState(s, true); }
         if (!/^[\w-]+\.apps\.googleusercontent\.com$/.test(msg.clientId || "")) throw new Error("Enter a valid Google OAuth web client ID.");
         s.clientId = msg.clientId; await save(s); return publicState(s, true);
       case "AVID_TRACKER_ENABLE":
