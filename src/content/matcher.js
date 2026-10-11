@@ -35,12 +35,12 @@
   }
 
   const CONTROLS = new Set(["INPUT", "TEXTAREA", "SELECT", "BUTTON"]);
-  function textWithoutControls(root) {
+  function textWithoutControls(root, skipLabels) {
     let out = "";
     const walk = (n) => {
       for (const child of n.childNodes) {
         if (child.nodeType === 3) out += child.textContent;
-        else if (child.nodeType === 1 && !CONTROLS.has(child.tagName)) walk(child);
+        else if (child.nodeType === 1 && !CONTROLS.has(child.tagName) && !(skipLabels && child.tagName === "LABEL")) walk(child);
       }
     };
     walk(root);
@@ -78,9 +78,7 @@
     // A question written beside its choices (a span before the radio labels)
     // sits inside the smallest container, so read it before looking outward.
     if (node) {
-      const clone = node.cloneNode(true);
-      clone.querySelectorAll("input, textarea, select, button, label").forEach((n) => n.remove());
-      const inside = norm(clone.textContent);
+      const inside = norm(textWithoutControls(node, true));
       if (inside.length > 2 && inside.length < 300) return inside;
     }
     for (let i = 0; i < 4 && node && node.parentElement; i++, node = node.parentElement) {
