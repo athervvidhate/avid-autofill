@@ -68,6 +68,19 @@
     const response = await chrome.runtime.sendMessage({ type: "AVID_JEV_SAVE_ANSWER", question: current.question, answer, anySite });
     if (!response?.ok) throw new Error(response?.error || "Avid could not save the answer.");
   }
+  // Polishing is opt-in: Chrome's built-in model first (when already
+  // downloaded), then the applicant's own free-tier key if one is set.
+  async function polishProviders() {
+    const settings = await A.getSettings(), providers = [];
+    if (!A.drafts) return providers;
+    if (settings.polishAnswers) providers.push(A.drafts.nanoProvider());
+    if (A.drafts.PROVIDERS[settings.draftProvider]) providers.push({ id: settings.draftProvider, rewrite: async prompt => {
+      const reply = await chrome.runtime.sendMessage({ type: "AVID_DRAFT_REWRITE", prompt });
+      if (!reply?.ok) throw new Error(reply?.error || "Drafting failed.");
+      return reply.text;
+    } });
+    return providers;
+  }
   async function fill(candidates, profile, run) {
     const url = location.href, root = document.documentElement;
     unanswered = new Map();
@@ -97,6 +110,7 @@
       report.results.push(...batch.map(candidate => ({ label: candidate.field.label, value: "", status: "ai-unavailable", field: candidate.field.id })));
       return report;
     }
+    let polishers;
     const fresh = location.href === url && document.documentElement === root && A._fillRun === run && JSON.stringify(await A.getProfile()) === JSON.stringify(profile) && (await A.getSettings()).jevEnabled;
     for (const candidate of batch) {
       const { field, el, group, custom, buttons } = candidate, result = response.results.find(result => result.id === field.id);
@@ -134,10 +148,17 @@
             record(ok && el.selectedIndex === index ? "filled" : "skipped", field.options[result.optionId]);
           }
         } else {
-          const probe = el.cloneNode(false); probe.value = result.value;
-          if (probe.value !== result.value || (el.maxLength >= 0 && result.value.length > el.maxLength) || (el.minLength > 0 && result.value.length < el.minLength) || !probe.checkValidity()) { record("ai-incompatible"); continue; }
-          A.fillers.setTextValue(el, result.value);
-          record(el.value === result.value && el.checkValidity() ? "filled" : "skipped", result.value);
+          let value = result.value;
+          // Written answers chosen from a template or work history can be
+          // polished; any failure leaves the saved text as it was.
+          if (el.tagName === "TEXTAREA" && /^(template_|history_summary)/.test(result.sourceId || "") && (polishers ||= await polishProviders()).length) {
+            const polished = await A.drafts.polish(value, { question: field.label, company: job?.company, role: job?.role, maxLength: el.maxLength >= 0 ? el.maxLength : undefined }, polishers);
+            if (polished.provider && location.href === url && document.documentElement === root && A._fillRun === run && !answered(candidate)) value = polished.text;
+          }
+          const probe = el.cloneNode(false); probe.value = value;
+          if (probe.value !== value || (el.maxLength >= 0 && value.length > el.maxLength) || (el.minLength > 0 && value.length < el.minLength) || !probe.checkValidity()) { record("ai-incompatible"); continue; }
+          A.fillers.setTextValue(el, value);
+          record(el.value === value && el.checkValidity() ? "filled" : "skipped", value);
         }
       } catch { record("error"); }
     }

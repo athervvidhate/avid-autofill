@@ -582,3 +582,29 @@ test("Ashby yes/no buttons reach Jev with their options and are answered by clic
     assert.equal(report.results.find(r => r.method === "jev").status, "filled");
   } finally { p.close(); }
 });
+
+const essayForm = '<form><div><label for="why">Why do you want to work at Acme?</label><textarea id="why"></textarea></div></form>';
+const templateText = "I'm interested in the Backend Engineer role at Acme. My experience as Engineer at Globex matches the work, and I'd like to bring it to Acme.";
+const polishedText = "I'm excited about the Backend Engineer role at Acme. My time as Engineer at Globex lines up with the work, and I'd like to bring that experience to Acme.";
+async function essay(settings, output, tweak = () => {}) {
+  const p = await page(essayForm, async msg => ({ ok: true, results: [{ id: msg.fields[0].id, status: "fill", value: templateText, sourceId: "template_why_company", sourceQuestion: "Why do you want to work at this company?" }] }));
+  p.dom.window.eval(read("src/shared/drafts.js"));
+  p.dom.window.LanguageModel = { availability: async () => "available", create: async () => ({ prompt: async () => output, destroy() {} }) };
+  tweak(p);
+  const merged = { ...p.settings, ...settings };
+  await p.A.saveSettings(merged);
+  const report = await p.A.engine.fillPage(p.profile, merged, null);
+  return { p, report, value: p.dom.window.document.getElementById("why").value };
+}
+test("a chosen template is polished by the built-in model only when the applicant opted in", async () => {
+  const on = await essay({ polishAnswers: true }, polishedText);
+  try { assert.equal(on.value, polishedText); } finally { on.p.close(); }
+  const off = await essay({}, polishedText);
+  try { assert.equal(off.value, templateText); } finally { off.p.close(); }
+});
+test("a polished answer that invents facts or does not fit keeps the saved text", async () => {
+  const invented = await essay({ polishAnswers: true }, polishedText + " I led 40 engineers.");
+  try { assert.equal(invented.value, templateText); } finally { invented.p.close(); }
+  const unavailable = await essay({ polishAnswers: true }, polishedText, p => { p.dom.window.LanguageModel.availability = async () => "downloadable"; });
+  try { assert.equal(unavailable.value, templateText); } finally { unavailable.p.close(); }
+});

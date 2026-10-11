@@ -148,6 +148,30 @@ browser (Jev sees only each candidate's description).
   (`{ id, question, text }`; no editor yet). Template answers go through the same
   gate and appear as extra Jev fills to review before submitting.
 
+## Written answers (optional polish)
+
+Jev still only chooses. When it picks a template or the work-history summary for
+a textarea, Avid can rewrite that text so it reads naturally for the question.
+Both sources are off until the applicant turns them on in **My Info → Written
+answers**:
+
+1. **Chrome's built-in AI** (Gemini Nano). Free, on device, no account. Used only
+   when `LanguageModel.availability()` is `available`; the model download starts
+   from a button in My Info, never during a fill. Chrome needs a desktop OS with
+   about 22 GB free disk, 16 GB RAM and a GPU above 4 GB VRAM, so many machines
+   will not qualify. Nothing leaves the browser.
+2. **The applicant's own free-tier key** (Groq or Google AI Studio). The worker
+   calls the fixed provider endpoint with a key stored apart from the profile
+   (`avidDraftKey`). The draft, question, company and role go to that provider;
+   Google's free tier may use prompts to improve its products.
+
+A rewrite is kept only if it adds no number or capitalised name that is absent
+from the saved text, question, company and role, stays plain and within the
+field's length limit, and arrives within 20 seconds. Otherwise the saved text
+is filled unchanged. Code: `src/shared/drafts.js`, `src/background/drafts.js`,
+`src/options/drafts.js`, the `polishProviders` hook in `src/content/jev.js`,
+tests in `test/drafts.mjs` and `test/jev.mjs`.
+
 ## Validation and limits
 
 - Validate exact model, question and option IDs, answer type, integer token usage,

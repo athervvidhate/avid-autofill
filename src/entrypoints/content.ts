@@ -12,6 +12,7 @@ import "../content/generic.js";
 import "../content/matcher.js";
 import "../content/adapters.js";
 import "../content/workday.js";
+import "../shared/drafts.js";
 import "../content/jev.js";
 import "../content/engine.js";
 import "../content/widget.js";
