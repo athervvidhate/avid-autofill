@@ -40,6 +40,9 @@
     for (let i = 0; i < 4 && node; i++) {
       node = node.parentElement;
       if (!node) break;
+      // Text of a container shared with other fields belongs to all of them, so
+      // an ancestor holding several controls cannot name this one.
+      if (node.querySelectorAll("input:not([type=hidden]), textarea, select").length > 1) break;
       // A field group container often holds the question text as its first text.
       const clone = node.cloneNode(true);
       clone.querySelectorAll("input, textarea, select, button").forEach((n) =>
@@ -59,6 +62,14 @@
     if (legend && legend.textContent.trim()) return norm(legend.textContent);
     let node = radios[0].parentElement;
     while (node && !radios.every((r) => node.contains(r))) node = node.parentElement;
+    // A question written beside its choices (a span before the radio labels)
+    // sits inside the smallest container, so read it before looking outward.
+    if (node) {
+      const clone = node.cloneNode(true);
+      clone.querySelectorAll("input, textarea, select, button, label").forEach((n) => n.remove());
+      const inside = norm(clone.textContent);
+      if (inside.length > 2 && inside.length < 300) return inside;
+    }
     for (let i = 0; i < 4 && node && node.parentElement; i++, node = node.parentElement) {
       const text = Array.from(node.parentElement.childNodes)
         .filter((child) => child !== node)
@@ -129,7 +140,7 @@
     { any: [/pronoun/], get: (p) => p.personal.pronouns },
 
     // --- Address ---
-    { any: [/street address/, /address line ?1/, /^address$/, /mailing address/], not: [/email/], get: (p) => p.personal.address },
+    { any: [/street address/, /address line ?1/, /(^|\| )address( \||$)/, /mailing address/], not: [/email/], get: (p) => p.personal.address },
     { any: [/\bcity\b/, /\btown\b/, /(^|\| )(current )?location( \||$)/, /(^|\| )current location\b/], not: [/velocity|capacity|ethnic/], expand: "place", get: (p) => p.personal.city },
     { any: [/\bstate\b/, /\bprovince\b/, /\bregion\b/], not: [/statement|estate|united states|work/], expand: "usState", get: (p) => p.personal.state },
     { any: [/zip/, /postal code/, /post code/], get: (p) => p.personal.postalCode },

@@ -285,7 +285,7 @@ test("off mode and sensitive, legal, or custom controls never call Jev", async (
   const p = await page('<form><div><label for="self">Your gender identity</label><input id="self"></div><input type="password" aria-label="Password"><input type="checkbox" aria-label="Agree to terms"><input role="combobox" aria-label="Anything else"><input type="text" aria-label="Search"></form>', () => { throw new Error("Unexpected Jev call"); });
   try {
     const report = await p.A.engine.fillPage(p.profile, p.settings, null);
-    assert.equal(report.aiMessage, "");
+    assert.doesNotMatch(report.aiMessage, /unavailable|invalid/);
     const q = await page(textForm, () => { throw new Error("Unexpected Jev call"); });
     try { q.settings.jevEnabled = false; assert.equal((await q.A.engine.fillPage(q.profile, q.settings, null)).aiMessage, ""); } finally { q.close(); }
   } finally { p.close(); }

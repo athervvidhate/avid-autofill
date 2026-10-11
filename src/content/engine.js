@@ -161,8 +161,11 @@
           const ok = fillers.setNativeSelect(el, [m.value, ...(m.alts || [])]);
           record(signal, m.value, ok ? (m.assumed ? "assumed" : "filled") : "no-option-match");
         } else if (type === "checkbox") {
+          // A text rule ("email", "phone") matching a checkbox's label is only
+          // a keyword hit, so such a box is left for the applicant.
+          if (m.kind !== "yesno") { unmatched.push({ el, signal }); continue; }
           // Affirmative yes/no answers tick the box; negatives leave it.
-          const want = m.kind === "yesno" ? isAffirmative(m.value) : true;
+          const want = isAffirmative(m.value);
           const ok = fillers.setCheckbox(el, want);
           record(signal, want ? "checked" : "unchecked", ok ? "filled" : "skipped");
         } else if (m.place && adapter.locationSearch && el.matches(adapter.locationSearch)) {
