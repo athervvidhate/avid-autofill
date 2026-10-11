@@ -57,13 +57,8 @@
     el.dispatchEvent(new Event("focus", { bubbles: true }));
 
     // Select any existing content so insertText replaces rather than appends.
-    try {
-      if (typeof el.setSelectionRange === "function") {
-        el.setSelectionRange(0, (el.value || "").length);
-      } else {
-        el.select && el.select();
-      }
-    } catch (_) {}
+    // Email and number inputs throw on setSelectionRange; select() still works.
+    selectAll(el);
 
     let inserted = false;
     try {
@@ -74,6 +69,9 @@
     } catch (_) {
       inserted = false;
     }
+    // Text that landed after an existing value (nothing was selected) doubles
+    // it: "me@x.comme@x.com". Replace the whole value instead.
+    if (inserted && el.value !== value && el.value.length > value.length && el.value.endsWith(value)) inserted = false;
 
     if (!inserted) {
       const setter =
@@ -96,13 +94,19 @@
   // Type into a dropdown's filter without firing change/blur. Workday closes
   // typeahead prompts on blur, so the option list must stay open until the
   // matching option has been clicked.
-  function setSearchValue(el, value) {
-    el.focus();
+  function selectAll(el) {
     try {
       if (typeof el.setSelectionRange === "function") {
         el.setSelectionRange(0, (el.value || "").length);
+        return;
       }
     } catch (_) {}
+    try { el.select && el.select(); } catch (_) {}
+  }
+
+  function setSearchValue(el, value) {
+    el.focus();
+    selectAll(el);
 
     let inserted = false;
     try {

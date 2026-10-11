@@ -1769,3 +1769,23 @@ test("Ashby fill waits for Ashby's own resume parse to finish before filling", a
   // No parse started: returns after the short start window.
   await adapter.resumeParse(fast);
 });
+
+test("typing over an existing email replaces it instead of appending", () => {
+  const { document, AvidAutofill: A } = blankWindow();
+  document.body.innerHTML = '<input type="email" id="e" value="old@example.com">';
+  const el = document.getElementById("e");
+  // A browser inserts at the caret; with nothing selected that is the end.
+  document.execCommand = (cmd, ui, text) => { el.value = el.value + text; return true; };
+  A.fillers.setTextValue(el, "alex.rivera@example.com");
+  assert.equal(el.value, "alex.rivera@example.com");
+});
+
+test("the resume goes to Ashby's Resume field, not its Autofill from resume box", async () => {
+  const { document, A, dom } = loadFixture("ashby-application-2.html", "https://jobs.ashbyhq.com/example/job/application");
+  dom.window.HTMLElement.prototype.getClientRects = function () { return [{}]; };
+  const targets = [];
+  A.fillers.uploadToInput = async (input) => { targets.push(input); return true; };
+  A.adapters.detect().resumeParse = async () => {};
+  await A.engine.fillPage(testProfile(A), { overwriteFilled: false, fillEEO: false, highlightFilled: false }, { name: "resume.pdf", type: "application/pdf", dataUrl: "data:application/pdf;base64,AA==" });
+  assert.deepEqual(targets.map((t) => t.id), ["_systemfield_resume"]);
+});

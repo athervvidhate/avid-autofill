@@ -262,9 +262,11 @@
   // often visually hidden behind a styled button, so we do NOT use the visible
   // check here — we score every enabled file input by how resume-like it looks.
   async function uploadResume(resume, matcher, fillers, record) {
+    // Ashby's "Autofill from resume" box is not the application's resume field:
+    // a file there only starts Ashby's own parse, which rewrites the form.
     const inputs = Array.from(
       F().queryAll('input[type="file"]')
-    ).filter((i) => !i.disabled);
+    ).filter((i) => !i.disabled && !i.closest('[class*="autofill-pane"], [class*="autofillPane"], [class*="autofill-input"]'));
 
     const scored = inputs.map((i) => ({
       el: i,
