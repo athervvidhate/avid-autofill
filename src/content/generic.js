@@ -38,7 +38,7 @@
 
   function visible(el) {
     return !!el && !el.disabled && el.type !== "hidden" && el.getAttribute("aria-hidden") !== "true" &&
-      (el.offsetParent !== null || el.getClientRects().length > 0);
+      A.fillers.isRendered(el);
   }
 
   // What the field says about itself. Text from surrounding containers is left

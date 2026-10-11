@@ -296,7 +296,6 @@
     const v = norm(value);
     const no = /^(no|none|not|non)\b/.test(v) || /\bnot\b/.test(v) && !/decline|prefer/.test(v);
     const decline = /decline|prefer not|do not wish|don't wish|not to (answer|say|disclose)/.test(v);
-    const noun = kind === "veteran" ? "veteran" : "disability";
     if (decline) return ["i decline to self-identify", "i do not wish to answer", "i do not want to answer", "i prefer not to answer", "i choose not to disclose", "decline to self-identify", "prefer not to answer"];
     if (no) return kind === "veteran" ? ["i am not a protected veteran", "not a protected veteran", "i am not a veteran", "no"] : ["no, i do not have a disability", "i do not have a disability", "no"];
     if (/^(yes|y)$/.test(v) || v.includes("protected") || v.includes("have a")) return kind === "veteran" ? ["i am a protected veteran", "i identify as one or more of the classifications of protected veteran", "yes"] : ["yes, i have a disability", "yes, i have a disability, or have had one in the past", "yes"];
