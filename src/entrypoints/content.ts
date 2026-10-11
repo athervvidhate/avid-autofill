@@ -2,6 +2,7 @@
 // The imported scripts still attach to globalThis.AvidAutofill and depend on
 // running in this order, the same order manifest.json used to list them.
 import { defineContentScript } from "wxt/utils/define-content-script";
+import "../content/widget-style.ts";
 import "../shared/schema.js";
 import "../shared/tracker-model.js";
 import "../shared/skills.js";

@@ -6,3 +6,8 @@ declare global {
   var AvidAutofill: Record<string, any>;
   var AVID_GOOGLE_CLIENT_ID: string;
 }
+
+declare module "*?raw" {
+  const text: string;
+  export default text;
+}
