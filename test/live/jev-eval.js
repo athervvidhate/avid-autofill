@@ -26,7 +26,7 @@
   }
 
   async function runCase(c, key) {
-    const sources = J.sourcesFor(c.profile || globalThis.JEV_PROFILE, c.pageUrl), fields = J.cleanFields(c.fields), stages = [{}, {}];
+    const sources = J.sourcesFor(c.profile || globalThis.JEV_PROFILE, c.pageUrl, c.job), fields = J.cleanFields(c.fields), stages = [{}, {}];
     const usage = { input_tokens: 0, output_tokens: 0, calls: 0 };
     // Stage two requests carry approved_fact; exact saved questions skip stage one.
     const stageOf = request => Object.values(request.state.fields).some(f => f.approved_fact) ? 1 : 0;

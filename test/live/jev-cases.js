@@ -38,10 +38,28 @@ const MISC_PROFILE = {
   misc: { skills: "TypeScript, React, Node.js, PostgreSQL", salaryExpectation: "$140,000 to $160,000 base", noticePeriod: "Two weeks", earliestStartDate: "June 2027", graduationDate: "May 2027", howHeard: "The company careers page" },
   questionBank: globalThis.JEV_PROFILE.questionBank.filter(e => !["salary", "start", "notice", "hear", "pronouns"].includes(e.id)),
 };
+// Saved work and education history, and no company-specific "why" answers.
+const HISTORY_PROFILE = {
+  ...globalThis.JEV_PROFILE,
+  work: [{ company: "Initech Labs", title: "Senior Software Engineer", startDate: "2021", current: true, description: "Built the billing platform. Led a team of five engineers. Cut cloud costs by a third." }, { company: "Hooli", title: "Software Engineer", startDate: "2018", endDate: "2021" }],
+  education: [{ school: "State University", degree: "BS", field: "Computer Science" }],
+  questionBank: globalThis.JEV_PROFILE.questionBank.filter(e => !/^why_|^contractor_/.test(e.id)),
+};
 const ACME = "https://boards.greenhouse.io/acme/jobs/4012", GLOBEX = "https://jobs.lever.co/globex/7f3a/apply";
 const yesNo = { o1: "Yes", o2: "No" }, noYes = { o1: "No", o2: "Yes" };
 
 globalThis.JEV_CASES = [
+  { id: "candidates", set: "candidates", pageUrl: ACME, profile: HISTORY_PROFILE, job: { company: "Acme", role: "Platform Engineer" }, fields: [
+    { id: "f0", label: "Why do you want to work here?", type: "textarea", expect: "template_why_company", tag: "template" },
+    { id: "f1", label: "What is your current job title?", type: "text", expect: "history_title", tag: "history" },
+    { id: "f2", label: "Who do you work for right now?", type: "text", expect: "history_company", tag: "history" },
+    { id: "f3", label: "Which university did you attend?", type: "text", expect: "history_school", tag: "history" },
+    { id: "f4", label: "Tell us about your most recent role.", type: "textarea", expect: ["template_current_work", "history_summary"], tag: "template" },
+    { id: "f5", label: "Describe a time you led a project under a tight deadline.", type: "textarea", expect: null, tag: "prose" },
+    { id: "f6", label: "What is your favorite programming paradigm and why?", type: "textarea", expect: null, tag: "prose" },
+    { id: "f7", label: "What compensation are you looking for?", type: "text", expect: "bank_salary", tag: "paraphrase" },
+  ] },
+
   { id: "smoke", set: "smoke", pageUrl: ACME, fields: [
     { id: "f0", label: "Preferred first name", type: "text", expect: "personal_preferredName", tag: "profile" },
     { id: "f1", label: "Will you now, or in the future, require sponsorship for employment visa status (e.g. H-1B)?", type: "select", options: yesNo, expect: { option: "o2" }, tag: "option" },
