@@ -1,0 +1,33 @@
+/* First-run setup. Reuses the My Info tokens and controls from options.css and adds
+   only the centered step layout. */
+.ob { width: min(720px, 100%); margin: 0 auto; padding: 28px 20px 48px; }
+.ob-top { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 20px; }
+.ob-progress { display: grid; gap: 6px; min-width: 150px; color: var(--muted); font-size: 12.5px; font-weight: 600; text-align: right; }
+.ob-track { height: 8px; border-radius: 999px; background: var(--mint); overflow: hidden; }
+.ob-track i { display: block; height: 100%; border-radius: 999px; background: var(--green); transition: width .25s ease; }
+.ob-card { padding: 32px 34px; border-radius: 28px; background: var(--card); box-shadow: var(--shadow); }
+.ob-card h1 { margin: 18px 0 10px; outline: none; }
+.ob-card .lead { margin: 0 0 20px; color: var(--muted); font-size: 15px; line-height: 1.55; }
+.ob-card .section-icon { width: 48px; height: 48px; }
+.ob-card .section-icon svg.i { width: 22px; height: 22px; }
+.ob-card .connection-head { padding: 14px 16px; margin-bottom: 14px; border-radius: 18px; background: var(--field); }
+.ob-points { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.ob-points li { position: relative; padding: 12px 14px 12px 40px; border-radius: 16px; background: var(--field); color: var(--muted); font-size: 13.5px; }
+.ob-points li::before { content: ""; position: absolute; left: 16px; top: 17px; width: 10px; height: 10px; border-radius: 3px 6px 3px 6px; background: var(--lime); }
+.ob-points b { color: var(--ink); }
+.ob-note { margin: 12px 0 16px; color: var(--muted); font-size: 12.5px; line-height: 1.5; }
+.ob-msg { min-height: 20px; margin: 12px 0 0; color: var(--ok); font-size: 13px; }
+.ob-card .resume-row { margin-bottom: 12px; }
+.ob-summary { display: grid; gap: 8px; margin: 0 0 8px; padding: 0; list-style: none; }
+.ob-summary li { position: relative; padding: 11px 14px 11px 42px; border-radius: 14px; background: var(--field); font-size: 13.5px; }
+.ob-summary li::before { content: ""; position: absolute; left: 16px; top: 15px; width: 12px; height: 12px; border-radius: 4px 7px 4px 7px; background: var(--green-soft); }
+.ob-summary li.ok::before { background: var(--lime); }
+.ob-nav { display: flex; align-items: center; gap: 8px; margin-top: 18px; padding: 8px; }
+.ob-spacer { flex: 1; }
+.btn.ghost { background: transparent; color: var(--muted); box-shadow: none; }
+.btn.ghost:hover { background: var(--field); color: var(--ink); }
+@media (max-width: 540px) {
+  .ob { padding: 16px 12px 32px; }
+  .ob-card { padding: 22px 18px; border-radius: 22px; }
+  .ob-top { align-items: flex-start; }
+}

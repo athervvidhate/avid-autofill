@@ -1,7 +1,8 @@
 (function () {
   const A = globalThis.AvidAutofill, J = A.jev;
   const active = new Set();
-  const optionsSender = sender => sender.id === chrome.runtime.id && sender.url?.split(/[?#]/)[0] === chrome.runtime.getURL("options.html");
+  // My Info and the first-run setup are the only pages that may change the connection.
+  const optionsSender = sender => sender.id === chrome.runtime.id && ["options.html", "onboarding.html"].some(page => sender.url?.split(/[?#]/)[0] === chrome.runtime.getURL(page));
   async function state() {
     const settings = await A.getSettings(), stored = await chrome.storage.local.get(J.KEY);
     return { enabled: settings.jevEnabled === true, hasKey: !!stored[J.KEY], hasAccess: await chrome.permissions.contains({ origins: [J.ORIGIN] }) };
@@ -14,6 +15,18 @@
     if (msg.key) await chrome.storage.local.set({ [J.KEY]: msg.key });
     await A.saveSettings({ ...await A.getSettings(), jevEnabled: msg.enabled });
     return state();
+  }
+  // Asks Jev one trivial question so a mistyped key is caught during setup
+  // instead of on the first application. Costs a few tokens. Nothing is stored.
+  async function verify(msg) {
+    if (typeof msg.key !== "string" || !msg.key.trim() || msg.key.length > 512 || /\s/.test(msg.key)) throw new Error("Enter a valid Jev API key.");
+    if (!await chrome.permissions.contains({ origins: [J.ORIGIN] })) throw new Error("Allow access to TypeSafe AI before checking the key.");
+    const request = { model: J.MODEL, state: {}, questions: { answer_check: { type: "choice", instructions: "Choose A.", criteria: { A: "The first option", B: "The second option" } } } };
+    try { await J.post(request, msg.key); return { valid: true }; }
+    catch (error) {
+      if (/rejected the API key/.test(error.message)) return { valid: false };
+      throw error;
+    }
   }
   async function fill(msg, sender) {
     if (sender.id !== chrome.runtime.id || !Number.isInteger(sender.tab?.id) || !/^(https?|file):/.test(sender.url || "")) throw new Error("Jev matching must start from an application page.");
@@ -64,6 +77,7 @@
     if (!optionsSender(sender)) throw new Error("Open My Info to change the Jev connection.");
     if (msg.type === "AVID_JEV_STATE") return state();
     if (msg.type === "AVID_JEV_SAVE") return save(msg);
+    if (msg.type === "AVID_JEV_VERIFY") return verify(msg);
     if (msg.type === "AVID_JEV_CLEAR") {
       await A.saveSettings({ ...await A.getSettings(), jevEnabled: false });
       await chrome.storage.local.remove(J.KEY);

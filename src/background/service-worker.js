@@ -1,7 +1,7 @@
 
-// Opens the options page on first install and whenever the page drawer asks.
+// Opens first-run setup on install; the page drawer opens My Info on request.
 chrome.runtime.onInstalled.addListener((details) => {
-  if (details.reason === "install") chrome.runtime.openOptionsPage();
+  if (details.reason === "install") chrome.tabs.create({ url: chrome.runtime.getURL("onboarding.html") });
 });
 
 // The toolbar icon opens the same page-mounted drawer as the in-page launcher.

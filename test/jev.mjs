@@ -40,6 +40,15 @@ async function connected(fetcher) {
 }
 const field = { id: "f0", label: "What should we call you?", type: "text" };
 
+test("setup can check a key with one tiny request and nothing is stored", async () => {
+  const setup = { ...admin, url: "chrome-extension://avid-test/onboarding.html" };
+  const ok = worker();
+  assert.deepEqual(clone(await ok.send({ type: "AVID_JEV_VERIFY", key: "synthetic-test-key" }, setup)), { ok: true, valid: true });
+  assert.equal(ok.calls.length, 1); assert.equal(ok.local.avidJevKey, undefined);
+  const rejected = worker(async () => ({ ok: false, status: 401 }));
+  assert.deepEqual(clone(await rejected.send({ type: "AVID_JEV_VERIFY", key: "wrong" }, setup)), { ok: true, valid: false });
+  assert.equal((await ok.send({ type: "AVID_JEV_VERIFY", key: "x" }, content)).ok, false);
+});
 test("Jev is off by default and cannot call the provider", async () => {
   const w = worker();
   const result = await w.send({ type: "AVID_JEV_FILL", fields: [field] }, content);

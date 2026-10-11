@@ -273,8 +273,7 @@
     }
   }
   function privileged(sender) {
-    const root = chrome.runtime.getURL("options.html");
-    return sender.url?.split(/[?#]/)[0] === root;
+    return ["options.html", "onboarding.html"].some(page => sender.url?.split(/[?#]/)[0] === chrome.runtime.getURL(page));
   }
   async function handle(msg, sender) {
     const s = await state();
