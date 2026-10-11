@@ -32,6 +32,7 @@ disconnects Jev.
 
 | File | Responsibility |
 | --- | --- |
+| `src/shared/candidates.js` | Similar-question ranking, history lines, fill-in templates |
 | `src/shared/jev.js` | Eligible sources, field contract, requests, validation, company scope and saving drawer answers |
 | `src/background/jev.js` | Trusted configuration, stored key, fetch, two stages, freshness, drawer answer saves |
 | `src/background/service-worker.js` | Imports the Jev worker |
@@ -121,6 +122,32 @@ The expected choice is `o1`. The worker returns the approved source value and
 option ID; the page resolves the ID to the captured control. A failed second
 stage discards the AI batch while preserving prior rule fills.
 
+## Answer candidates
+
+Jev only chooses among answers it is given, so more candidates means more
+fields it can safely answer. All of these are built locally from the saved
+profile and the open page; no model writes text, and values never leave the
+browser (Jev sees only each candidate's description).
+
+- **Similar questions.** For each field, saved bank answers and templates are
+  ranked by weighted word overlap with the field label (synonyms folded, such
+  as compensation/salary and relocate/move). Only the 10 most similar go into
+  that field's request, so a large bank neither bloats it nor distracts the
+  model. Banks of 10 or fewer are sent whole, as before. Profile facts always
+  stay. The 0.80 gate is unchanged.
+- **History lines** (`history_*`): most recent title and employer, a short
+  summary (the first sentences of the latest role's description), previous roles
+  with dates, latest degree and field, and school. They are the applicant's own
+  saved text, never rewritten.
+- **Templates** (`template_*`): stock answers with blanks (`{company}`, `{role}`,
+  `{currentTitle}`, `{currentCompany}`, `{firstName}`) for "why this company",
+  "why this role", "tell us about your current role" and "why are you looking".
+  Company and role come from the page (`job-detector`), cleaned by the worker
+  (120 characters, braces and control characters removed). A template is offered
+  only when every blank has a value. Add your own as `profile.answerTemplates`
+  (`{ id, question, text }`; no editor yet). Template answers go through the same
+  gate and appear as extra Jev fills to review before submitting.
+
 ## Validation and limits
 
 - Validate exact model, question and option IDs, answer type, integer token usage,
@@ -154,8 +181,9 @@ stage discards the AI batch while preserving prior rule fills.
   the free-text profile facts that have no default (salary expectation, notice
   period, earliest start date, graduation date, how you heard), and approved
   applicable bank entries. Default-backed answers (work authorization,
-  relocation, country, the yes/no questions), EEO, and entire work/education
-  histories are not model sources: a default is not the applicant's answer.
+  relocation, country, the yes/no questions) and EEO are not model sources: a
+  default is not the applicant's answer. Work and education histories are not
+  sent whole; see Answer candidates.
 - Company scope compares actual sender URL origin and path boundaries. For a
   shared ATS host use the company path, such as `https://jobs.ashbyhq.com/acme/`.
   Queries/fragments are ignored. A forged page URL in a message has no effect.

@@ -24,7 +24,7 @@ function worker(fetcher = async (_, init) => ({ ok: true, json: async () => repl
     runtime: { id: "avid-test", getURL: path => `chrome-extension://avid-test/${path}`, onMessage: { addListener(fn) { listener = fn; } } },
   };
   const context = vm.createContext({ chrome, URL, TextEncoder, AbortController, crypto, setTimeout, clearTimeout, fetch: async (url, init) => { calls.push({ url, init }); return fetcher(url, init); } });
-  for (const file of ["src/shared/schema.js", "src/shared/jev.js", "src/shared/skills.js", "src/background/jev.js"]) vm.runInContext(read(file), context);
+  for (const file of ["src/shared/schema.js", "src/shared/candidates.js", "src/shared/jev.js", "src/shared/skills.js", "src/background/jev.js"]) vm.runInContext(read(file), context);
   const A = context.AvidAutofill;
   const send = (message, sender = admin) => new Promise(resolve => listener(message, sender, resolve));
   return { A, local, session, calls, send, set permission(value) { permission = value; } };
@@ -295,7 +295,7 @@ test("My Info saves approved scoped bank entries and exports no Jev key", async 
   const dom = new JSDOM(read("src/entrypoints/options/index.html"), { runScripts: "outside-only", pretendToBeVisual: true, url: admin.url });
   const local = {};
   dom.window.chrome = { storage: { local: { async get(key) { return { [key]: local[key] }; }, async set(values) { Object.assign(local, clone(values)); } } } };
-  for (const file of ["src/shared/schema.js", "src/shared/jev.js", "src/options/options.js"]) dom.window.eval(read(file));
+  for (const file of ["src/shared/schema.js", "src/shared/candidates.js", "src/shared/jev.js", "src/options/options.js"]) dom.window.eval(read(file));
   try {
     await new Promise(resolve => setTimeout(resolve, 0));
     const doc = dom.window.document;
@@ -322,11 +322,11 @@ test("My Info saves approved scoped bank entries and exports no Jev key", async 
 
 test("live evaluation cases have a consistent oracle and grading", () => {
   const context = vm.createContext({ URL, TextEncoder });
-  for (const file of ["src/shared/jev.js", "test/live/jev-cases.js", "test/live/jev-eval.js"]) vm.runInContext(read(file), context);
+  for (const file of ["src/shared/candidates.js", "src/shared/jev.js", "test/live/jev-cases.js", "test/live/jev-eval.js"]) vm.runInContext(read(file), context);
   const J = context.AvidAutofill.jev, grade = context.JEV_GRADE, ids = new Set();
   for (const c of context.JEV_CASES) {
     assert.ok(!ids.has(c.id), `duplicate case ${c.id}`); ids.add(c.id);
-    const sources = J.sourcesFor(c.profile || context.JEV_PROFILE, c.pageUrl);
+    const sources = J.sourcesFor(c.profile || context.JEV_PROFILE, c.pageUrl, c.job);
     J.cleanFields(c.fields);
     for (const field of c.fields) {
       if (field.expect === null) continue;
@@ -396,7 +396,7 @@ test("labels sent to Jev drop generated field identifiers", async () => {
 
 test("saved free-text facts are sources; default-backed answers are not", () => {
   const context = vm.createContext({ URL, TextEncoder });
-  for (const file of ["src/shared/schema.js", "src/shared/jev.js"]) vm.runInContext(read(file), context);
+  for (const file of ["src/shared/schema.js", "src/shared/candidates.js", "src/shared/jev.js"]) vm.runInContext(read(file), context);
   const A = context.AvidAutofill, profile = clone(A.DEFAULT_PROFILE);
   Object.assign(profile.misc, { salaryExpectation: "$150,000", earliestStartDate: "June 2027", graduationDate: "May 2027", noticePeriod: "Two weeks", howHeard: "Careers page" });
   profile.personal.pronouns = "they/them";
@@ -501,6 +501,72 @@ test("a field asking a saved question word for word uses that answer without a s
   await w.send({ type: "AVID_JEV_FILL", fields: [fields[0]] }, content);
   assert.equal(requests.length, 1);
 });
+
+test("candidates: similar bank questions rank first, synonyms count, and large banks are narrowed", () => {
+  const context = vm.createContext({});
+  for (const file of ["src/shared/candidates.js"]) vm.runInContext(read(file), context);
+  const C = context.AvidAutofill.candidates;
+  const [pay, weekends, relocate] = C.scores("What compensation do you expect? *", ["What are your salary expectations?", "Are you available to work weekends?", "Are you willing to relocate?"]);
+  assert.ok(pay > .3 && pay > 3 * Math.max(weekends, relocate), `pay ${pay}`);
+  assert.ok(C.scores("Would you move to Denver?", ["Are you willing to relocate?"])[0] > .2);
+  assert.equal(C.scores("???", ["Are you willing to relocate?"])[0], 0);
+  const sources = { personal_email: { description: "Personal email address", value: "a@b.test", kind: "email" } };
+  for (let i = 0; i < 30; i++) sources[`bank_q${i}`] = { description: i === 17 ? "What salary do you expect?" : `Unrelated topic number ${i} widget`, value: String(i), kind: "text" };
+  const narrowed = C.narrow({ label: "Expected compensation" }, sources);
+  assert.equal(Object.keys(narrowed).filter(id => id.startsWith("bank_")).length, C.KEEP);
+  assert.ok(narrowed.bank_q17 && narrowed.personal_email);
+  const small = { a: sources.personal_email, bank_x: sources.bank_q1 };
+  assert.equal(C.narrow({ label: "x" }, small), small, "small banks pass whole");
+});
+
+test("candidates: history lines and templates come from the profile, and blanks are never left", () => {
+  const context = vm.createContext({});
+  vm.runInContext(read("src/shared/candidates.js"), context);
+  const C = context.AvidAutofill.candidates;
+  const profile = {
+    personal: { firstName: "Robin" },
+    work: [{ company: "Initech", title: "Staff Engineer", startDate: "2021", current: true, description: "Built the billing platform. Led a team of five. Cut costs." }, { company: "Hooli", title: "Engineer", startDate: "2018", endDate: "2021" }],
+    education: [{ school: "State University", degree: "BS", field: "Computer Science" }],
+  };
+  const history = C.historySources(profile);
+  assert.equal(history.history_title.value, "Staff Engineer");
+  assert.equal(history.history_company.value, "Initech");
+  assert.equal(history.history_degree.value, "BS in Computer Science");
+  assert.equal(history.history_roles.value, "Staff Engineer at Initech (2021 to present); Engineer at Hooli (2018 to 2021)");
+  assert.match(history.history_summary.value, /^Built the billing platform\./);
+  assert.equal(Object.keys(C.historySources({})).length, 0);
+  assert.deepEqual(Object.keys(C.templateSources(profile, {})), ["template_current_work"], "job-dependent templates need a company and role");
+  const filled = C.templateSources(profile, { company: "Globex {x}", role: "Platform <b>Engineer" });
+  assert.match(filled.template_why_company.value, /^I'm interested in the Platform b Engineer role at Globex x\. My experience as Staff Engineer at Initech/);
+  assert.ok(Object.values(filled).every(s => !/\{\w+\}/.test(s.value)));
+  profile.answerTemplates = [{ id: "mine", question: "What is your management style?", text: "I lead as {firstName}, a {nope}." }, { id: "ok", question: "Name?", text: "{firstName}" }];
+  const own = C.templateSources(profile, {});
+  assert.equal(own.template_mine, undefined, "unknown blanks drop the template");
+  assert.equal(own.template_ok.value, "Robin");
+});
+
+test("template and history candidates reach Jev as descriptions, are filled locally, and carry the page's company and role", async () => {
+  const requests = [];
+  const w = worker(async (_, init) => { const request = JSON.parse(init.body); requests.push(request); const pick = (id, choice) => request.questions[id]?.criteria[choice] ? { [id]: choice } : { [id]: "NEEDS_USER" }; return { ok: true, json: async () => reply(request, { ...pick("answer_f0", "template_why_company"), ...pick("answer_f1", "history_company") }) }; });
+  const profile = clone(w.A.DEFAULT_PROFILE);
+  profile.work = [{ company: "Initech", title: "Staff Engineer", description: "Built billing." }];
+  await w.A.saveProfile(profile);
+  assert.equal((await w.send({ type: "AVID_JEV_SAVE", enabled: true, key: "synthetic-test-key" })).ok, true);
+  const fields = [{ id: "f0", label: "Why do you want to work here?", type: "textarea" }, { id: "f1", label: "Who do you work for now?", type: "text" }];
+  const result = await w.send({ type: "AVID_JEV_FILL", fields, job: { company: "Globex", role: "Platform Engineer" } }, content);
+  assert.equal(result.ok, true, result.error);
+  assert.match(result.results[0].value, /Platform Engineer role at Globex\. My experience as Staff Engineer at Initech/);
+  assert.equal(result.results[1].value, "Initech");
+  const body = JSON.stringify(requests);
+  assert.equal(body.includes("Initech"), false, "values stay local");
+  assert.equal(body.includes("Globex"), false);
+  assert.ok(requests[0].questions.answer_f0.criteria.template_why_company && requests[0].questions.answer_f1.criteria.history_company);
+  requests.length = 0;
+  const noJob = await w.send({ type: "AVID_JEV_FILL", fields: [fields[0]] }, content);
+  assert.ok(!requests[0].questions.answer_f0.criteria.template_why_company, "no detected job, no job-dependent template");
+  assert.equal(noJob.results[0].status, "ai-needs-answer");
+});
+
 test("Ashby yes/no buttons reach Jev with their options and are answered by clicking", async () => {
   const html = '<form><div data-field-path="q"><label for="q">Are you willing to be on call?</label><div><button aria-pressed="false" data-option="yes">Yes</button><button aria-pressed="false" data-option="no">No</button><input type="checkbox" name="q" tabindex="-1"></div></div></form>';
   const p = await page(html, async msg => {

@@ -26,7 +26,7 @@
       if (!await chrome.permissions.contains({ origins: [J.ORIGIN] })) throw new Error("TypeSafe page access is missing. Re-enable Jev in My Info.");
       const key = (await chrome.storage.local.get(J.KEY))[J.KEY];
       if (!key) throw new Error("Enter your Jev API key in My Info.");
-      const profile = await A.getProfile(), sources = J.sourcesFor(profile, sender.url);
+      const profile = await A.getProfile(), sources = J.sourcesFor(profile, sender.url, msg.job);
       if (!Object.keys(sources).length) throw new Error("Save profile details or approved question-bank answers before using Jev.");
       async function fresh() {
         if (JSON.stringify(await A.getProfile()) !== JSON.stringify(profile) || !(await A.getSettings()).jevEnabled || (await chrome.storage.local.get(J.KEY))[J.KEY] !== key || !await chrome.permissions.contains({ origins: [J.ORIGIN] })) throw new Error("Profile or Jev connection changed. Fill the page again.");

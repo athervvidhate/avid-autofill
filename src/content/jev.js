@@ -86,7 +86,9 @@
     const batch = sendable.slice(0, 20);
     for (const candidate of sendable.slice(20)) { unanswered.set(candidate.field.id, candidate); report.results.push({ label: candidate.field.label, value: "", status: "ai-limit", field: candidate.field.id }); }
     let response;
-    try { response = await chrome.runtime.sendMessage({ type: "AVID_JEV_FILL", fields: batch.map(candidate => candidate.field) }); }
+    // Company and role from the page, for fill-in templates. Advisory text only; the worker cleans it.
+    let job; try { job = A.jobDetector?.inspect()?.job; } catch { /* Templates need a detected job; skip them otherwise. */ }
+    try { response = await chrome.runtime.sendMessage({ type: "AVID_JEV_FILL", fields: batch.map(candidate => candidate.field), job: job ? { company: job.company, role: job.role } : undefined }); }
     catch { response = { ok: false, error: "Jev is unavailable. Reload the extension and application page." }; }
     const valid = response?.ok && Array.isArray(response.results) && response.results.length === batch.length && response.results.every(result => result && typeof result.id === "string" && batch.some(candidate => candidate.field.id === result.id)) && new Set(response.results.map(result => result.id)).size === batch.length;
     if (!valid) {

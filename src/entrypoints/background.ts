@@ -3,6 +3,7 @@
 import { defineBackground } from "wxt/utils/define-background";
 import "../shared/schema.js";
 import "../shared/jev.js";
+import "../shared/candidates.js";
 import "../shared/skills.js";
 import "../background/jev.js";
 import "../shared/tracker-model.js";
