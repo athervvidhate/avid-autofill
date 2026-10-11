@@ -14,7 +14,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SCRIPTS = ["src/shared/schema.js", "src/popup/target.js", "src/content/fillers.js", "src/content/matcher.js", "src/content/adapters.js", "src/shared/skills.js", "src/content/workday.js", "src/content/engine.js"]
   .map((p) => fs.readFileSync(path.join(ROOT, p), "utf8"));
 
-async function fill(html, url) {
+async function fill(html, url, extra = {}) {
   const dom = new JSDOM(html, { runScripts: "outside-only", pretendToBeVisual: true, url });
   const win = dom.window, store = {};
   win.chrome = { storage: { local: { async get(k) { return k == null ? { ...store } : { [k]: store[k] }; }, async set(o) { Object.assign(store, o); }, async remove(k) { delete store[k]; } } } };
@@ -27,6 +27,7 @@ async function fill(html, url) {
     links: { linkedin: "https://linkedin.com/in/alexrivera" },
     work: [{ company: "Globex", title: "Software Engineer" }],
     workAuth: { authorizedToWork: "Yes", requireSponsorship: "No" },
+    ...extra,
   });
   const report = await A.engine.fillPage(profile, A.DEFAULT_SETTINGS, null);
   return { report, doc: win.document, close: () => win.close() };
@@ -43,11 +44,13 @@ const CASES = [
   { name: "jazzhr", url: "https://app.jazz.co/apply/abc", ats: "JazzHR", values: { "resumator-firstname-value": "Alex", "resumator-address-value": "1 Market Street", "resumator-city-value": "Portland", "resumator-state-value": "CA", "resumator-postal-value": "94016" } },
   { name: "teamtailor", url: "https://acme.teamtailor.com/jobs/1/applications/new", ats: "Teamtailor", values: { candidate_first_name: "Alex", candidate_last_name: "Rivera", candidate_phone: "5551230000", candidate_linkedin: "https://linkedin.com/in/alexrivera" } },
   { name: "paylocity", url: "https://recruiting.paylocity.com/Recruiting/Jobs/Apply/1", ats: "Paylocity", byName: { "ctl00$FirstName": "Alex", "ctl00$Mobile": "5551230000", "ctl00$Zip": "94016" } },
+  // Phone help text names "the country code", and the salary range is two boxes.
+  { name: "paylocity-info", url: "https://recruiting.paylocity.com/Recruiting/Jobs/Apply/2", ats: "Paylocity", profile: { misc: { salaryExpectation: "$120K-160K" } }, values: { "info.firstName": "Alex", "info.cellPhone": "5551230000", "info.phone": "5551230000", "info.minimumDesiredSalary": "120,000", "info.maximumDesiredSalary": "160,000" } },
 ];
 
 for (const c of CASES) {
   test(`${c.name}: fields fill from the saved profile and nothing is filled wrongly`, async () => {
-    const { report, doc, close } = await fill(site(c.name), c.url);
+    const { report, doc, close } = await fill(site(c.name), c.url, c.profile);
     try {
       assert.equal(report.ats, c.ats);
       for (const [id, want] of Object.entries(c.values || {})) assert.equal(doc.getElementById(id).value, want, id);
@@ -173,4 +176,23 @@ test("Lever self-ID and screening: signature date, race, sponsorship wording, ho
     assert.match(doc.getElementById("sigdate").value, /^\d\d\/\d\d\/\d{4}$/);
     assert.notEqual(doc.getElementById("sigdate").value, "No");
   } finally { close(); }
+});
+
+test("a two-box salary range gets one end of the saved range in each box", () => {
+  const dom = new JSDOM("", { runScripts: "outside-only", url: "https://example.com/" });
+  try {
+    for (const src of SCRIPTS) dom.window.eval(src);
+    const A = dom.window.AvidAutofill;
+    const at = (saved, signal) => {
+      const profile = A.mergeDefaults(A.DEFAULT_PROFILE, { misc: { salaryExpectation: saved } });
+      return A.matcher.match(signal, profile, A.matcher.makeHelpers(profile))?.value;
+    };
+    assert.equal(at("$120K-160K", "salary range | info minimum desired salary"), "120,000");
+    assert.equal(at("$120K-160K", "maximum desired salary"), "160,000");
+    assert.equal(at("120-160k", "minimum salary"), "120,000", "one suffix covers both ends");
+    assert.equal(at("100,000-130,000", "salary max"), "130,000");
+    assert.equal(at("$150,000", "maximum salary"), "150,000", "a single amount fills either box");
+    assert.equal(at("$120K-160K", "desired salary"), "$120K-160K", "a single salary box keeps the saved text");
+    assert.equal(at("Negotiable", "minimum salary"), "Negotiable");
+  } finally { dom.window.close(); }
 });

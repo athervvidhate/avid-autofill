@@ -6,6 +6,15 @@ export default defineConfig({
   srcDir: "src",
   // Keep the existing scripts readable globals rather than auto-imported helpers.
   imports: false,
+  hooks: {
+    // WXT writes options_ui; keep the options_page key the extension has always used.
+    "build:manifestGenerated": (_wxt, manifest) => {
+      if (manifest.options_ui) {
+        manifest.options_page = manifest.options_ui.page;
+        delete manifest.options_ui;
+      }
+    },
+  },
   manifest: {
     name: "Avid Autofill for Job Applications",
     // Pins the extension ID (hlakbjlejclnadcmikjpinjkagkkjgpn) for dev, local builds and releases,
