@@ -9,7 +9,7 @@ const LAYOUT = {
     ["email", "Email"], ["phone", "Phone"],
     ["phoneDeviceType", "Phone device type", "select:Mobile|Home|Other"],
     ["address", "Street address", "wide"], ["city", "City"], ["state", "State/Province"],
-    ["postalCode", "Zip/Postal"], ["country", "Country"], ["pronouns", "Pronouns"],
+    ["postalCode", "Zip/Postal"], ["country", "Country"], ["citizenship", "Citizenship (if not Country)"], ["pronouns", "Pronouns"],
   ],
   links: [
     ["linkedin", "LinkedIn"], ["github", "GitHub"],
@@ -37,6 +37,11 @@ const LAYOUT = {
     ["consentToOtherRoles", "Consider me for other roles?", "select:Yes|No"],
     ["consentToRecording", "Consent to AI note-taker/recording?", "select:Yes|No"],
     ["over18", "Are you 18 or older?", "select:Yes|No"],
+    ["willingOnsite", "Willing to work onsite?", "select:Yes|No"],
+    ["willingOnCall", "Willing to be on call?", "select:Yes|No"],
+    ["outsideEmployment", "Outside work or advisory roles?", "select:No|Yes"],
+    ["securityClearance", "Active security clearance", "select:None|Confidential|Secret|Top Secret|TS/SCI"],
+    ["remoteExperience", "Worked remote or hybrid before?", "select:|Yes, fully remote|Yes, hybrid|No"],
   ],
   eeo: [
     ["gender", "Gender"], ["hispanicLatino", "Hispanic/Latino?", "select:|Yes|No"],

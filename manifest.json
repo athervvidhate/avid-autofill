@@ -45,6 +45,7 @@
         "src/content/job-detector.js",
         "src/content/tracker.js",
         "src/content/fillers.js",
+        "src/content/generic.js",
         "src/content/matcher.js",
         "src/content/adapters.js",
         "src/content/workday.js",

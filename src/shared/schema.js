@@ -21,6 +21,7 @@
       state: "",
       postalCode: "",
       country: "United States",
+      citizenship: "", // country of citizenship; blank = same as country
       pronouns: "",
     },
     links: {
@@ -75,6 +76,11 @@
       consentToOtherRoles: "Yes",
       consentToRecording: "Yes", // AI note-taker or interview recording consent
       over18: "Yes",
+      willingOnsite: "Yes", // willing to work from the office / onsite in person
+      willingOnCall: "Yes", // willing to take part in an on-call rotation
+      outsideEmployment: "No", // other jobs, consulting or advisory roles alongside this one
+      securityClearance: "None", // active security clearance level, or None
+      remoteExperience: "", // worked remote or hybrid before: "Yes, fully remote" | "Yes, hybrid" | "No"
     },
     meta: {
       importedAt: "",
@@ -89,6 +95,7 @@
     overwriteFilled: false, // if true, replace values already present in a field
     fillEEO: false, // opt-in: only fill voluntary self-ID when explicitly enabled
     fillSkills: true, // add skills to Workday skills sections
+    tickAcknowledgements: true, // tick "I agree" / "I have read and understand" boxes
     highlightFilled: true, // briefly outline fields we touched
     jevEnabled: false, // optional matching of approved saved answers
   };

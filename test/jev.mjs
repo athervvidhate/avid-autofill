@@ -356,7 +356,7 @@ test("acceptance gate is the live-calibrated probability of 0.80", () => {
 
 test("custom dropdowns reach Jev with their real options and fill by exact label", async () => {
   let sent;
-  const p = await page('<form><label for="clearance">Do you hold an active security clearance?</label><input id="clearance" role="combobox" aria-controls="clearance-list"></form>', async msg => {
+  const p = await page('<form><label for="clearance">Have you used our product before?</label><input id="clearance" role="combobox" aria-controls="clearance-list"></form>', async msg => {
     sent = msg.fields;
     return { ok: true, results: [{ id: msg.fields[0].id, status: "fill", value: "Yes", optionId: "o1", sourceQuestion: "Do you hold a clearance?" }] };
   });
@@ -377,7 +377,7 @@ test("custom dropdowns reach Jev with their real options and fill by exact label
     input.addEventListener("keydown", event => { if (event.key === "Escape") close(); });
     const report = await p.A.engine.fillPage(p.profile, p.settings, null);
     assert.equal(sent.length, 1);
-    assert.deepEqual(JSON.parse(JSON.stringify(sent[0])), { id: sent[0].id, label: "do you hold an active security clearance? | clearance", type: "select", options: { o0: "No", o1: "Yes", o2: "Prefer not to say" } });
+    assert.deepEqual(JSON.parse(JSON.stringify(sent[0])), { id: sent[0].id, label: "have you used our product before? | clearance", type: "select", options: { o0: "No", o1: "Yes", o2: "Prefer not to say" } });
     assert.equal(input.value, "Yes");
     assert.equal(report.results.find(r => r.method === "jev").status, "filled");
   } finally { p.close(); }
@@ -500,4 +500,19 @@ test("a field asking a saved question word for word uses that answer without a s
   requests.length = 0;
   await w.send({ type: "AVID_JEV_FILL", fields: [fields[0]] }, content);
   assert.equal(requests.length, 1);
+});
+test("Ashby yes/no buttons reach Jev with their options and are answered by clicking", async () => {
+  const html = '<form><div data-field-path="q"><label for="q">Are you willing to be on call?</label><div><button aria-pressed="false" data-option="yes">Yes</button><button aria-pressed="false" data-option="no">No</button><input type="checkbox" name="q" tabindex="-1"></div></div></form>';
+  const p = await page(html, async msg => {
+    assert.equal(JSON.stringify(msg.fields[0].options), JSON.stringify({ o0: "Yes", o1: "No" }));
+    assert.match(msg.fields[0].label, /^are you willing to be on call\?/);
+    return { ok: true, results: [{ id: msg.fields[0].id, status: "fill", value: "No", optionId: "o1" }] };
+  });
+  try {
+    const doc = p.dom.window.document;
+    doc.querySelectorAll("button").forEach(b => { b.getClientRects = () => [{}]; b.addEventListener("click", () => doc.querySelectorAll("button").forEach(o => o.setAttribute("aria-pressed", String(o === b)))); });
+    const report = await p.A.engine.fillPage(p.profile, p.settings, null);
+    assert.equal(doc.querySelector('button[aria-pressed="true"]').textContent, "No");
+    assert.equal(report.results.find(r => r.method === "jev").status, "filled");
+  } finally { p.close(); }
 });

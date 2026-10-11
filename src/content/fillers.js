@@ -57,13 +57,8 @@
     el.dispatchEvent(new Event("focus", { bubbles: true }));
 
     // Select any existing content so insertText replaces rather than appends.
-    try {
-      if (typeof el.setSelectionRange === "function") {
-        el.setSelectionRange(0, (el.value || "").length);
-      } else {
-        el.select && el.select();
-      }
-    } catch (_) {}
+    // Email and number inputs throw on setSelectionRange; select() still works.
+    selectAll(el);
 
     let inserted = false;
     try {
@@ -74,6 +69,9 @@
     } catch (_) {
       inserted = false;
     }
+    // Text that landed after an existing value (nothing was selected) doubles
+    // it: "me@x.comme@x.com". Replace the whole value instead.
+    if (inserted && el.value !== value && el.value.length > value.length && el.value.endsWith(value)) inserted = false;
 
     if (!inserted) {
       const setter =
@@ -96,13 +94,19 @@
   // Type into a dropdown's filter without firing change/blur. Workday closes
   // typeahead prompts on blur, so the option list must stay open until the
   // matching option has been clicked.
-  function setSearchValue(el, value) {
-    el.focus();
+  function selectAll(el) {
     try {
       if (typeof el.setSelectionRange === "function") {
         el.setSelectionRange(0, (el.value || "").length);
+        return;
       }
     } catch (_) {}
+    try { el.select && el.select(); } catch (_) {}
+  }
+
+  function setSearchValue(el, value) {
+    el.focus();
+    selectAll(el);
 
     let inserted = false;
     try {
@@ -226,6 +230,20 @@
     return false;
   }
 
+  // Yes/No answered with a pair of buttons rather than inputs (Ashby). Clicks the
+  // button whose text is the answer; true once it reports itself pressed.
+  function setButtonChoice(buttons, value) {
+    const target = normalize(value);
+    const el = buttons.find((b) => normalize(b.textContent) === target);
+    if (!el) return false;
+    if (el.getAttribute("aria-pressed") !== "true") {
+      el.focus();
+      el.click();
+      flash(el);
+    }
+    return el.getAttribute("aria-pressed") !== "false";
+  }
+
   function setCheckbox(el, shouldCheck) {
     if (el.checked !== shouldCheck) {
       clickChoice(el);
@@ -276,6 +294,13 @@
     // Options render in a portal. When the opener names its listbox, look only
     // there, so hidden lists elsewhere on the page (phone country codes) are ignored.
     const listboxId = typeInput && typeInput.getAttribute("aria-controls");
+    // Other questions' answer buttons and radio rows have "option" in their
+    // class names too (Ashby): never pick from a different form field.
+    const ownField = control.closest("[data-field-path]");
+    const inOtherField = (o) => {
+      const field = o.closest("[data-field-path]");
+      return !!field && field !== ownField;
+    };
     const findOption = () => {
       const listbox = listboxId && document.getElementById(listboxId);
       const visible = Array.from(
@@ -284,7 +309,11 @@
           listbox || undefined
         )
       ).filter(
-        (o) => o.offsetParent !== null || o.getClientRects().length > 0
+        (o) =>
+          (o.offsetParent !== null || o.getClientRects().length > 0) &&
+          !inOtherField(o) &&
+          !o.matches("button[aria-pressed], input") &&
+          !o.querySelector("input")
       );
       // A wrapper whose class mentions "option" holds every option's text, so it
       // would match any target and a click on it lands on whichever option the
@@ -486,6 +515,7 @@
     setNativeSelect,
     setRadio,
     setCheckbox,
+    setButtonChoice,
     setReactSelect,
     setLocationSearch,
     uploadToInput,

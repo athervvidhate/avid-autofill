@@ -108,6 +108,7 @@ async function loadState() {
   $("overwrite").checked = settings.overwriteFilled;
   $("eeo").checked = settings.fillEEO;
   $("skills").checked = settings.fillSkills !== false;
+  $("acknowledge").checked = settings.tickAcknowledgements !== false;
 }
 
 async function persistSettings() {
@@ -115,6 +116,7 @@ async function persistSettings() {
   settings.overwriteFilled = $("overwrite").checked;
   settings.fillEEO = $("eeo").checked;
   settings.fillSkills = $("skills").checked;
+  settings.tickAcknowledgements = $("acknowledge").checked;
   await AvidAutofill.saveSettings(settings);
 }
 
@@ -163,7 +165,7 @@ $("fill").addEventListener("click", async () => {
 
 $("enable-btn").addEventListener("click", enableOnPage);
 
-for (const id of ["overwrite", "eeo", "skills"]) $(id).addEventListener("change", persistSettings);
+for (const id of ["overwrite", "eeo", "skills", "acknowledge"]) $(id).addEventListener("change", persistSettings);
 for (const id of ["open-options-1", "open-options-2"])
   $(id).addEventListener("click", (e) => {
     e.preventDefault();
