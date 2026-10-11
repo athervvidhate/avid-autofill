@@ -70,6 +70,9 @@
             <label class="field">Authorized redirect URI<input id="google-redirect" readonly></label>
             <label class="field split-top">OAuth web client ID<input id="google-client-id" placeholder="...apps.googleusercontent.com" autocomplete="off"></label>
             <div class="io-actions split-top"><button class="btn secondary" id="google-client-save">Save client ID</button><button class="btn danger-quiet" id="google-client-reset" hidden>Use built-in connection</button></div>
+            <label class="field split-top">Existing tracker sheet link<input id="google-sheet" placeholder="https://docs.google.com/spreadsheets/d/..." autocomplete="off"></label>
+            <button class="btn secondary split-top" id="google-sheet-save">Use this sheet</button>
+            <p><small>Connect Google first. Works only for a sheet created by the Google client you are using (the built-in one, or your own above).</small></p>
           </details>
         </section>
 

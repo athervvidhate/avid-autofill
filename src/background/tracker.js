@@ -102,6 +102,11 @@
       const found = await api(s, `${DRIVE}?${query}`);
       let file = found.files?.[0];
       if (!file) {
+        // A reinstall or new extension ID loses the saved sheet link; reuse the sheet this client already made.
+        const prior = await api(s, `${DRIVE}?${new URLSearchParams({ q: "trashed = false and appProperties has { key='avidTrackerSetup' }", fields: "files(id)", orderBy: "modifiedTime desc", pageSize: "1" })}`);
+        file = prior.files?.[0];
+      }
+      if (!file) {
         if (c.creationAttemptedAt && Date.now() - c.creationAttemptedAt < 180000) throw new Error("Sheet creation is still unconfirmed. Wait three minutes, then reconnect so Avid can recover it.");
         c.creationAttemptedAt = Date.now();
         await save(s);
@@ -296,6 +301,21 @@
         if (!msg.clientId) { delete s.clientId; await save(s); return publicState(s, true); }
         if (!/^[\w-]+\.apps\.googleusercontent\.com$/.test(msg.clientId || "")) throw new Error("Enter a valid Google OAuth web client ID.");
         s.clientId = msg.clientId; await save(s); return publicState(s, true);
+      case "AVID_TRACKER_SHEET": {
+        const id = String(msg.sheet || "").match(/\/spreadsheets\/d\/([\w-]+)/)?.[1] || String(msg.sheet || "").trim();
+        if (!/^[\w-]{20,}$/.test(id)) throw new Error("Paste the Google Sheets link of your tracker sheet.");
+        if (!s.connection?.sub) throw new Error("Connect Google first, then choose the sheet.");
+        if (s.entries.some(e => e.state !== "synced")) throw new Error("Wait for pending entries to sync before switching sheets.");
+        const previous = s.connection;
+        s.connection = { ...previous, spreadsheetId: id, sheetId: null, templateVersion: 0 };
+        delete s.connection.columns; delete s.connection.tabName;
+        await save(s);
+        try { return await connect(s); }
+        catch (error) {
+          s.connection = previous; await save(s);
+          throw new Error(error.status === 403 || error.status === 404 ? "This Google connection cannot open that sheet. Google only lets Avid use sheets that Avid's Google client created. To keep an older sheet, use the client that created it under Advanced." : error.message);
+        }
+      }
       case "AVID_TRACKER_ENABLE":
         if (msg.enabled && !await chrome.permissions.contains({ origins: M.ORIGINS })) throw new Error("Allow access to career pages to enable automatic tracking.");
         s.enabled = msg.enabled === true; await save(s); await register(s, s.enabled); return publicState(s, true);

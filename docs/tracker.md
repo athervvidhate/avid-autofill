@@ -3,7 +3,7 @@
 Set up Google Sheets in **My Info → Connections**. The connection creates a
 spreadsheet named **Job applications** with an **Applications** tab. Avid saves
 the Google account, spreadsheet ID, numeric tab ID, and template version in this
-browser. Subsequent saves use that configuration. Reconnecting does not create a
+browser. Subsequent saves use that configuration. If the saved link is lost (a reinstall or a new extension ID), connecting again reuses the tracker sheet this Google client already created instead of making another. Reconnecting does not create a
 replacement for a missing or inaccessible sheet.
 
 Enable **Ask to track submitted applications** and allow access to HTTP and HTTPS
