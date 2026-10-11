@@ -8,7 +8,7 @@
 
   const isVisible = (el) =>
     el &&
-    (el.offsetParent !== null || el.getClientRects().length > 0) &&
+    F().isRendered(el) &&
     !el.disabled &&
     el.getAttribute("aria-hidden") !== "true" &&
     el.type !== "hidden";

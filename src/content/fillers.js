@@ -310,7 +310,7 @@
         )
       ).filter(
         (o) =>
-          (o.offsetParent !== null || o.getClientRects().length > 0) &&
+          isRendered(o) &&
           !inOtherField(o) &&
           !o.matches("button[aria-pressed], input") &&
           !o.querySelector("input")
@@ -442,9 +442,8 @@
   async function buttonOptions(button) {
     press(button);
     await sleep(300);
-    const shown = (o) => o.offsetParent !== null || o.getClientRects().length > 0;
     const named = document.getElementById(button.getAttribute("aria-controls") || "");
-    const boxes = named ? [named] : queryAll('[role="listbox"]').filter(shown);
+    const boxes = named ? [named] : queryAll('[role="listbox"]').filter(isRendered);
     const labels = boxes.flatMap((box) => queryAll('[role="option"], [data-automation-id="promptOption"]', box)).map((o) => (o.getAttribute("data-automation-label") || o.textContent).trim()).filter(Boolean);
     for (const target of [button, document.activeElement || button]) {
       target.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, cancelable: true, key: "Escape", keyCode: 27 }));
@@ -506,7 +505,11 @@
     return true;
   }
 
+  // Laid out on the page: hidden and detached nodes have no offset parent or boxes.
+  const isRendered = (el) => el.offsetParent !== null || el.getClientRects().length > 0;
+
   AvidAutofill.fillers = {
+    isRendered,
     queryAll,
     customValue,
     customOptions,
