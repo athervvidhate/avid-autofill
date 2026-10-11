@@ -29,6 +29,8 @@ export default defineConfig({
       "https://openidconnect.googleapis.com/*",
     ],
     optional_host_permissions: ["http://*/*", "https://*/*"],
+    // The drawer's fonts, loaded by the content script into the page it runs on.
+    web_accessible_resources: [{ resources: ["fonts/*.woff2"], matches: ["<all_urls>"], use_dynamic_url: true }],
     icons: {
       16: "icons/icon-16.png",
       32: "icons/icon-32.png",

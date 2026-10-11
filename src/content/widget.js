@@ -30,6 +30,7 @@
 
     const atsLabel = adapter.beta ? `${adapter.name} (beta)` : adapter.name;
     const fillLabel = adapter.name === "Generic" ? "Try filling this page" : "Fill this application";
+    AvidAutofill.loadWidgetFonts?.();
     root.appendChild(el(`<style>${AvidAutofill.widgetStyle || ""}</style>`));
     const wrap = el(`<div class="wrap"></div>`);
     const launcher = el(`<button class="launcher" hidden aria-label="Open Avid Autofill">Open Avid</button>`);
