@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Avid Autofill | Set up</title>
+    <link rel="stylesheet" href="../../options/options.css" />
+    <link rel="stylesheet" href="../../onboarding/onboarding.css" />
+  </head>
+  <body>
+    <main class="ob">
+      <header class="ob-top">
+        <a class="brand" href="#" aria-label="Avid Autofill"><span class="mark">A</span><span><b>Avid Autofill</b><small>Set up</small></span></a>
+        <div class="ob-progress" aria-live="polite"><span id="ob-count"></span><div class="ob-track" aria-hidden="true"><i id="ob-fill"></i></div></div>
+      </header>
+
+      <section class="ob-card" data-step="welcome" hidden>
+        <span class="section-icon" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></svg></span>
+        <h1><span class="hl">Welcome to Avid</span></h1>
+        <p class="lead">Avid fills job applications from your saved details. You review everything, and Avid never submits for you. Setup takes a couple of minutes and every step can be skipped.</p>
+        <ul class="ob-points">
+          <li><b>Your profile stays in this browser.</b> It is stored locally and only goes into the pages you choose to fill.</li>
+          <li><b>Google is optional.</b> It only powers the application tracker spreadsheet.</li>
+          <li><b>Jev is optional.</b> It uses your own TypeSafe AI key to answer more questions from your saved answers.</li>
+        </ul>
+      </section>
+
+      <section class="ob-card" data-step="google" hidden>
+        <span class="section-icon" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M12 22v-5"/><path d="M9 8V2"/><path d="M15 8V2"/><path d="M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8Z"/></svg></span>
+        <h1><span class="hl">Sign in with Google</span></h1>
+        <p class="lead">Connect once and Avid creates a formatted Job applications spreadsheet and keeps it up to date. Only the application details you approve go to Google. Your profile and resume stay here.</p>
+        <div class="connection-head"><div><h3>Google Sheets</h3><p id="ob-google-account">Not connected</p></div><span class="connection-badge" id="ob-google-badge">Not connected</span></div>
+        <div class="io-actions"><button class="btn primary" id="ob-google-connect" type="button">Sign in with Google</button></div>
+        <p id="ob-google-msg" class="ob-msg" role="status" aria-live="polite"></p>
+      </section>
+
+      <section class="ob-card" data-step="jev" hidden>
+        <span class="section-icon" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></svg></span>
+        <h1><span class="hl">Add your Jev key</span></h1>
+        <p class="lead">Jev picks the right saved answer for questions Avid's built-in matching leaves blank. It uses your own <a href="https://typesafe.ai" target="_blank" rel="noopener noreferrer">TypeSafe AI</a> key and credits. <a href="https://github.com/athervvidhate/avid-autofill/blob/main/docs/jev.md" target="_blank" rel="noopener noreferrer">How Jev works</a>.</p>
+        <label class="field">TypeSafe AI API key<input id="ob-jev-key" type="password" autocomplete="off" spellcheck="false" placeholder="Paste your Jev key"></label>
+        <p class="ob-note">The key is stored in this browser's extension storage, apart from your profile. It is never logged, exported, or sent anywhere except the Jev API. Checking it costs a few tokens.</p>
+        <div class="io-actions"><button class="btn primary" id="ob-jev-save" type="button">Check and save key</button><button class="btn danger-quiet" id="ob-jev-remove" type="button" hidden>Remove key</button></div>
+        <p id="ob-jev-msg" class="ob-msg" role="status" aria-live="polite"></p>
+      </section>
+
+      <section class="ob-card" data-step="import" hidden>
+        <span class="section-icon" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M16 13H8"/><path d="M16 17H8"/></svg></span>
+        <h1><span class="hl">Resume and import</span></h1>
+        <p class="lead">Add the resume to attach on applications. If you used Avid before, import your exported profile and skip the typing.</p>
+        <div class="resume-row"><div><b id="ob-resume-name">No resume saved</b><p>PDF or DOCX. Read only when you fill a page.</p></div><label class="btn secondary">Choose file<input type="file" id="ob-resume-file" accept=".pdf,.doc,.docx,application/pdf" hidden></label></div>
+        <div class="resume-row"><div><b>Import a profile file</b><p>The JSON file from My Info &gt; Export JSON.</p></div><label class="btn secondary">Import JSON<input type="file" id="ob-import-file" accept="application/json" hidden></label></div>
+        <p id="ob-import-msg" class="ob-msg" role="status" aria-live="polite"></p>
+      </section>
+
+      <section class="ob-card" data-step="contact" hidden>
+        <span class="section-icon" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
+        <h1><span class="hl">Contact details</span></h1>
+        <p class="lead">Name, how to reach you, and where you are.</p>
+        <div class="grid" data-fields="contact"></div>
+      </section>
+
+      <section class="ob-card" data-step="work" hidden>
+        <span class="section-icon" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/><rect width="20" height="14" x="2" y="6" rx="2"/></svg></span>
+        <h1><span class="hl">Work history</span></h1>
+        <p class="lead">Most recent role first. You can add more in My Info any time.</p>
+        <div data-cards="work"></div>
+        <button class="btn add" type="button" data-add="work">+ Add role</button>
+      </section>
+
+      <section class="ob-card" data-step="education" hidden>
+        <span class="section-icon" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z"/><path d="M22 10v6"/><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/></svg></span>
+        <h1><span class="hl">Education</span></h1>
+        <p class="lead">Schools, degrees, and fields of study.</p>
+        <div data-cards="education"></div>
+        <button class="btn add" type="button" data-add="education">+ Add school</button>
+      </section>
+
+      <section class="ob-card" data-step="auth" hidden>
+        <span class="section-icon" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg></span>
+        <h1><span class="hl">Work authorization</span></h1>
+        <p class="lead">Answers to the questions almost every application asks.</p>
+        <div class="grid" data-fields="auth"></div>
+      </section>
+
+      <section class="ob-card" data-step="selfid" hidden>
+        <span class="section-icon" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg></span>
+        <h1><span class="hl">Voluntary self-ID</span></h1>
+        <p class="lead">Gender, ethnicity, veteran and disability questions. Entirely optional.</p>
+        <div class="notice"><b>Optional by design.</b> Avid never fills these fields unless you turn on "Fill voluntary self-ID questions" for an application.</div>
+        <div class="grid split-top" data-fields="selfid"></div>
+      </section>
+
+      <section class="ob-card" data-step="done" hidden>
+        <span class="section-icon" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg></span>
+        <h1><span class="hl">You're set up</span></h1>
+        <p class="lead">Here is where things stand. Everything can be changed in My Info.</p>
+        <ul class="ob-summary" id="ob-summary"></ul>
+        <p class="ob-note">To try it, open any job application. The Avid drawer appears on the page. For career sites Avid does not know, turn on "Offer autofill on any job site" in My Info.</p>
+        <div class="io-actions"><button class="btn primary" id="ob-finish" type="button">Open My Info</button></div>
+      </section>
+
+      <footer class="ob-nav">
+        <button class="btn secondary" id="ob-back" type="button">Back</button>
+        <span class="ob-spacer"></span>
+        <button class="btn ghost ob-skip" id="ob-skip" type="button">Skip</button>
+        <button class="btn primary" id="ob-next" type="button">Continue</button>
+      </footer>
+    </main>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>
