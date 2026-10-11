@@ -51,6 +51,8 @@ try {
   const workerTarget = await until(async () => (await targets()).find(t => t.type === "service_worker" && t.url.endsWith("/background.js")), "extension service worker");
   const worker = await cdp(workerTarget.webSocketDebuggerUrl);
   const base = `chrome-extension://${new URL(workerTarget.url).host}`;
+  // The worker opens My Info on install; ask again in case this browser has not yet (it focuses an open one).
+  await worker.evaluate("chrome.runtime.openOptionsPage()");
   const optionsTarget = await until(async () => (await targets()).find(t => t.url.startsWith(base) && t.url.includes("options.html")), "Connections page");
   const options = await cdp(optionsTarget.webSocketDebuggerUrl);
   await options.send("Emulation.setDeviceMetricsOverride", { width: 1100, height: 900, deviceScaleFactor: 1, mobile: false });
