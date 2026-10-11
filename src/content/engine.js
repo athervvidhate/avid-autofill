@@ -14,6 +14,11 @@
     el.type !== "hidden";
 
   const isAffirmative = (v) => /^(yes|y|true|1)$/i.test(String(v).trim());
+  // An option that agrees to or acknowledges something ("I agree", "I have read
+  // and understand ..."), ticked when settings.tickAcknowledgements is on.
+  const ACKNOWLEDGES = /^(yes,? )?i (have read|(hereby )?(agree|acknowledge|accept|understand|confirm|certify|consent|attest))\b|^(agree|accept|acknowledge(d)?|i agree)\b/i;
+  const acknowledgement = (el, settings) =>
+    settings.tickAcknowledgements !== false && ACKNOWLEDGES.test((AvidAutofill.labelTextFor(el) || "").trim());
 
   async function fillPage(profile, settings, resume) {
     const run = AvidAutofill._fillRun = (AvidAutofill._fillRun || 0) + 1;
@@ -47,6 +52,9 @@
 
     // --- 0. Resume upload (if a resume is stored). ---
     if (resume) await uploadResume(resume, matcher, fillers, record);
+    // Ashby parses an uploaded resume and then rewrites the form from it,
+    // erasing anything filled before the parse finished. Wait it out.
+    if (resume && adapter.resumeParse) await adapter.resumeParse(fillers.sleep);
 
     // Workday work-history repeater (Add Another + per-panel fill) runs before
     // the generic date sweep so its date sections are marked handled first and
@@ -89,6 +97,8 @@
           const values = m.place ? [...m.alts, m.value] : [m.value, ...(m.alts || [])];
           const ok = await fillers.setReactSelect(control, values);
           record(signal, m.value, ok ? (m.assumed ? "assumed" : "filled") : "skipped");
+          // No option read like the profile value: leave the question to Jev.
+          if (!ok) unmatched.push({ el: control, custom: true, signal });
         } catch (_) {
           record(signal, m.value, "error");
         }
@@ -111,11 +121,51 @@
       if (!group.length) continue;
       group.forEach((r) => handled.add(r));
       const signal = M().groupSignal(group);
-      const m = matcher.match(signal, profile, helpers);
+      // A lone radio is an acknowledgement ("I agree"), never a profile question,
+      // however much policy text its title carries.
+      const m = group.length > 1 ? matcher.match(signal, profile, helpers) : null;
+      if (!m && group.length === 1 && acknowledgement(group[0], settings)) {
+        if (!group[0].checked) fillers.setCheckbox(group[0], true);
+        record(signal, AvidAutofill.labelTextFor(group[0]), group[0].checked ? "filled" : "skipped");
+        continue;
+      }
       if (!m) { unmatched.push({ el: group[0], group, signal }); continue; }
       if (m.eeo && !settings.fillEEO) continue;
-      const ok = fillers.setRadio(group, m.value);
+      let ok = [m.value, ...(m.alts || [])].some((v) => fillers.setRadio(group, v));
+      if (!ok && m.duration) {
+        const i = matcher.nearestDuration(m.value, group.map((r) => AvidAutofill.labelTextFor(r) || r.value));
+        if (i >= 0) ok = fillers.setRadio([group[i]], group[i].value || AvidAutofill.labelTextFor(group[i]));
+      }
       record(signal, m.value, ok ? (m.assumed ? "assumed" : "filled") : "skipped");
+      // None of the options reads like the profile value: leave the question to Jev.
+      if (!ok) unmatched.push({ el: group[0], group, signal });
+    }
+
+    // --- 2b. Yes/No button pairs: a parent whose only buttons read "Yes" and "No".
+    //         Any checkbox beside them is the form's hidden mirror of the buttons. ---
+    const yesNoGroups = new Map();
+    F().queryAll("button").forEach((b) => {
+      const parent = b.parentElement;
+      if (parent && !handled.has(b) && /^(yes|no)$/i.test(b.textContent.trim())) {
+        yesNoGroups.set(parent, [...(yesNoGroups.get(parent) || []), b]);
+      }
+    });
+    for (const [container, buttons] of yesNoGroups) {
+      const answers = buttons.map((b) => b.textContent.trim().toLowerCase()).sort().join();
+      if (answers !== "no,yes" || container.querySelectorAll("button").length !== 2 || !buttons.every(isVisible)) continue;
+      buttons.forEach((b) => handled.add(b));
+      F().queryAll("input", container).forEach((i) => handled.add(i));
+      const signal = matcher.choiceSignal(container);
+      const m = matcher.match(signal, profile, helpers);
+      if (!m) { unmatched.push({ el: buttons[0], buttons, signal }); continue; }
+      if (m.eeo && !settings.fillEEO) continue;
+      if (!settings.overwriteFilled && buttons.some((b) => b.getAttribute("aria-pressed") === "true")) {
+        record(signal, m.value, "kept-existing");
+        continue;
+      }
+      const ok = [m.value, ...(m.alts || [])].some((v) => fillers.setButtonChoice(buttons, v));
+      record(signal, m.value, ok ? (m.assumed ? "assumed" : "filled") : "skipped");
+      if (!ok) unmatched.push({ el: buttons[0], buttons, signal });
     }
 
     // --- 3. Everything else: text inputs, textareas, native selects, checkboxes.
@@ -144,6 +194,11 @@
 
       const signal = matcher.signalFor(el);
       const m = matcher.match(signal, profile, helpers);
+      if (!m && type === "checkbox" && acknowledgement(el, settings)) {
+        fillers.setCheckbox(el, true);
+        record(signal, "checked", el.checked ? "filled" : "skipped");
+        continue;
+      }
       if (!m) { unmatched.push({ el, signal }); continue; }
       if (m.eeo && !settings.fillEEO) continue;
 
@@ -158,7 +213,12 @@
 
       try {
         if (el.tagName === "SELECT") {
-          const ok = fillers.setNativeSelect(el, [m.value, ...(m.alts || [])]);
+          let ok = fillers.setNativeSelect(el, [m.value, ...(m.alts || [])]);
+          if (!ok && m.duration) {
+            const options = Array.from(el.options);
+            const i = matcher.nearestDuration(m.value, options.map((o) => o.value ? o.textContent : ""));
+            if (i >= 0) ok = fillers.setNativeSelect(el, [options[i].value]);
+          }
           record(signal, m.value, ok ? (m.assumed ? "assumed" : "filled") : "no-option-match");
         } else if (type === "checkbox") {
           // Affirmative yes/no answers tick the box; negatives leave it.
@@ -168,6 +228,11 @@
         } else if (m.place && adapter.locationSearch && el.matches(adapter.locationSearch)) {
           const picked = await fillers.setLocationSearch(el, m.value, m.alts);
           record(signal, picked || m.value, picked ? "filled" : "no-option-match");
+        } else if (type === "number" && !/^-?\d+(\.\d+)?$/.test(m.value)) {
+          // A number input rejects text like "100,000-130,000": use its first number.
+          const first = m.value.replace(/(\d),(?=\d{3})/g, "$1").match(/-?\d+(\.\d+)?/);
+          if (first) fillers.setTextValue(el, first[0]);
+          record(signal, first ? first[0] : m.value, first && el.value ? "filled" : "skipped");
         } else {
           fillers.setTextValue(el, m.value);
           record(signal, m.value, el.value ? "filled" : "skipped");
@@ -197,9 +262,11 @@
   // often visually hidden behind a styled button, so we do NOT use the visible
   // check here — we score every enabled file input by how resume-like it looks.
   async function uploadResume(resume, matcher, fillers, record) {
+    // Ashby's "Autofill from resume" box is not the application's resume field:
+    // a file there only starts Ashby's own parse, which rewrites the form.
     const inputs = Array.from(
       F().queryAll('input[type="file"]')
-    ).filter((i) => !i.disabled);
+    ).filter((i) => !i.disabled && !i.closest('[class*="autofill-pane"], [class*="autofillPane"], [class*="autofill-input"]'));
 
     const scored = inputs.map((i) => ({
       el: i,

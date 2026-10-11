@@ -1604,7 +1604,7 @@ test("location questions naming countries are answered from the profile country"
   assert.equal(answer("are you located in the united states?"), "No");
 });
 
-test("consent and attestation checkboxes are left for the applicant", async () => {
+test("acknowledgement boxes are ticked unless the applicant turns that off", async () => {
   const { document, AvidAutofill: A } = blankWindow();
   const profile = testProfile(A), helpers = A.matcher.makeHelpers(profile);
   for (const signal of ["i agree", "i certify that the information provided is true", "i acknowledge the privacy notice", "i have read and understand the terms", "accept terms and conditions"]) {
@@ -1612,8 +1612,10 @@ test("consent and attestation checkboxes are left for the applicant", async () =
   }
   document.body.innerHTML = '<form><label><input type="checkbox" id="agree"> I agree to the processing of my data</label></form>';
   document.getElementById("agree").getClientRects = () => [{}];
-  await A.engine.fillPage(profile, A.DEFAULT_SETTINGS, null);
+  await A.engine.fillPage(profile, { ...A.DEFAULT_SETTINGS, tickAcknowledgements: false }, null);
   assert.equal(document.getElementById("agree").checked, false);
+  await A.engine.fillPage(profile, A.DEFAULT_SETTINGS, null);
+  assert.equal(document.getElementById("agree").checked, true);
 });
 
 test("Lever location search picks the suggestion in the profile's state", async () => {
@@ -1640,6 +1642,152 @@ test("Lever location search picks the suggestion in the profile's state", async 
   assert.equal(input.value, "Portland, CA, USA");
   assert.equal(document.getElementById("selected-location").value, '{"name":"Portland, CA, USA"}');
   assert.equal(report.results.find(r => /location/.test(r.label))?.status, "filled");
+});
+
+test("fillPage answers a captured Ashby form: yes/no buttons, pronouns, LinkedIn, gender and race", async () => {
+  const { document, A, dom } = loadFixture("ashby-application.html", "https://jobs.ashbyhq.com/example/job/application");
+  dom.window.HTMLElement.prototype.getClientRects = function () { return [{}]; };
+  // Ashby's buttons only change state through their click handler.
+  document.querySelectorAll(".ashby-application-form-input-yesno-option").forEach((b) =>
+    b.addEventListener("click", () => {
+      b.parentElement.querySelectorAll("button").forEach((o) => o.setAttribute("aria-pressed", String(o === b)));
+    })
+  );
+  const profile = testProfile(A);
+  Object.assign(profile.personal, { pronouns: "he/him" });
+  profile.eeo.gender = "Male";
+  profile.eeo.race = "Asian";
+  profile.workAuth = { authorizedToWork: "Yes", requireSponsorship: "No" };
+  await A.engine.fillPage(profile, { overwriteFilled: false, fillEEO: true, highlightFilled: false }, null);
+
+  const pressed = (path) =>
+    document.querySelector(`[data-field-path="${path}"] button[aria-pressed="true"]`)?.textContent;
+  assert.equal(pressed("1cd98c1a-3766-498b-8ab7-f7e325a11883"), "Yes", "onsite");
+  assert.equal(pressed("28aa6e1c-b695-442a-adea-8ac56073529d"), "Yes", "work authorization");
+  assert.equal(pressed("c86cc07c-951c-46a2-8804-dfdbc4a00150"), "No", "sponsorship");
+  const value = (id) => document.getElementById(id).value;
+  assert.equal(value("ad70a2c7-3548-440d-bd8f-4b72c54fc521"), "he/him", "pronouns");
+  assert.equal(value("36e042a7-71c3-4d17-a72f-54d355a547b9"), "", "name pronunciation is not the pronouns field");
+  assert.equal(value("aebd5254-2ac1-40d3-827f-01e4eaadaf29"), "https://linkedin.com/in/alexrivera", "LinkedIn");
+  const checked = (name) => document.querySelector(`input[type="radio"][name$="${name}"]:checked`)?.id;
+  assert.match(checked("_systemfield_eeoc_gender"), /gender-labeled-radio-0$/);
+  assert.match(checked("_systemfield_eeoc_race"), /race-labeled-radio-4$/);
+  // The relocation question keeps its own answer, not a neighbour's.
+  assert.match(checked("fb61f6eb-5a53-477d-9f04-8f6118f14a4f"), /radio-0$/);
+});
+
+test("fillPage fills a second captured Ashby form without misreading long questions", async () => {
+  const { document, A, dom } = loadFixture("ashby-application-2.html", "https://jobs.ashbyhq.com/example/job/application");
+  dom.window.HTMLElement.prototype.getClientRects = function () { return [{}]; };
+  document.querySelectorAll(".ashby-application-form-input-yesno-option").forEach((b) =>
+    b.addEventListener("click", () => {
+      b.parentElement.querySelectorAll("button").forEach((o) => o.setAttribute("aria-pressed", String(o === b)));
+    })
+  );
+  // Ashby comboboxes list their options in a popup once typed into.
+  const optionsFor = {
+    "What is your work location": ["Austin, TX", "Portland, OR"],
+    "If this role requires a security clearance": ["None", "Secret", "Top Secret"],
+    "Please select the country you hold citizenship in": ["Canada", "United States", "United States Minor Outlying Islands"],
+    "If you hold citizenship in a second country": ["None", "Canada", "United States"],
+  };
+  document.querySelectorAll('[role="combobox"]').forEach((input) => {
+    const label = input.closest("[data-field-path]").querySelector("label").textContent;
+    const title = Object.keys(optionsFor).find((t) => label.startsWith(t));
+    input.addEventListener("input", () => {
+      document.querySelectorAll("[data-popup]").forEach((n) => n.remove());
+      const popup = document.createElement("div");
+      popup.setAttribute("data-popup", "");
+      for (const text of optionsFor[title] || []) {
+        const option = document.createElement("div");
+        option.setAttribute("role", "option");
+        option.textContent = text;
+        option.addEventListener("click", () => { input.value = text; popup.remove(); });
+        popup.append(option);
+      }
+      document.body.append(popup);
+    });
+  });
+  const profile = testProfile(A);
+  Object.assign(profile.personal, { city: "Austin", state: "TX" });
+  profile.misc.salaryExpectation = "100,000-130,000";
+  profile.misc.noticePeriod = "one month";
+  profile.questions.remoteExperience = "Yes, hybrid";
+  profile.links.portfolio = "https://alex.example.dev";
+  await A.engine.fillPage(profile, { overwriteFilled: false, fillEEO: false, highlightFilled: false }, null);
+
+  const entryFor = (title) =>
+    Array.from(document.querySelectorAll("[data-field-path]")).find((e) => e.querySelector("label")?.textContent.startsWith(title));
+  const answer = (title) => entryFor(title).querySelector("input:not([type=checkbox]), textarea").value;
+  const pressedFor = (title) => entryFor(title).querySelector('button[aria-pressed="true"]')?.textContent;
+  assert.equal(pressedFor("Are you able and willing to work from our Los Angeles"), "Yes", "office attendance");
+  assert.equal(pressedFor("Are you legally authorized"), "Yes");
+  assert.equal(pressedFor("Will you now or in the future require visa sponsorship"), "No");
+  assert.equal(pressedFor("On-Call Requirements"), "Yes");
+  assert.equal(pressedFor("Outside Work and Advisory Disclosure"), "No");
+  assert.equal(pressedFor("Have you heard of TRM"), undefined, "unknown yes/no questions are left for Jev");
+  const chosen = (title) => entryFor(title).querySelector('input[type="radio"]:checked')?.id;
+  assert.match(chosen("What is your current notice period"), /radio-2$/, "one month -> the 1 month option");
+  assert.match(chosen("Have you previously worked in a remote or hybrid"), /radio-1$/);
+  assert.equal(answer("If this role requires a security clearance"), "None");
+  assert.equal(answer("Please select the country you hold citizenship in"), "United States");
+  assert.equal(answer("If you hold citizenship in a second country"), "None");
+  assert.equal(answer("Please provide relevant work samples"), "https://alex.example.dev");
+  assert.equal(answer("What is your work location"), "Austin, TX");
+  assert.equal(answer("Please list your most recent employer"), "Globex");
+  assert.equal(answer("Please share your base compensation"), "100000", "a number input gets the first number of a salary range");
+  assert.equal(answer("Why are you considering leaving"), "", "a 'why leaving' question is not the job title");
+  assert.equal(answer("If yes, please provide details"), "", "a follow-up for details is not the sponsorship answer");
+  for (const id of ["764b6651", "b8b84bc4", "5a49f203"]) {
+    assert.ok(document.querySelector(`input[type="radio"][name*="${id}"]:checked`), `acknowledgement ${id} is ticked`);
+  }
+});
+
+test("notice periods match the option covering the same length of time", () => {
+  const { A } = loadFixture("ashby-application-2.html");
+  const options = ["1-2 weeks", "3-4 weeks", "1 month", "2 months", "3+ months"];
+  const pick = (v) => options[A.matcher.nearestDuration(v, options)];
+  assert.equal(pick("2 weeks"), "1-2 weeks");
+  assert.equal(pick("4 weeks"), "3-4 weeks");
+  assert.equal(pick("30 days"), "1 month");
+  assert.equal(pick("six months"), "3+ months");
+  assert.equal(pick("Immediately"), "1-2 weeks");
+  assert.equal(A.matcher.nearestDuration("June 1, 2027", options), -1);
+});
+
+test("Ashby fill waits for Ashby's own resume parse to finish before filling", async () => {
+  const { document, A, dom } = loadFixture("ashby-application-2.html", "https://jobs.ashbyhq.com/example/job/application");
+  const adapter = A.adapters.detect();
+  assert.equal(adapter.name, "Ashby");
+  const layer = document.querySelector(".ashby-application-form-autofill-input-pending-layer");
+  const fast = () => new Promise((resolve) => dom.window.setTimeout(resolve, 5));
+  let parsed = false;
+  dom.window.setTimeout(() => layer.setAttribute("data-state", "visible"), 20);
+  dom.window.setTimeout(() => { layer.setAttribute("data-state", "hidden"); parsed = true; }, 150);
+  await adapter.resumeParse(fast);
+  assert.equal(parsed, true, "returns only after the parsing layer hides again");
+  // No parse started: returns after the short start window.
+  await adapter.resumeParse(fast);
+});
+
+test("typing over an existing email replaces it instead of appending", () => {
+  const { document, AvidAutofill: A } = blankWindow();
+  document.body.innerHTML = '<input type="email" id="e" value="old@example.com">';
+  const el = document.getElementById("e");
+  // A browser inserts at the caret; with nothing selected that is the end.
+  document.execCommand = (cmd, ui, text) => { el.value = el.value + text; return true; };
+  A.fillers.setTextValue(el, "alex.rivera@example.com");
+  assert.equal(el.value, "alex.rivera@example.com");
+});
+
+test("the resume goes to Ashby's Resume field, not its Autofill from resume box", async () => {
+  const { document, A, dom } = loadFixture("ashby-application-2.html", "https://jobs.ashbyhq.com/example/job/application");
+  dom.window.HTMLElement.prototype.getClientRects = function () { return [{}]; };
+  const targets = [];
+  A.fillers.uploadToInput = async (input) => { targets.push(input); return true; };
+  A.adapters.detect().resumeParse = async () => {};
+  await A.engine.fillPage(testProfile(A), { overwriteFilled: false, fillEEO: false, highlightFilled: false }, { name: "resume.pdf", type: "application/pdf", dataUrl: "data:application/pdf;base64,AA==" });
+  assert.deepEqual(targets.map((t) => t.id), ["_systemfield_resume"]);
 });
 
 test("native selects and radios match whole words, so Man does not pick Woman or No pick Not", () => {

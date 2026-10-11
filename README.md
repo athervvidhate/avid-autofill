@@ -75,8 +75,13 @@ the field matching for your own search.
 | iCIMS, Taleo | Detected; generic fill only |
 | Workable, SmartRecruiters | Detected; generic fill with ARIA dropdown support |
 
-Company-embedded ATS on custom domains and more platforms are on the
-[roadmap](#roadmap). Open an issue with a posting URL if one you use is missing.
+**Unfamiliar sites:** the toolbar button opens the drawer on any page. Turn on
+*Offer autofill on any job site* in Connections and the drawer appears by itself
+on any page that looks like a job application (name and email fields plus a
+resume upload or job questions). Fields are matched from labels, placeholders,
+and standard `autocomplete` attributes.
+
+More platforms are on the [roadmap](#roadmap). Open an issue with a posting URL if one you use is missing.
 
 ## Install (from source)
 
