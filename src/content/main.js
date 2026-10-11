@@ -13,9 +13,10 @@
 
   // Mount the drawer when we recognize the ATS. A toolbar click can also ask us
   // to mount on an unrecognized page so the user can see its status.
+  let captured = false;
   function init() {
     const adapter = AvidAutofill.adapters.detect();
-    if (adapter.name === "iCIMS" && window.parent !== window) return;
+    if (adapter.name === "iCIMS" && window.parent !== window) return true;
     if (adapter.name === "iCIMS" && document.querySelector("iframe#icims_content_iframe")) {
       AvidAutofill.engine.fillPage = async () => {
         const response = await chrome.runtime.sendMessage({ type: "AVID_FILL_ICIMS_FRAME" });
@@ -23,18 +24,36 @@
         return response.report;
       };
     }
-    if (AvidAutofill.workday && AvidAutofill.workday.captureDescription) AvidAutofill.workday.captureDescription().catch(() => {});
+    if (!captured && AvidAutofill.workday && AvidAutofill.workday.captureDescription) AvidAutofill.workday.captureDescription().catch(() => {});
+    captured = true;
     const requested = !!g.__avidOpenDrawer;
-    if (adapter.name !== "Generic" || document.querySelector("form") || requested) {
+    if (adapter.name !== "Generic" || requested || AvidAutofill.generic.detect().isApplication) {
       AvidAutofill.widget.mount(adapter);
       if (requested) {
         delete g.__avidOpenDrawer;
         AvidAutofill.widget.open();
       }
+      return true;
     }
+    return false;
   }
-  if ("requestIdleCallback" in window) requestIdleCallback(init, { timeout: 2000 });
-  else setTimeout(init, 800);
+
+  // On an unfamiliar site the form often renders after load (single-page apps,
+  // an Apply button that reveals it), so keep checking for a couple of minutes.
+  function watch() {
+    let timer;
+    const stop = () => { observer.disconnect(); clearTimeout(timer); };
+    const observer = new MutationObserver(() => {
+      clearTimeout(timer);
+      timer = setTimeout(() => { if (init()) stop(); }, 750);
+    });
+    observer.observe(document.documentElement, { childList: true, subtree: true });
+    setTimeout(stop, 120000);
+  }
+
+  function start() { if (!init()) watch(); }
+  if ("requestIdleCallback" in window) requestIdleCallback(start, { timeout: 2000 });
+  else setTimeout(start, 800);
 
   chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     if (msg && msg.type === "AVID_OPEN_DRAWER") {

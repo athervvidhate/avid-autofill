@@ -97,7 +97,9 @@
       attr(el, "data-qa"),
       attr(el, "autocomplete"),
     ].map(deCamel);
-    return norm([...human, ...ids].filter(Boolean).join(" | "));
+    // Standard-attribute hints help on sites whose labels and names say nothing.
+    const hint = AvidAutofill.generic ? AvidAutofill.generic.hints(el) : "";
+    return norm([...human, ...ids, hint].filter(Boolean).join(" | "));
   }
 
   // Helpers reading from the profile.
@@ -116,8 +118,8 @@
   // `kind` hints the filler (text | yesno | select). Default text.
   const RULES = [
     // --- Name ---
-    { any: [/first name/, /given name/, /^fname$/, /legal first/], not: [/preferred/], get: (p, h) => h.firstName() },
-    { any: [/last name/, /family name/, /surname/, /^lname$/, /legal last/], get: (p, h) => h.lastName() },
+    { any: [/first name/, /given name/, /^fname$/, /legal first/, /(^|\| )first( \||$)/], not: [/preferred/], get: (p, h) => h.firstName() },
+    { any: [/last name/, /family name/, /surname/, /^lname$/, /legal last/, /(^|\| )last( \||$)/], get: (p, h) => h.lastName() },
     { any: [/preferred (first )?name/, /nick ?name/, /goes by/, /name you('d| would) prefer/, /like us to call you/], get: (p) => p.personal.preferredName || p.personal.firstName },
     { any: [/legal name/, /full name/, /^name$/, /(^|\| )name(\*| \||$)/, /your name/, /candidate name/], not: [/company|user|file|first|last|middle|event|account|maiden|screen|pronounc|phonetic/], get: (p) => p.personal.fullName || `${p.personal.firstName} ${p.personal.lastName}`.trim() },
 
@@ -125,14 +127,14 @@
     { any: [/confirm.*e-?mail/, /e-?mail.*confirm/], not: [/company/], get: (p) => p.personal.email },
     { any: [/e-?mail/, /^email address$/], not: [/confirm|company/], get: (p) => p.personal.email },
     { any: [/phone device type/], kind: "select", get: (p) => p.personal.phoneDeviceType || "Mobile" },
-    { any: [/phone/, /mobile/, /telephone/, /contact number/], not: [/extension/, /device type/, /\bsms\b/, /opt.?in/, /phone code/, /country.*code/, /phonetic/], get: (p) => p.personal.phone },
+    { any: [/phone/, /mobile/, /telephone/, /contact number/, /\bcell\b/], not: [/extension/, /device type/, /\bsms\b/, /opt.?in/, /phone code/, /country.*code/, /phonetic/], get: (p) => p.personal.phone },
     { any: [/pronoun/], get: (p) => p.personal.pronouns },
 
     // --- Address ---
     { any: [/street address/, /address line ?1/, /^address$/, /mailing address/], not: [/email/], get: (p) => p.personal.address },
     { any: [/\bcity\b/, /\btown\b/, /(^|\| )(current )?location( \||$)/, /(^|\| )current location\b/], not: [/velocity|capacity|ethnic/], expand: "place", get: (p) => p.personal.city },
     { any: [/\bstate\b/, /\bprovince\b/, /\bregion\b/], not: [/statement|estate|united states|work/], expand: "usState", get: (p) => p.personal.state },
-    { any: [/zip/, /postal code/, /post code/], get: (p) => p.personal.postalCode },
+    { any: [/zip/, /postal code/, /post ?code/], get: (p) => p.personal.postalCode },
     { any: [/\b(located|location|based|living|reside|residing) in\b/], not: [/relocat|willing|commut|authoriz|work|time ?zone|hours/], kind: "yesno", get: (p, h, signal) => inListedCountry(signal, p.personal.country) },
     { any: [/country/, /nationality/], not: [/authoriz/, /eligible to work/, /sponsor/, /work in the country/, /citizen/], get: (p) => p.personal.country },
 

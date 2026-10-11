@@ -61,6 +61,8 @@
           <p id="connection-msg" role="status" aria-live="polite"></p>
           <label class="tracker-toggle"><input type="checkbox" id="tracker-enabled"><span><b>Ask to track submitted applications</b><small>Detect applications on company career pages and unfamiliar sites, even without autofill. Enabling this asks for access to HTTP and HTTPS pages. You approve each entry before Avid adds it.</small></span></label>
           <div id="tracker-pending" class="notice" hidden><b id="tracker-pending-count"></b><ul id="tracker-pending-list"></ul><button class="btn secondary" id="tracker-retry">Retry saved entries</button></div>
+          <label class="tracker-toggle"><input type="checkbox" id="anysite-enabled"><span><b>Offer autofill on any job site</b><small>Show the Avid drawer on company career pages and platforms Avid does not know, whenever the page looks like a job application. Enabling this asks for access to HTTP and HTTPS pages. Nothing is sent anywhere, and Avid still never submits for you.</small></span></label>
+          <p id="anysite-msg" role="status" aria-live="polite"></p>
           <details id="google-setup" hidden>
             <summary>Google connection setup for this unpacked build</summary>
             <p>The extension needs a Google OAuth web client ID before sign-in can work. This is a one-time developer setup, not a client secret.</p>
@@ -99,5 +101,6 @@
     <script src="options.js"></script>
     <script src="connections.js"></script>
     <script src="jev.js"></script>
+    <script src="anysite.js"></script>
   </body>
 </html>
