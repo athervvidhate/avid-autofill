@@ -1,6 +1,6 @@
 // Fills each application page as it appears, so the applicant does not click
-// Fill on every step. Nothing fills until the applicant has clicked Fill once in
-// this tab; that click arms it for the rest of the application. Watches for a set of fillable fields it has not filled yet
+// Fill on every step. Nothing fills until the applicant has clicked Fill once on
+// this application; that click arms it for the rest of the application. Watches for a set of fillable fields it has not filled yet
 // (a Next click, a route change, a section that opens) and runs one fill for it.
 (function () {
   const AvidAutofill = (globalThis.AvidAutofill = globalThis.AvidAutofill || {});
@@ -20,8 +20,20 @@
   let timer = null;
   let lastUrl = location.href;
 
+  // The application this page belongs to: the host plus the path up to the first
+  // segment carrying an id (a job number or uuid), so its later steps share it but
+  // another job opened in the same tab does not.
+  function appKey() {
+    const parts = location.pathname.split("/").filter(Boolean);
+    const at = parts.findIndex((p) => /\d/.test(p));
+    return location.host + "/" + (at < 0 ? "" : parts.slice(0, at + 1).join("/"));
+  }
   const wasArmed = () => {
-    try { return armed || sessionStorage.getItem(FLAG) === "1"; } catch (_) { return armed; }
+    try { return armed || sessionStorage.getItem(FLAG) === appKey(); } catch (_) { return armed; }
+  };
+  // A reload shows the page the applicant was already on, so it is not a new step.
+  const reloaded = () => {
+    try { return performance.getEntriesByType("navigation")[0]?.type === "reload"; } catch (_) { return false; }
   };
 
   const text = (s) => String(s || "").replace(/\s+/g, " ").trim().slice(0, 80);
@@ -125,14 +137,14 @@
     window.addEventListener("popstate", settle);
     window.addEventListener("hashchange", settle);
     // A full page load after the applicant already armed it: fill the new page.
-    if (fillNow && wasArmed()) settle();
+    if (fillNow && wasArmed() && !reloaded()) settle();
   }
 
   // Called after the applicant's own Fill click: this page counts as done, and
   // every later step fills by itself.
   function arm() {
     armed = true;
-    try { sessionStorage.setItem(FLAG, "1"); } catch (_) { /* private mode */ }
+    try { sessionStorage.setItem(FLAG, appKey()); } catch (_) { /* private mode */ }
     freshFields().forEach((k) => filled.add(k));
     start(false);
   }

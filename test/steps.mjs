@@ -83,3 +83,28 @@ test("turning the setting off stops automatic fills", async () => {
   await new Promise((r) => setTimeout(r, 1800));
   assert.equal(fills, 0);
 }, 10000);
+
+test("a Fill on one job does not arm another job opened in the same tab", async () => {
+  const html = '<form><input name="first_name" aria-label="First name"></form>';
+  const first = setup(html);
+  first.history.replaceState({}, "", "/acme/jobs/1a2b3c/apply");
+  first.AvidAutofill.steps.arm();
+  const armed = first.sessionStorage.getItem("avidStepsArmed");
+  assert.equal(armed, "jobs.example.com/acme/jobs/1a2b3c");
+  // A later step of the same job still counts as armed; another job does not.
+  first.history.replaceState({}, "", "/acme/jobs/1a2b3c/apply/step-two");
+  const second = setup(html);
+  second.sessionStorage.setItem("avidStepsArmed", armed);
+  second.history.replaceState({}, "", "/acme/jobs/9z8y7x/apply");
+  let fills = 0;
+  second.AvidAutofill.widget = { fill: async () => { fills += 1; return {}; } };
+  second.AvidAutofill.steps.start();
+  second.AvidAutofill.steps._settle();
+  await new Promise((r) => setTimeout(r, 1800));
+  assert.equal(fills, 0);
+  // The same check on the armed job's own page does fill.
+  second.history.replaceState({}, "", "/acme/jobs/1a2b3c/apply/step-two");
+  second.AvidAutofill.steps._settle();
+  await new Promise((r) => setTimeout(r, 1800));
+  assert.equal(fills, 1);
+}, 10000);

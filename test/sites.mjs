@@ -264,3 +264,19 @@ test("a Jobvite resume input is found from the menu around it, not the cover let
   assert.deepEqual(used, ["r"]);
   win.close();
 });
+
+test("a Rippling radio hidden with display:none behind its wrapper is still answered", async () => {
+  const html = '<form><div><div><div><p>Do you require work authorization to work in the United States for this internship?</p></div></div><div data-testid="field"><div role="radiogroup">'
+    + ["Yes", "No"].map((v) => `<div role="radio" aria-checked="false" data-value="${v}"><input class="hidden" type="radio" name="q1" value="${v}" aria-labelledby="l${v}"><div id="l${v}"><p>${v}</p></div></div>`).join("") + '</div></div></div></form>';
+  const dom = new JSDOM(html, { runScripts: "outside-only", pretendToBeVisual: true, url: "https://ats.rippling.com/acme/jobs/1/apply" });
+  const win = dom.window, store = {};
+  win.chrome = { storage: { local: { async get(k) { return k == null ? { ...store } : { [k]: store[k] }; }, async set(o) { Object.assign(store, o); }, async remove(k) { delete store[k]; } } } };
+  for (const src of SCRIPTS) win.eval(src);
+  // Only the inputs are display:none.
+  win.HTMLElement.prototype.getClientRects = function () { return this.matches("input.hidden") ? [] : [{ width: 100, height: 20 }]; };
+  const A = win.AvidAutofill;
+  A.fillers.sleep = async () => {};
+  await A.engine.fillPage(A.mergeDefaults(A.DEFAULT_PROFILE, {}), A.DEFAULT_SETTINGS, null);
+  assert.equal(win.document.querySelector('input[name="q1"]:checked')?.value, "No");
+  win.close();
+});

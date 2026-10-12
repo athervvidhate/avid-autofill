@@ -20,6 +20,10 @@
       // The outer page's drawer fills this frame through the relay below. Later
       // steps of the form load inside this frame, so it watches for them itself.
       AvidAutofill.widget.fill = fillHere;
+      try {
+        const sent = chrome.runtime.sendMessage({ type: "AVID_ICIMS_FRAME_READY" });
+        if (sent && sent.catch) sent.catch(() => {});
+      } catch (_) { /* extension reloaded */ }
       if (AvidAutofill.steps) AvidAutofill.steps.start();
       return true;
     }

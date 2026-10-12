@@ -13,6 +13,13 @@
     el.getAttribute("aria-hidden") !== "true" &&
     el.type !== "hidden";
 
+  // A radio styled away with display:none behind a visible wrapper (Rippling's
+  // div[role=radio], or a label drawn as the button) is still a live choice.
+  const styledChoice = (el) => {
+    const wrap = el.closest('[role="radio"], [role="checkbox"], label');
+    return !!wrap && !el.disabled && wrap.getAttribute("aria-hidden") !== "true" && F().isRendered(wrap);
+  };
+
   const isAffirmative = (v) => /^(yes|y|true|1)$/i.test(String(v).trim());
   // An option that agrees to or acknowledges something ("I agree", "I have read
   // and understand ..."), ticked when settings.tickAcknowledgements is on.
@@ -138,7 +145,7 @@
       if (group.length >= 2 && group.length <= 3 && group.every((c) => choiceLabel.test(matcher.norm(AvidAutofill.labelTextFor(c) || c.value)))) radioGroups[`checkbox:${name}`] = group;
     }
     for (const name of Object.keys(radioGroups)) {
-      const group = radioGroups[name].filter((r) => isVisible(r) && !inRepeater(r));
+      const group = radioGroups[name].filter((r) => (isVisible(r) || styledChoice(r)) && !inRepeater(r));
       if (!group.length) continue;
       group.forEach((r) => handled.add(r));
       const signal = M().groupSignal(group);
