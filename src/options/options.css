@@ -60,7 +60,7 @@ body::after { content: ""; position: fixed; z-index: -1; width: 420px; height: 4
 .sidebar-note span:last-child { grid-column: 2; line-height: 1.4; }
 .local-dot { width: 9px; height: 9px; border-radius: 3px 6px 3px 6px; background: var(--lime); }
 .content { position: relative; width: min(900px, 100%); margin: 0 auto; padding: 40px 32px 112px; }
-.squiggle { position: absolute; right: 36px; top: 30px; width: 64px; height: 18px; fill: none; stroke: var(--green); stroke-width: 3; stroke-linecap: round; }
+.squiggle { position: absolute; right: 36px; top: 27px; width: 64px; height: 24px; overflow: visible; fill: none; stroke: var(--green); stroke-width: 3; stroke-linecap: round; }
 .page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 8px; padding-top: 18px; }
 h1 { margin: 0 0 6px; font: 800 40px/1 var(--display); letter-spacing: -0.035em; }
 .hl { background: linear-gradient(transparent 58%, var(--lime) 58%, var(--lime) 92%, transparent 92%); padding: 0 4px; margin-left: -4px; }
