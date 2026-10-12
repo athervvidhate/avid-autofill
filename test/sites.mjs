@@ -11,7 +11,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const SCRIPTS = ["src/shared/schema.js", "src/popup/target.js", "src/content/fillers.js", "src/content/matcher.js", "src/content/adapters.js", "src/shared/skills.js", "src/content/workday.js", "src/content/engine.js"]
+const SCRIPTS = ["src/shared/schema.js", "src/popup/target.js", "src/content/fillers.js", "src/content/matcher.js", "src/content/adapters.js", "src/shared/skills.js", "src/content/workday.js", "src/content/repeaters.js", "src/content/engine.js"]
   .map((p) => fs.readFileSync(path.join(ROOT, p), "utf8"));
 
 async function fill(html, url, extra = {}) {
