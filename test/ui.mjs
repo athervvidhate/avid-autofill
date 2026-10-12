@@ -437,7 +437,7 @@ test("a very large page is previewed in part and typing a note does not rescrub 
   const note = shadow.querySelector(".report-note");
   note.value = "Resume upload missed";
   note.dispatchEvent(new dom.window.Event("input"));
-  assert.match(shadow.querySelector(".report-facts").textContent, /What went wrong\s*Resume upload missed/);
+  assert.match(preview.textContent, /What went wrong: Resume upload missed/);
   assert.equal(preview.textContent.slice(preview.textContent.indexOf("<!doctype")), before);
   dom.window.close();
 });
