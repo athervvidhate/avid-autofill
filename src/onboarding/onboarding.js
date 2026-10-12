@@ -35,11 +35,7 @@
 
   const loadState = async () => { state = { step: 0, skipped: [], ...(await chrome.storage.local.get(KEY))[KEY] }; state.step = Math.min(Math.max(+state.step || 0, 0), STEPS.length - 1); };
   const saveState = () => chrome.storage.local.set({ [KEY]: state });
-  async function send(type, data = {}) {
-    const result = await chrome.runtime.sendMessage({ type, ...data });
-    if (!result?.ok) throw new Error(result?.error || "Reload the extension and reopen setup.");
-    return result;
-  }
+  const send = (type, data = {}) => A.request({ type, ...data }, "Reload the extension and reopen setup.");
   const say = (id, text) => { $(id).textContent = text; };
 
   function control(id, label, type, options) {
@@ -210,6 +206,21 @@
   async function refreshResume() {
     const resume = await A.getResume();
     say("ob-resume-name", resume ? `Saved: ${resume.name}` : "No resume saved");
+    $("ob-resume-read").hidden = !resume;
+  }
+  // Reads the resume on this device, then lets the user review before anything is saved.
+  async function readResume(blob) {
+    if (busy) return;
+    busy = true; $("ob-resume-read").disabled = true;
+    say("ob-resume-msg", "Reading your resume...");
+    try {
+      const merged = await A.importResume(blob, await A.getProfile());
+      if (merged) {
+        await A.saveProfile(merged); profile = merged;
+        say("ob-resume-msg", "Added to your profile. The next steps show what it filled in.");
+      } else say("ob-resume-msg", "Nothing was added.");
+    } catch (e) { say("ob-resume-msg", e.message); }
+    busy = false; $("ob-resume-read").disabled = false;
   }
   $("ob-resume-file").onchange = event => {
     const file = event.target.files[0];
@@ -218,9 +229,14 @@
     reader.onload = async () => {
       await A.saveResume({ name: file.name, type: file.type || "application/pdf", dataUrl: reader.result });
       await refreshResume();
+      await readResume(file);
     };
     reader.readAsDataURL(file);
     event.target.value = "";
+  };
+  $("ob-resume-read").onclick = async () => {
+    const resume = await A.getResume();
+    if (resume) await readResume(await (await fetch(resume.dataUrl)).blob());
   };
   $("ob-import-file").onchange = async event => {
     const file = event.target.files[0];
