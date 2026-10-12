@@ -1567,6 +1567,25 @@ test("profile links do not answer questions that only mention the platform", () 
   assert.equal(answer("link to a github repository for a project you are proud of"), null);
 });
 
+test("date inputs take ISO dates and never type into the previous field; ambiguous school lists stay empty", async () => {
+  const win = blankWindow(), A = win.AvidAutofill, doc = win.document;
+  win.Element.prototype.getClientRects = () => [{}];
+  doc.body.innerHTML = `<label>Undergraduate GPA <input type="number" id="gpa"></label>
+    <label>Date of Undergraduate Graduation <input type="date" id="grad"></label>
+    <label>Undergraduate University <select id="school"><option value="">Select</option><option>State University-North Campus</option><option>State University-South Campus</option></select></label>`;
+  const profile = testProfile(A);
+  profile.education = [{ school: "State University", gpa: "3.8", endDate: "May 2018" }];
+  const gpa = doc.getElementById("gpa");
+  // Focus stays on the GPA box, as when the page is not in front and a date input cannot take focus.
+  const focus = win.HTMLElement.prototype.focus;
+  win.HTMLElement.prototype.focus = function () { if (this.id !== "grad") focus.call(this); };
+  await A.engine.fillPage(profile, A.DEFAULT_SETTINGS, null);
+  assert.equal(gpa.value, "3.8");
+  assert.equal(doc.getElementById("grad").value, "2018-05-01");
+  assert.equal(doc.getElementById("school").value, "", "two campuses match the name: neither is picked");
+  win.close();
+});
+
 test("name pronunciation questions are not answered with the legal name", () => {
   const A = blankWindow().AvidAutofill, profile = testProfile(A), helpers = A.matcher.makeHelpers(profile);
   assert.equal(A.matcher.match("type your response | name pronunciation | how do you pronounce your name? | cards a69a985a field2", profile, helpers), null);

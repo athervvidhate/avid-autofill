@@ -65,7 +65,9 @@
       // execCommand replaces the selection we made above with the value, firing
       // the real input pipeline. Treat it as successful if the field ended up
       // non-empty (masked fields may reformat, so we don't require an exact match).
-      inserted = document.execCommand("insertText", false, value) && !!el.value;
+      // insertText goes to whichever element holds focus: when this one could not
+      // take it (a date input in an unfocused page), it would type into the previous field.
+      inserted = el.getRootNode().activeElement === el && document.execCommand("insertText", false, value) && !!el.value;
     } catch (_) {
       inserted = false;
     }
@@ -189,6 +191,10 @@
           break;
         }
       }
+      // A name several options extend ("University of Washington" in a list of its
+      // campuses) does not say which one: leave the choice to the applicant.
+      const extending = (tg) => Array.from(el.options).filter((opt) => hasWord(normalize(opt.textContent), tg) && normalize(opt.textContent) !== tg);
+      if (matched && !targets.some((tg) => hasWord(tg, normalize(matched.textContent))) && targets.some((tg) => tg.includes(" ") && hasWord(normalize(matched.textContent), tg) && extending(tg).length > 1)) matched = null;
     }
     if (!matched) return false;
     nativeSelectSetter.call(el, matched.value);
