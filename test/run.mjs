@@ -1599,12 +1599,14 @@ test("a select's options do not become its label; education level and 'currently
   const win = blankWindow(), A = win.AvidAutofill, doc = win.document;
   win.Element.prototype.getClientRects = () => [{}];
   doc.body.innerHTML = `<label>Select a university or college <select id="school"><option value="">Select</option><option>Washington State University</option><option>State University</option></select></label>
+    <div>What university did you attend? <select id="s2" class="select2-hidden-accessible" aria-hidden="true"><option value="">Select a university</option><option>State University</option></select></div>
     <label>Highest level of education <select id="level"><option value="">Select</option><option>High School Diploma</option><option>Bachelor's Degree</option><option>Master's Degree</option></select></label>`;
   const profile = testProfile(A);
   profile.education = [{ school: "State University", degree: "Bachelor of Science" }];
   await A.engine.fillPage(profile, A.DEFAULT_SETTINGS, null);
   assert.equal(doc.getElementById("school").value, "State University", "'Washington State University' in the options must not read as a state question");
   assert.equal(doc.getElementById("level").value, "Bachelor's Degree");
+  assert.equal(doc.getElementById("s2").value, "State University", "a Select2 select is hidden from assistive tech but is still the field");
   const helpers = A.matcher.makeHelpers(profile);
   assert.equal(A.matcher.match("where are you currently located?", profile, helpers)?.value, "Portland");
   assert.equal(A.matcher.match("who is your current or previous employer?", profile, helpers)?.value, "Globex");
