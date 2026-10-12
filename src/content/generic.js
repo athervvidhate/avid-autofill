@@ -3,6 +3,7 @@
 // holds a job application form so the drawer can be offered there.
 (function () {
   const A = (globalThis.AvidAutofill = globalThis.AvidAutofill || {});
+  const SEEN = "avidSeenApplication";
 
   // WHATWG autocomplete tokens, spelled the way the matcher's rules expect.
   const AUTOCOMPLETE = {
@@ -93,7 +94,16 @@
     if (submit) { score += 1; reasons.push("apply button"); }
     // A login or sign-up form (a password field next to the email) is not an application.
     const loginOnly = password && !resume && jobFields === 0;
-    const isApplication = !loginOnly && ((identity >= 2 && (resume || jobFields >= 1 || (cue && submit))) || (identity >= 1 && resume && cue));
+    // Later steps of an application (work history, questions) have no name or email
+    // field, so a resume box or job questions on a job page count too, and so does
+    // any form with several fields on a site already recognised in this tab.
+    const seen = (() => { try { return sessionStorage.getItem(SEEN) === "1"; } catch (_) { return false; } })();
+    const isApplication = !loginOnly && (
+      (identity >= 2 && (resume || jobFields >= 1 || (cue && submit))) ||
+      (identity >= 1 && resume && cue) ||
+      (resume && jobFields >= 1 && cue) ||
+      (seen && fields.length >= 4));
+    if (isApplication && !seen) { try { sessionStorage.setItem(SEEN, "1"); } catch (_) { /* private mode */ } }
     return { isApplication, score, reasons };
   }
 

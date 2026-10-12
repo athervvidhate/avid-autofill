@@ -7,6 +7,7 @@
   if (AvidAutofill.steps) return;
 
   const QUIET_MS = 1200; // wait for the page to stop changing before reading it
+  const WINDOW_MS = 12000; // how long a step change is watched before giving up
   const MAX_RUNS = 25;
   const FIELDS = 'input:not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="reset"]):not([type="image"]):not([type="password"]), select, textarea, [role="combobox"]';
 
@@ -74,27 +75,57 @@
       // Fields the fill revealed (State after Country) belong to this pass.
       freshFields().forEach((k) => filled.add(k));
       running = false;
-      schedule();
     }
   }
 
-  function schedule() {
-    if (running || !wasArmed()) return;
+  // After a step change, wait for the page to stop changing, then fill once. The
+  // page is only watched for a short window, so a form that keeps redrawing
+  // itself later never triggers a fill the applicant did not ask for.
+  let observer = null;
+  let windowTimer = null;
+  function settle() {
+    if (!wasArmed() || running) return;
+    const quiet = () => {
+      clearTimeout(timer);
+      // Nothing new yet means the next page is still loading: keep watching.
+      timer = setTimeout(() => { if (freshFields().length) { stopWatching(); maybeFill(); } }, QUIET_MS);
+    };
+    if (!observer) {
+      observer = new MutationObserver(quiet);
+      observer.observe(document.documentElement, { childList: true, subtree: true });
+      windowTimer = setTimeout(stopWatching, WINDOW_MS);
+    }
+    quiet();
+  }
+  function stopWatching() {
+    if (observer) observer.disconnect();
+    observer = null;
+    clearTimeout(windowTimer);
     clearTimeout(timer);
-    timer = setTimeout(maybeFill, QUIET_MS);
   }
 
-  function start() {
+  const NEXT = /^(save( and| &|,)? ?(continue|next)|save|next|next step|continue|continue to .*|proceed|go to next.*|forward|apply now|start application)$/i;
+  const NOT_NEXT = /\b(back|previous|cancel|delete|remove|discard|sign out|log ?out)\b/i;
+  function onClick(event) {
+    const t = event.target && event.target.closest && event.target.closest('button, a, input[type="submit"], input[type="button"], [role="button"]');
+    if (!t || t.closest("#avid-autofill-root")) return;
+    const label = String(t.textContent || t.value || t.getAttribute("aria-label") || "").replace(/\s+/g, " ").trim();
+    if (label.length > 40 || NOT_NEXT.test(label) || !NEXT.test(label)) return;
+    settle();
+  }
+
+  function start(fillNow = true) {
     if (started) return;
     started = true;
-    new MutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true });
-    // Single-page apps change the URL without a load; a fresh step may reuse the DOM.
+    document.addEventListener("click", onClick, true);
+    // Single-page apps change the URL without a load.
     setInterval(() => {
-      if (location.href !== lastUrl) { lastUrl = location.href; schedule(); }
-    }, 800);
-    window.addEventListener("popstate", schedule);
-    window.addEventListener("hashchange", schedule);
-    schedule();
+      if (location.href !== lastUrl) { lastUrl = location.href; settle(); }
+    }, 1000);
+    window.addEventListener("popstate", settle);
+    window.addEventListener("hashchange", settle);
+    // A full page load after the applicant already armed it: fill the new page.
+    if (fillNow && wasArmed()) settle();
   }
 
   // Called after the applicant's own Fill click: this page counts as done, and
@@ -103,8 +134,8 @@
     armed = true;
     try { sessionStorage.setItem(FLAG, "1"); } catch (_) { /* private mode */ }
     freshFields().forEach((k) => filled.add(k));
-    start();
+    start(false);
   }
 
-  AvidAutofill.steps = { start, arm, _freshFields: freshFields, _reset: () => { filled.clear(); runs = 0; } };
+  AvidAutofill.steps = { start, arm, _freshFields: freshFields, _reset: () => { filled.clear(); runs = 0; }, _onClick: onClick, _settle: settle };
 })();
