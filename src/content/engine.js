@@ -13,6 +13,13 @@
     el.getAttribute("aria-hidden") !== "true" &&
     el.type !== "hidden";
 
+  // A radio styled away with display:none behind a visible wrapper (Rippling's
+  // div[role=radio], or a label drawn as the button) is still a live choice.
+  const styledChoice = (el) => {
+    const wrap = el.closest('[role="radio"], [role="checkbox"], label');
+    return !!wrap && !el.disabled && wrap.getAttribute("aria-hidden") !== "true" && F().isRendered(wrap);
+  };
+
   const isAffirmative = (v) => /^(yes|y|true|1)$/i.test(String(v).trim());
   // An option that agrees to or acknowledges something ("I agree", "I have read
   // and understand ..."), ticked when settings.tickAcknowledgements is on.
@@ -78,6 +85,14 @@
     // rows, so each row takes the matching profile entry instead of entry 0.
     if (adapter.name === "Breezy") breezyEntries(profile, fillers, record, handled);
 
+    // Work history and education as repeating rows: one profile entry per row, and
+    // a new row for each entry the form does not list yet.
+    let repeatRoots = [];
+    if (AvidAutofill.repeaters && !adapter.hasDateSections && adapter.name !== "Breezy") {
+      repeatRoots = await AvidAutofill.repeaters.fill(profile, { record, handled, settings });
+    }
+    const inRepeater = (el) => repeatRoots.some((r) => r.contains(el));
+
     // --- 1. Custom (react-select / combobox / Workday) dropdowns first, so their
     //        inner <input> is marked handled before the text pass sees it.
     //        Runs twice: selecting Country reveals the State dropdown, etc. ---
@@ -87,7 +102,7 @@
         F().queryAll(sel).forEach((c) => controls.push(c));
       }
       for (const control of dedupe(controls)) {
-        if (handled.has(control) || !isVisible(control)) continue;
+        if (handled.has(control) || inRepeater(control) || !isVisible(control)) continue;
         F().queryAll("input", control).forEach((i) => handled.add(i));
         handled.add(control);
         // React-select's question label belongs to its inner input; the control
@@ -130,7 +145,7 @@
       if (group.length >= 2 && group.length <= 3 && group.every((c) => choiceLabel.test(matcher.norm(AvidAutofill.labelTextFor(c) || c.value)))) radioGroups[`checkbox:${name}`] = group;
     }
     for (const name of Object.keys(radioGroups)) {
-      const group = radioGroups[name].filter(isVisible);
+      const group = radioGroups[name].filter((r) => (isVisible(r) || styledChoice(r)) && !inRepeater(r));
       if (!group.length) continue;
       group.forEach((r) => handled.add(r));
       const signal = M().groupSignal(group);
@@ -165,7 +180,7 @@
     });
     for (const [container, buttons] of yesNoGroups) {
       const answers = buttons.map((b) => b.textContent.trim().toLowerCase()).sort().join();
-      if (answers !== "no,yes" || container.querySelectorAll("button").length !== 2 || !buttons.every(isVisible)) continue;
+      if (answers !== "no,yes" || container.querySelectorAll("button").length !== 2 || !buttons.every(isVisible) || inRepeater(container)) continue;
       buttons.forEach((b) => handled.add(b));
       F().queryAll("input", container).forEach((i) => handled.add(i));
       const signal = matcher.choiceSignal(container);
@@ -194,7 +209,7 @@
       AvidAutofill.workday &&
       AvidAutofill.workday.isEducationField;
     for (const el of nodes) {
-      if (handled.has(el)) continue;
+      if (handled.has(el) || inRepeater(el)) continue;
       // Work-experience panel fields are owned by workExperiencePass/datePass;
       // skip them so the generic "job title" rule can't stamp work[0].title onto
       // every panel (see AvidAutofill.workday.isWorkExperienceField).
@@ -233,7 +248,9 @@
 
       try {
         if (el.tagName === "SELECT") {
-          let ok = fillers.setNativeSelect(el, [m.value, ...(m.alts || [])]);
+          // "BS" is listed as "Bachelor's Degree".
+          const degrees = /degree|diploma/.test(signal) && AvidAutofill.repeaters ? AvidAutofill.repeaters.degreeAlts(m.value) : [];
+          let ok = fillers.setNativeSelect(el, [m.value, ...(m.alts || []), ...degrees]);
           if (!ok && m.duration) {
             const options = Array.from(el.options);
             const i = matcher.nearestDuration(m.value, options.map((o) => o.value ? o.textContent : ""));
@@ -257,8 +274,11 @@
           if (first) fillers.setTextValue(el, first[0]);
           record(signal, first ? first[0] : m.value, first && el.value ? "filled" : "skipped");
         } else {
-          fillers.setTextValue(el, m.value);
-          record(signal, m.value, el.value ? "filled" : "skipped");
+          // A date input takes only YYYY-MM-DD.
+          const us = type === "date" && m.value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+          const value = us ? `${us[3]}-${us[1]}-${us[2]}` : m.value;
+          fillers.setTextValue(el, value);
+          record(signal, value, el.value ? "filled" : "skipped");
         }
       } catch (_) {
         record(signal, m.value, "error");
@@ -335,7 +355,7 @@
 
     const scored = inputs.map((i) => ({
       el: i,
-      sig: (matcher.signalFor(i) + " " + (i.accept || "")).toLowerCase(),
+      sig: (matcher.signalFor(i) + " " + (i.accept || "") + " " + ownBlockText(i)).toLowerCase(),
     }));
 
     // Prefer inputs that mention resume/cv; skip ones clearly for something else.
@@ -367,6 +387,14 @@
     } catch (_) {
       record("resume upload", resume.name, "error");
     }
+  }
+
+  // Text of the largest block around a file input that holds no other file
+  // input. Jobvite's input sits in a menu reading "File / Type or Paste Resume".
+  function ownBlockText(input) {
+    let node = input;
+    while (node.parentElement && node.parentElement.querySelectorAll('input[type="file"]').length === 1) node = node.parentElement;
+    return node === input ? "" : (node.textContent || "").replace(/\s+/g, " ").slice(0, 300);
   }
 
   // Signal for a radio/checkbox group: prefer a fieldset legend, else nearby text.

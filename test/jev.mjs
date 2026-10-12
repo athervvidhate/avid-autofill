@@ -181,7 +181,7 @@ async function page(html, sendMessage, existingWorker) {
   const dom = new JSDOM(html, { runScripts: "outside-only", pretendToBeVisual: true, url: content.url });
   const w = existingWorker || worker();
   dom.window.chrome = { storage: { local: { get: async key => clone({ [key]: w.local[key] }), set: async values => Object.assign(w.local, clone(values)) } }, runtime: { sendMessage } };
-  for (const file of ["src/shared/schema.js", "src/content/fillers.js", "src/content/matcher.js", "src/content/adapters.js", "src/content/workday.js", "src/content/jev.js", "src/content/engine.js"]) dom.window.eval(read(file));
+  for (const file of ["src/shared/schema.js", "src/content/fillers.js", "src/content/matcher.js", "src/content/adapters.js", "src/content/workday.js", "src/content/repeaters.js", "src/content/jev.js", "src/content/engine.js"]) dom.window.eval(read(file));
   const A = dom.window.AvidAutofill;
   A.fillers.sleep = async () => {};
   for (const el of dom.window.document.querySelectorAll("input,textarea,select")) el.getClientRects = () => [{}];
