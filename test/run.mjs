@@ -1567,6 +1567,21 @@ test("profile links do not answer questions that only mention the platform", () 
   assert.equal(answer("link to a github repository for a project you are proud of"), null);
 });
 
+test("a select's options do not become its label; education level and 'currently located' questions are answered", async () => {
+  const win = blankWindow(), A = win.AvidAutofill, doc = win.document;
+  win.Element.prototype.getClientRects = () => [{}];
+  doc.body.innerHTML = `<label>Select a university or college <select id="school"><option value="">Select</option><option>Washington State University</option><option>State University</option></select></label>
+    <label>Highest level of education <select id="level"><option value="">Select</option><option>High School Diploma</option><option>Bachelor's Degree</option><option>Master's Degree</option></select></label>`;
+  const profile = testProfile(A);
+  profile.education = [{ school: "State University", degree: "Bachelor of Science" }];
+  await A.engine.fillPage(profile, A.DEFAULT_SETTINGS, null);
+  assert.equal(doc.getElementById("school").value, "State University", "'Washington State University' in the options must not read as a state question");
+  assert.equal(doc.getElementById("level").value, "Bachelor's Degree");
+  const helpers = A.matcher.makeHelpers(profile);
+  assert.equal(A.matcher.match("where are you currently located?", profile, helpers)?.value, "Portland");
+  win.close();
+});
+
 test("name pronunciation questions are not answered with the legal name", () => {
   const A = blankWindow().AvidAutofill, profile = testProfile(A), helpers = A.matcher.makeHelpers(profile);
   assert.equal(A.matcher.match("type your response | name pronunciation | how do you pronounce your name? | cards a69a985a field2", profile, helpers), null);

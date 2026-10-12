@@ -14,11 +14,11 @@
     // 1. <label for=id>
     if (el.id) {
       const l = root.querySelector(`label[for="${cssEscape(el.id)}"]`);
-      if (l) parts.push(l.textContent);
+      if (l) parts.push(textWithoutControls(l));
     }
-    // 2. wrapping <label>
+    // 2. wrapping <label>. A select inside it would add every option to the label.
     const wrap = el.closest("label");
-    if (wrap) parts.push(wrap.textContent);
+    if (wrap) parts.push(textWithoutControls(wrap));
     // 3. aria-labelledby
     const labelledby = el.getAttribute && el.getAttribute("aria-labelledby");
     if (labelledby) {
@@ -186,7 +186,7 @@
     // --- Address ---
     { any: [/(primary |permanent |current )?(residence|residential|home) address/, /address of (your )?(primary )?residence/], get: (p) => fullAddress(p.personal) },
     { any: [/street address/, /address line ?1/, /(^|\| )address( \||$)/, /mailing address/], not: [/email/], get: (p) => p.personal.address },
-    { any: [/\bcity\b/, /\btown\b/, /(^|\| )(current )?location( \||$)/, /(^|\| )current location\b/, /\bwork location\b/, /where (are you|do you) (located|based|live)/], not: [/velocity|capacity|ethnic/], expand: "place", get: (p) => p.personal.city },
+    { any: [/\bcity\b/, /\btown\b/, /(^|\| )(current )?location( \||$)/, /(^|\| )current location\b/, /\bwork location\b/, /where (are you|do you) (currently )?(located|based|live)/], not: [/velocity|capacity|ethnic/], expand: "place", get: (p) => p.personal.city },
     { any: [/\bstate\b/, /\bprovince\b/, /\bregion\b/], not: [/statement|estate|united states|work/], expand: "usState", get: (p) => p.personal.state },
     { any: [/zip/, /postal code/, /post ?code/], get: (p) => p.personal.postalCode },
     { any: [/\bresident of\b/, /\bdo you (live|reside) in\b/], not: [/relocat|willing/], kind: "yesno", get: (p, h, signal) => residentOfState(signal, p.personal.state) },
@@ -210,7 +210,9 @@
     // --- Education ---
     { any: [/which (university|college|school)/, /(university|college|school) (did|do) you (last )?(attend|graduate)/, /last attended/], get: (p, h) => h.edu0().school },
     { any: [/school/, /university/, /college/, /institution/], not: [/high school diploma\?/, /are you/, /current.*student/, /enrolled/, /graduation/, /anticipated/], get: (p, h) => h.edu0().school },
-    { any: [/degree/], get: (p, h) => h.edu0().degree },
+    // "Highest level of education" is answered by the degree level, which dropdowns word as "Bachelor's Degree".
+    { any: [/highest (level of )?(education|degree|schooling)/, /(level of|education) (education|level)\b/], expand: "degree", get: (p, h) => h.edu0().degree },
+    { any: [/degree/], expand: "degree", get: (p, h) => h.edu0().degree },
     { any: [/major/, /field of study/, /discipline/], get: (p, h) => h.edu0().field || h.edu0().degree },
     { any: [/\bgpa\b/, /grade point/], get: (p, h) => h.edu0().gpa },
     { any: [/graduation/, /grad(uation)? date/, /end date/, /expected graduation/], get: (p, h) => h.edu0().endDate },
@@ -288,6 +290,20 @@
     }
     const ab = US_STATES[v.toLowerCase()];
     return ab ? [ab] : [];
+  }
+
+  // The common wordings of a degree level, for dropdowns that list "Bachelor's Degree"
+  // where the profile says "Bachelor of Science".
+  function degreeAlternates(value) {
+    const v = norm(value);
+    const levels = [
+      [/bachelor|\bb\.?(s|a|sc|eng|tech)\b/, ["Bachelor's Degree", "Bachelor's", "Bachelors", "Bachelor"]],
+      [/master|\bm\.?(s|a|sc|eng|ba)\b|\bmba\b/, ["Master's Degree", "Master's", "Masters", "Master"]],
+      [/ph\.?d|doctor/, ["Doctorate", "Doctoral Degree", "PhD", "Ph.D."]],
+      [/associate/, ["Associate's Degree", "Associate's", "Associates", "Associate"]],
+    ];
+    const hit = levels.find(([re]) => re.test(v));
+    return hit ? hit[1] : [];
   }
 
   // Self-ID dropdowns word their options as sentences ("I am not a protected
@@ -422,7 +438,7 @@
         const value = rule.get(profile, helpers, signal);
         if (value == null || value === "") return null;
         // "None" clearance reads as "No" on a yes/no control, and so on.
-        const alts = rule.expand === "veteran" || rule.expand === "disability" ? selfIdAlternates(rule.expand, value) : rule.expand === "usState" ? stateAlternates(value) : rule.expand === "place" ? placeAlternates(value, profile) : /^none$/i.test(value) ? rule.alts || [] : [];
+        const alts = rule.expand === "veteran" || rule.expand === "disability" ? selfIdAlternates(rule.expand, value) : rule.expand === "degree" ? degreeAlternates(value) : rule.expand === "usState" ? stateAlternates(value) : rule.expand === "place" ? placeAlternates(value, profile) : /^none$/i.test(value) ? rule.alts || [] : [];
         return { value: String(value), alts, duration: !!rule.duration, kind: rule.kind || "text", eeo: !!rule.eeo, assumed: !!rule.assumed, place: rule.expand === "place" };
       }
     }
