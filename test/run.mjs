@@ -65,6 +65,7 @@ const SCRIPTS = [
   "src/content/adapters.js",
   "src/shared/skills.js",
   "src/content/workday.js",
+  "src/content/repeaters.js",
   "src/content/engine.js",
 ].map((p) => fs.readFileSync(path.join(ROOT, p), "utf8"));
 
