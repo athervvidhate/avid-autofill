@@ -340,6 +340,7 @@ test("the small prompt appears after confirmation without invoking autofill, and
   const b = backend({ enabled: true });
   const onMessage = [];
   dom.window.chrome = { ...b.chrome, runtime: { sendMessage: msg => b.request(msg.type.replace("AVID_TRACKER_", ""), msg, { ...sender, url: dom.window.location.href }), onMessage: { addListener: fn => onMessage.push(fn) } } };
+  dom.window.eval(read("src/shared/schema.js"));
   dom.window.eval(read("src/content/tracker.js"));
   await new Promise(resolve => setTimeout(resolve, 60));
   let root = dom.window.document.querySelector("#avid-tracker-root").shadowRoot;
@@ -367,6 +368,7 @@ test("the manual tracker sidebar shows both date defaults", async () => {
   const dom = detector();
   const b = backend();
   dom.window.chrome = { ...b.chrome, runtime: { sendMessage: msg => b.request(msg.type.replace("AVID_TRACKER_", ""), msg, { ...sender, url: dom.window.location.href }), onMessage: { addListener() {} } } };
+  dom.window.eval(read("src/shared/schema.js"));
   dom.window.eval(read("src/content/tracker.js"));
   await new Promise(resolve => setTimeout(resolve, 60));
   await dom.window.AvidAutofill.tracker.open();

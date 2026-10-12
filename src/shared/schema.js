@@ -154,6 +154,13 @@
     await chrome.storage.local.set({ [SETTINGS_KEY]: settings });
   };
 
+  // Message the service worker; its replies are { ok, ...result } or { ok: false, error }.
+  AvidAutofill.request = async function (message, fallback) {
+    const result = await chrome.runtime.sendMessage(message);
+    if (!result?.ok) throw new Error(result?.error || fallback);
+    return result;
+  };
+
   AvidAutofill.STORAGE_KEY = STORAGE_KEY;
   AvidAutofill.SETTINGS_KEY = SETTINGS_KEY;
   AvidAutofill.mergeDefaults = mergeDefaults;
