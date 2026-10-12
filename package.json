@@ -12,11 +12,12 @@
     "typecheck": "tsc -p .",
     "lint": "biome check .",
     "test": "vitest run",
-    "test:browser": "wxt build && node test/extension-browser.mjs && node test/tracker-browser.mjs",
+    "test:browser": "wxt build && node test/extension-browser.mjs && node test/tracker-browser.mjs && node test/resume-browser.mjs",
     "import": "node build/import-from-career-ops.mjs"
   },
   "dependencies": {
-    "js-yaml": "^4.1.0"
+    "js-yaml": "^4.1.0",
+    "pdfjs-dist": "^5.7.284"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.15",

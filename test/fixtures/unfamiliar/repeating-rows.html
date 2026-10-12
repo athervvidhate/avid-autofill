@@ -1,0 +1,48 @@
+<!doctype html>
+<html><head><title>Application Wizard</title></head><body>
+<form>
+  <fieldset>
+    <legend>Work History</legend>
+    <div class="wrapper" id="work">
+      <div class="rows">
+        <div class="row sample" aria-hidden="true">
+          <label for="w-s-1">Employer *</label><input id="w-s-1" name="w-s-1">
+          <label for="w-s-2">Position Title *</label><input id="w-s-2" name="w-s-2">
+          <label for="w-s-3">Current position? *</label><select id="w-s-3" name="w-s-3"><option value="">Select an option</option><option>Yes</option><option>No</option></select>
+          <label for="w-s-4">Start Date *</label><input id="w-s-4" name="w-s-4" type="month">
+          <label for="w-s-5">End Date</label><input id="w-s-5" name="w-s-5" type="month">
+        </div>
+        <div class="row">
+          <label for="w-0-1">Employer *</label><input id="w-0-1" name="w-0-1" value="Initech">
+          <label for="w-0-2">Position Title *</label><input id="w-0-2" name="w-0-2" value="Analyst">
+          <label for="w-0-3">Current position? *</label><select id="w-0-3" name="w-0-3"><option value="">Select an option</option><option>Yes</option><option selected>No</option></select>
+          <label for="w-0-4">Start Date *</label><input id="w-0-4" name="w-0-4" type="month" value="2019-01">
+          <label for="w-0-5">End Date</label><input id="w-0-5" name="w-0-5" type="month" value="2020-12">
+        </div>
+        <div class="row">
+          <label for="w-1-1">Employer *</label><input id="w-1-1" name="w-1-1">
+          <label for="w-1-2">Position Title *</label><input id="w-1-2" name="w-1-2">
+          <label for="w-1-3">Current position? *</label><select id="w-1-3" name="w-1-3"><option value="">Select an option</option><option>Yes</option><option>No</option></select>
+          <label for="w-1-4">Start Date *</label><input id="w-1-4" name="w-1-4" type="month">
+          <label for="w-1-5">End Date</label><input id="w-1-5" name="w-1-5" type="month">
+        </div>
+      </div>
+      <a href="#" class="add">add another</a>
+    </div>
+  </fieldset>
+  <fieldset>
+    <legend>Education</legend>
+    <div class="wrapper" id="edu">
+      <div class="rows">
+        <div class="row">
+          <label for="e-0-1">School *</label><input id="e-0-1" name="e-0-1">
+          <label for="e-0-2">Degree *</label><select id="e-0-2" name="e-0-2"><option value="">Select an option</option><option>High School Graduate or Equivalent</option><option>Bachelor's Degree</option><option>Master's Degree</option></select>
+          <label for="e-0-3">Major</label><input id="e-0-3" name="e-0-3">
+        </div>
+      </div>
+      <button type="button">Add education</button>
+    </div>
+  </fieldset>
+  <label for="resume">Resume</label><input id="resume" type="file">
+</form>
+</body></html>

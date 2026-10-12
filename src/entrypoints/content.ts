@@ -13,9 +13,12 @@ import "../content/generic.js";
 import "../content/matcher.js";
 import "../content/adapters.js";
 import "../content/workday.js";
+import "../content/repeaters.js";
 import "../content/jev.js";
 import "../content/engine.js";
+import "../content/report.js";
 import "../content/widget.js";
+import "../content/steps.js";
 import "../content/main.js";
 
 export default defineContentScript({

@@ -5,11 +5,7 @@
   const M = A.trackerModel;
   let root, host, watching = false, timer, routeTimer, observer, signature = "", current, previousFocus;
   const $ = selector => root.querySelector(selector);
-  async function send(type, data = {}) {
-    const result = await chrome.runtime.sendMessage({ type: `AVID_TRACKER_${type}`, ...data });
-    if (!result?.ok) throw new Error(result?.error || "The extension was reloaded. Refresh this page to use the tracker.");
-    return result;
-  }
+  const send = (type, data = {}) => A.request({ type: `AVID_TRACKER_${type}`, ...data }, "The extension was reloaded. Refresh this page to use the tracker.");
   function mount() {
     if (root) { if (!host.isConnected) document.documentElement.append(host); return; }
     host = document.createElement("div"); host.id = "avid-tracker-root";

@@ -96,6 +96,7 @@
     fillEEO: false, // opt-in: only fill voluntary self-ID when explicitly enabled
     fillSkills: true, // add skills to Workday skills sections
     tickAcknowledgements: true, // tick "I agree" / "I have read and understand" boxes
+    autoFillSteps: true, // fill each new application page as it appears
     highlightFilled: true, // briefly outline fields we touched
     jevEnabled: false, // optional matching of approved saved answers
   };
@@ -151,6 +152,13 @@
 
   AvidAutofill.saveSettings = async function (settings) {
     await chrome.storage.local.set({ [SETTINGS_KEY]: settings });
+  };
+
+  // Message the service worker; its replies are { ok, ...result } or { ok: false, error }.
+  AvidAutofill.request = async function (message, fallback) {
+    const result = await chrome.runtime.sendMessage(message);
+    if (!result?.ok) throw new Error(result?.error || fallback);
+    return result;
   };
 
   AvidAutofill.STORAGE_KEY = STORAGE_KEY;
