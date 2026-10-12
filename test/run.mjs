@@ -1271,6 +1271,34 @@ test("setReactSelect never chooses an unrelated first option", async () => {
   assert.equal(clicked, false);
 });
 
+// A react-select-style filter box: the list shows only the options containing what is typed.
+function filteringSelect(win, options) {
+  const { document } = win;
+  document.body.innerHTML = `<input role="combobox" aria-controls="lb"><div id="lb"></div>`;
+  const input = document.querySelector("input"), list = document.getElementById("lb");
+  const render = () => {
+    list.innerHTML = options.filter((o) => o.toLowerCase().includes(input.value.toLowerCase())).map((o) => `<div role="option">${o}</div>`).join("");
+    for (const o of list.querySelectorAll("div")) {
+      Object.defineProperty(o, "offsetParent", { configurable: true, get: () => document.body });
+      o.addEventListener("click", () => { picked = o.textContent; });
+    }
+  };
+  let picked = "";
+  input.addEventListener("input", render);
+  return { input, picked: () => picked };
+}
+
+test("setReactSelect searches each target in turn and clears a search that found nothing", async () => {
+  const win = blankWindow(), A = win.AvidAutofill;
+  const found = filteringSelect(win, ["High School Diploma", "Bachelor's Degree", "Master's Degree"]);
+  assert.equal(await A.fillers.setReactSelect(found.input, ["Bachelor of Science", "Bachelor's Degree"]), true);
+  assert.equal(found.picked(), "Bachelor's Degree");
+  const none = filteringSelect(win, ["High School Diploma"]);
+  assert.equal(await A.fillers.setReactSelect(none.input, ["Bachelor of Science", "Bachelor's"]), false);
+  assert.equal(none.input.value, "", "unmatched search text is not left in the box");
+  win.close();
+});
+
 const RACE_OPTIONS = [
   "American Indian or Alaska Native (Not Hispanic or Latino) (United States of America)",
   "Asian (Not Hispanic or Latino) (United States of America)",
@@ -1579,6 +1607,8 @@ test("a select's options do not become its label; education level and 'currently
   assert.equal(doc.getElementById("level").value, "Bachelor's Degree");
   const helpers = A.matcher.makeHelpers(profile);
   assert.equal(A.matcher.match("where are you currently located?", profile, helpers)?.value, "Portland");
+  assert.equal(A.matcher.match("who is your current or previous employer?", profile, helpers)?.value, "Globex");
+  assert.equal(A.matcher.match("name of your previous employer", profile, helpers), null);
   win.close();
 });
 

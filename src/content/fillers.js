@@ -282,11 +282,12 @@
       (control.matches("input") && control) ||
       control.querySelector("input") ||
       document.querySelector('input[data-automation-id="searchBox"]');
-    if (typeInput) {
+    const search = async (text) => {
       typeInput.focus();
-      setSearchValue(typeInput, typed);
+      setSearchValue(typeInput, text);
       await sleep(240);
-    }
+    };
+    if (typeInput) await search(typed);
 
     const optText = (o) =>
       normalize(o.getAttribute("data-automation-label") || o.textContent);
@@ -327,17 +328,25 @@
         null
       );
     };
-    for (let attempt = 0; attempt < 8 && !pick; attempt++) {
-      pick = findOption();
-      if (pick) {
-        // The list re-renders while a typed search resolves, and a node found
-        // mid-render can end up showing a different option when it is clicked.
-        // Click only an option that is still the match after the list settles.
-        await sleep(120);
-        const again = findOption();
-        if (!again || !pick.isConnected || again !== pick || optText(again) !== optText(pick)) pick = null;
+    // The list filters by what was typed, so each target is tried as its own search
+    // ("Bachelor of Science" finds nothing in a list of "Bachelor's Degree").
+    // Searches that must keep the first target typed (Workday's Enter search, free entry) try only it.
+    const searches = config && (config.searchOnEnter || config.allowCreate) ? [typed] : targets.slice(0, 4);
+    for (const [i, text] of searches.entries()) {
+      if (i) await search(text);
+      for (let attempt = 0; attempt < 8 && !pick; attempt++) {
+        pick = findOption();
+        if (pick) {
+          // The list re-renders while a typed search resolves, and a node found
+          // mid-render can end up showing a different option when it is clicked.
+          // Click only an option that is still the match after the list settles.
+          await sleep(120);
+          const again = findOption();
+          if (!again || !pick.isConnected || again !== pick || optText(again) !== optText(pick)) pick = null;
+        }
+        if (!pick && typeInput && attempt < 7) await sleep(150);
       }
-      if (!pick && typeInput && attempt < 7) await sleep(150);
+      if (pick || !typeInput) break;
     }
     // Workday's search prompts (skills, field of study) list matches only after
     // Enter runs the search.
@@ -355,6 +364,8 @@
         pressEnter(typeInput);
         return true;
       }
+      // Do not leave the search text behind as if it were an answer.
+      if (typeInput) setSearchValue(typeInput, "");
       return false;
     }
     const chosen = optText(pick);
