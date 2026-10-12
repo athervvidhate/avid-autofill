@@ -10,6 +10,8 @@ import "../shared/tracker-model.js";
 import "../background/google-config.js";
 import "../background/tracker.js";
 import "../background/anysite.js";
+import "../shared/profile-sync.js";
+import "../background/profile-sync.js";
 import "../background/service-worker.js";
 
 export default defineBackground(() => {});

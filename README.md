@@ -214,9 +214,14 @@ content scripts. Disconnecting stops syncing and keeps your sheet and pending
 entries. Automatic detection requires optional HTTP/HTTPS page access and can
 be turned off in Connections.
 
-**Going forward:** optional cloud features may be added later, such as syncing
-your profile across devices or drafting answers to open-ended questions with an
-LLM. These will always be:
+**Optional profile sync:** off by default. When you turn it on in Connections,
+your profile and saved answers are copied to Chrome's own sync storage, which
+Chrome carries to your other browsers signed in to the same Google account.
+There is no Avid server or account. Your resume file, Jev key and settings stay
+on each device. Turning it off stops syncing and leaves each browser's copy.
+
+**Going forward:** optional cloud features may be added later, such as drafting
+answers to open-ended questions with an LLM. These will always be:
 
 - **Opt-in** - off by default; local-only stays the default experience.
 - **Disclosed** - clearly stated what leaves your device and where it goes.
