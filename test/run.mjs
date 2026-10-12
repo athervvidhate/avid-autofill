@@ -1816,3 +1816,22 @@ test("setRadio and setCheckbox report false when the click does not take", () =>
   assert.equal(A.fillers.setRadio([document.getElementById("a")], "Yes"), false);
   assert.equal(A.fillers.setCheckbox(document.getElementById("c"), true), false);
 });
+
+test("setReactSelect searches each fallback when the first answer filters every option out", async () => {
+  const win = blankWindow();
+  const { document, AvidAutofill: A } = win;
+  document.body.innerHTML = '<div id="c"><input role="combobox" aria-controls="lb"></div><ul id="lb" role="listbox"></ul>';
+  const input = document.querySelector("input"), list = document.getElementById("lb");
+  const all = ["White", "Asian", "Black or African American"];
+  // A Rippling-style search box: the list shows only options containing the query.
+  input.addEventListener("input", () => {
+    list.innerHTML = all.filter((o) => o.toLowerCase().includes(input.value.toLowerCase())).map((o) => `<li role="option">${o}</li>`).join("");
+    list.querySelectorAll("li").forEach((li) => {
+      Object.defineProperty(li, "offsetParent", { configurable: true, get: () => document.body });
+      li.addEventListener("click", () => { input.value = li.textContent; });
+    });
+  });
+  const ok = await A.fillers.setReactSelect(document.getElementById("c"), ["South Asian", "asian"]);
+  assert.equal(ok, true);
+  assert.equal(input.value, "Asian");
+});

@@ -339,6 +339,17 @@
       }
       if (!pick && typeInput && attempt < 7) await sleep(150);
     }
+    // Typing the first answer filters the list down to it. When nothing matched
+    // ("South Asian" on a list that only has "Asian"), search each fallback in turn.
+    for (const alt of typeInput && !pick ? targets.slice(1) : []) {
+      if (normalize(alt) === normalize(typed)) continue;
+      setSearchValue(typeInput, alt);
+      for (let attempt = 0; attempt < 5 && !pick; attempt++) {
+        await sleep(attempt ? 150 : 240);
+        pick = findOption();
+      }
+      if (pick) break;
+    }
     // Workday's search prompts (skills, field of study) list matches only after
     // Enter runs the search.
     if (!pick && typeInput && config && config.searchOnEnter) {

@@ -465,3 +465,16 @@ test("a very large page is previewed in part and typing a note does not rescrub 
   assert.equal(preview.textContent.slice(preview.textContent.indexOf("<!doctype")), before);
   dom.window.close();
 });
+
+test("a company careers page that wraps the iCIMS frame shows the drawer on its own", () => {
+  const dom = new JSDOM('<body><h1>Careers</h1><iframe id="icims_content_iframe"></iframe></body>', { runScripts: "outside-only", pretendToBeVisual: true, url: "https://example-company.com/careers" });
+  const win = dom.window;
+  win.chrome = chromeShim();
+  win.requestIdleCallback = (callback) => callback();
+  for (const file of ["src/shared/schema.js", "src/content/adapters.js", "src/content/widget.js"]) win.eval(fs.readFileSync(path.join(ROOT, file), "utf8"));
+  win.AvidAutofill.generic = { detect: () => ({ isApplication: false }) };
+  win.AvidAutofill.engine = { fillPage: async () => ({ filledCount: 0, results: [] }) };
+  win.eval(fs.readFileSync(path.join(ROOT, "src/content/main.js"), "utf8"));
+  assert.ok(win.document.querySelector("#avid-autofill-root"));
+  win.close();
+});
