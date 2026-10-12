@@ -508,7 +508,32 @@
     }
   }
 
+  // Workday marks a field it rejected aria-invalid even though the value shows.
+  // After the fill, re-enter any text field that still holds a value but is
+  // flagged, once, with the full key-event sequence (fillers.keyEvents).
+  async function recommitPass(ctx) {
+    const { fillers, record } = ctx;
+    await fillers.sleep(400);
+    const stuck = fillers
+      .queryAll('input[aria-invalid="true"]:not([role="spinbutton"]):not([type="checkbox"]):not([type="radio"]):not([type="file"])')
+      .filter((el) => el.value && fillers.isRendered(el));
+    if (!stuck.length) return 0;
+    const prev = fillers.keyEvents;
+    fillers.keyEvents = true;
+    try {
+      for (const el of stuck) {
+        const value = el.value;
+        fillers.setTextValue(el, value);
+        record(`${el.getAttribute("aria-label") || el.name || el.id || "field"} (re-entered)`, value, "filled");
+      }
+    } finally {
+      fillers.keyEvents = prev;
+    }
+    return stuck.length;
+  }
+
   AvidAutofill.workday = {
+    recommitPass,
     parseDate,
     datePass,
     yearSpinPlan,

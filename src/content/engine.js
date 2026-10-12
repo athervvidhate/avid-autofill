@@ -47,6 +47,9 @@
       };
     }
 
+    // Workday's React form reads key events, so text fills there send them too.
+    fillers.keyEvents = adapter.name === "Workday";
+
     const record = (signal, value, status) =>
       results.push({ label: shorten(signal), value, status });
 
@@ -263,6 +266,10 @@
       } catch (_) {
         record(signal, m.value, "error");
       }
+    }
+
+    if (adapter.name === "Workday" && AvidAutofill.workday && AvidAutofill.workday.recommitPass) {
+      await AvidAutofill.workday.recommitPass({ fillers, record });
     }
 
     let aiMessage = "";
