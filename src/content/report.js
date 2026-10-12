@@ -46,7 +46,7 @@
 
   // The report file: a comment block of facts about the application, then the scrubbed page.
   // Only field labels and outcomes come from the fill result; the values filled are left out.
-  function buildReport({ adapter, profile, fillReport, note }) {
+  function buildReport({ adapter, profile, fillReport, note, html }) {
     const manifest = (() => { try { return chrome.runtime.getManifest(); } catch (_) { return {}; } })();
     const page = new URL(location.href);
     const fields = document.querySelectorAll("input:not([type=hidden]):not([type=submit]):not([type=button]), select, textarea").length;
@@ -69,9 +69,13 @@
     }
     const ats = String((adapter && adapter.name) || "generic").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "generic";
     const stamp = new Date().toISOString().slice(0, 16).replace(/[-:]/g, "").replace("T", "-");
+    const pageHtml = html == null ? scrubbedHtml(profile, { strict: true }) : html;
+    const header = `<!--\n${lines.join("\n")}\n-->\n`;
     return {
       filename: `avid-report-${ats}-${stamp}.html`,
-      text: `<!--\n${lines.join("\n")}\n-->\n${scrubbedHtml(profile, { strict: true })}`,
+      header,
+      html: pageHtml,
+      text: header + pageHtml,
       subject: `Avid Autofill problem: ${adapter && adapter.name ? adapter.name : "unknown site"} (${page.hostname})`,
     };
   }

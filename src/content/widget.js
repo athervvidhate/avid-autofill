@@ -80,8 +80,9 @@
           <p class="copy-help">This sends the developer the page so the problem can be fixed. Nothing is sent until you attach the saved file to the email yourself. Your saved profile details, anything you typed into the form, and hidden form values are removed first.</p>
           <label class="report-label" for="avid-report-note">What went wrong? (optional)</label>
           <textarea class="report-note" id="avid-report-note" rows="3" maxlength="500"></textarea>
-          <label class="report-label" for="avid-report-preview">Exactly what the file contains</label>
-          <textarea class="report-preview" id="avid-report-preview" rows="9" readonly spellcheck="false"></textarea>
+          <label class="report-label" for="avid-report-preview">What the file contains: details about this application, then the page</label>
+          <textarea class="report-facts" id="avid-report-preview" rows="7" readonly spellcheck="false"></textarea>
+          <textarea class="report-preview" aria-label="Page HTML in the report" rows="7" readonly spellcheck="false"></textarea>
           <p class="copy-status report-status" role="status" aria-live="polite"></p>
           <div class="report-actions"><button class="primary report-send" type="button">Save report and open email</button><button class="track report-cancel" type="button">Cancel</button></div>
         </section>
@@ -252,23 +253,30 @@
     if (canReport) mountReport();
 
     function mountReport() {
-      let built = null;
-      const status = $(".report-status"), note = $(".report-note"), preview = $(".report-preview");
-      const rebuild = async () => {
-        built = AvidAutofill.report.buildReport({ adapter, profile: await AvidAutofill.getProfile(), fillReport: lastFillReport, note: note.value });
-        preview.value = built.text;
+      // The page is scrubbed once per open: cloning and scanning it on every keystroke made typing lag.
+      let built = null, html = "";
+      const status = $(".report-status"), note = $(".report-note"), facts = $(".report-facts"), preview = $(".report-preview");
+      const PREVIEW_CHARS = 20000;
+      const rebuild = (profile) => {
+        built = AvidAutofill.report.buildReport({ adapter, profile, fillReport: lastFillReport, note: note.value, html });
+        facts.value = built.header;
       };
       $(".report-open").addEventListener("click", async () => {
         status.textContent = "";
         showView("report");
-        await rebuild();
+        const profile = await AvidAutofill.getProfile();
+        html = AvidAutofill.report.scrubbedHtml(profile, { strict: true });
+        rebuild(profile);
+        // A very large page is shown in part so the drawer stays responsive; the saved file has all of it.
+        preview.value = html.length > PREVIEW_CHARS
+          ? `${html.slice(0, PREVIEW_CHARS)}\n\n... ${Math.round((html.length - PREVIEW_CHARS) / 1000)} KB more of page HTML, scrubbed the same way, is in the saved file.`
+          : html;
         note.focus();
       });
-      note.addEventListener("input", () => { rebuild(); });
+      note.addEventListener("input", () => { if (built) rebuild(); });
       $(".report-cancel").addEventListener("click", () => { showView("fill"); $(".report-open").focus(); });
       $(".report-send").addEventListener("click", async () => {
         try {
-          await rebuild();
           const blob = new Blob([built.text], { type: "text/html" });
           const save = document.createElement("a");
           save.href = URL.createObjectURL(blob); save.download = built.filename; save.click();

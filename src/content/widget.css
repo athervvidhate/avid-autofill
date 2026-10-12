@@ -119,8 +119,9 @@ details.preferences[open] summary::after { transform: rotate(90deg); }
 .report-view[hidden] { display: none; }
 .report-view h1 { margin: 0 0 4px 4px; font: 800 19px/1.2 var(--display); letter-spacing: -0.02em; }
 .report-label { display: block; margin: 12px 4px 4px; color: #3f4a42; font-size: 12.5px; font-weight: 700; }
-.report-note, .report-preview { box-sizing: border-box; width: 100%; padding: 8px 10px; border: 0; border-radius: 12px; background: var(--field); color: var(--ink); font: 12px/1.4 ui-monospace, monospace; resize: vertical; }
+.report-note, .report-facts, .report-preview { box-sizing: border-box; width: 100%; padding: 8px 10px; border: 0; border-radius: 12px; background: var(--field); color: var(--ink); font: 12px/1.4 ui-monospace, monospace; resize: vertical; }
 .report-note { font-family: inherit; }
+.report-facts { margin-bottom: 6px; }
 .report-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
 .review { color: #3f4a42; font-size: 12px; text-align: right; line-height: 1.35; }
 .launcher { position: fixed; top: 50%; right: 10px; width: 42px; height: 112px; transform: translateY(-50%); border-radius: 999px;
