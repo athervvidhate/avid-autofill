@@ -52,9 +52,44 @@
   // prefer document.execCommand("insertText"), which fires genuine
   // beforeinput/InputEvent that React's value tracker accepts. Native setter is
   // the fallback for anything that rejects execCommand.
+  // Strict React forms (Workday) also listen for the key events a person's typing
+  // produces. When `keyEvents` is on, the fill is wrapped in the same
+  // keydown/keypress ... textInput/input ... keyup sequence.
+  function keyEvent(el, type) {
+    el.dispatchEvent(new KeyboardEvent(type, { bubbles: true, cancelable: true, composed: true, key: "Unidentified" }));
+  }
+
+  // Workday ignores synthetic input until the document has had one real user
+  // gesture (navigator.userActivation.hasBeenActive, sticky for the document's
+  // lifetime). Resolves true once that has happened, false if `timeout` ms pass
+  // first. Lets a caller that fires without a click (a toolbar popup, a
+  // page-change trigger) hold the fill until the user touches the page.
+  function whenUserActive(timeout = 0) {
+    const ua = navigator.userActivation;
+    if (!ua || ua.hasBeenActive) return Promise.resolve(true);
+    return new Promise((resolve) => {
+      const events = ["pointerdown", "mousedown", "keydown", "touchstart"];
+      let timer;
+      const done = (ok) => {
+        events.forEach((t) => window.removeEventListener(t, onEvent, true));
+        clearTimeout(timer);
+        resolve(ok);
+      };
+      // Only trusted events count as a gesture; let the browser flag settle first.
+      const onEvent = (e) => { if (e.isTrusted) setTimeout(() => done(true), 0); };
+      events.forEach((t) => window.addEventListener(t, onEvent, true));
+      if (timeout > 0) timer = setTimeout(() => done(!!navigator.userActivation.hasBeenActive), timeout);
+    });
+  }
+
   function setTextValue(el, value) {
     el.focus();
     el.dispatchEvent(new Event("focus", { bubbles: true }));
+    if (AvidAutofill.fillers.keyEvents) {
+      el.click();
+      keyEvent(el, "keydown");
+      keyEvent(el, "keypress");
+    }
 
     // Select any existing content so insertText replaces rather than appends.
     // Email and number inputs throw on setSelectionRange; select() still works.
@@ -82,6 +117,8 @@
         new InputEvent("input", { bubbles: true, composed: true, inputType: "insertText", data: value })
       );
     }
+
+    if (AvidAutofill.fillers.keyEvents) keyEvent(el, "keyup");
 
     // Workday validates required fields on blur; fire change + blur to clear the
     // "field is required" error the same way tabbing out of the field would.
@@ -532,6 +569,8 @@
     customValue,
     customOptions,
     setTextValue,
+    whenUserActive,
+    keyEvents: false,
     setDateSpinner,
     setNativeSelect,
     setRadio,
