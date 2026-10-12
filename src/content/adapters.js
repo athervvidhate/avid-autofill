@@ -3,16 +3,19 @@
 // ATS was detected, and (2) selectors for that ATS's *custom* (non-native)
 // dropdowns, which need the click-open-type-pick dance in fillers.setReactSelect.
 //
-// Greenhouse, Lever, Ashby, and SmartRecruiters add custom-dropdown selectors to
-// the generic engine. Workday is a beta adapter with its own date and repeater
-// passes. iCIMS, Taleo, Workable, Jobvite, BambooHR, Breezy, Recruitee, JazzHR,
-// Teamtailor, and Paylocity are detection-only stubs.
+// Greenhouse, Lever, Ashby, SmartRecruiters, Workable, iCIMS, Taleo, Oracle
+// Recruiting, SuccessFactors, BambooHR, Rippling and Jobvite name the platform,
+// detect it by host or by markup, and add that platform's custom-dropdown
+// selectors to the generic engine. Workday is a beta adapter with its own date
+// and repeater passes. Breezy, Recruitee, JazzHR, Teamtailor and Paylocity are
+// detection-only stubs.
 (function () {
   const AvidAutofill = (globalThis.AvidAutofill = globalThis.AvidAutofill || {});
 
   const ADAPTERS = [
     {
       name: "SmartRecruiters",
+      host: /smartrecruiters\.com/,
       detect: () => /(^|\.)smartrecruiters\.com$/.test(location.hostname) || !!document.querySelector("oc-app-root"),
       customSelectSelectors: ['[role="combobox"]'],
     },
@@ -80,19 +83,76 @@
       // Typeable MM/DD/YYYY date sections handled by the workday date module.
       hasDateSections: true,
     },
-    // --- Detection-only stubs ---
     {
-      name: "Jobvite",
-      stub: true,
-      detect: () => /jobvite\.com/.test(location.host),
+      name: "Workable",
+      host: /(^|\.)workable\.com$/,
+      detect: () =>
+        /(^|\.)workable\.com$/.test(location.host) ||
+        !!document.querySelector('[data-ui="application-form"]'),
+      // Workable's phone country code and EEO answers are ARIA comboboxes.
+      customSelectSelectors: ['[class*="styles__select"]', '[role="combobox"]'],
+    },
+    {
+      name: "iCIMS",
+      host: /(^|\.)icims\.com$/,
+      detect: () =>
+        /(^|\.)icims\.com$/.test(location.host) ||
+        !!document.querySelector("#iCIMS_MainWrapper, .iCIMS_MainWrapper, iframe#icims_content_iframe"),
+      // iCIMS forms are native tables of inputs and selects; the application
+      // itself loads inside an iframe that main.js reaches through the service worker.
       customSelectSelectors: [],
+    },
+    {
+      name: "Taleo",
+      host: /(^|\.)taleo\.net$/,
+      detect: () =>
+        /(^|\.)taleo\.net$/.test(location.host) ||
+        !!document.querySelector("#requisitionDescriptionInterface, #taleoContent, form[action*='.ftl']"),
+      // Legacy Taleo is native HTML; the newer Oracle-hosted flow uses comboboxes.
+      customSelectSelectors: ['[role="combobox"]'],
+    },
+    {
+      name: "Oracle Recruiting",
+      host: /oraclecloud\.com/,
+      detect: () =>
+        (/(^|\.)oraclecloud\.com$/.test(location.host) && /CandidateExperience|hcmUI/i.test(location.pathname)) ||
+        !!document.querySelector("apply-flow-form, [class*='apply-flow'], oj-select-single, oj-input-text[class*='apply']"),
+      // Oracle JET renders selects as oj-select-single / oj-combobox-one.
+      customSelectSelectors: ["oj-select-single", "oj-combobox-one", '[role="combobox"]'],
+    },
+    {
+      name: "SuccessFactors",
+      host: /successfactors\.(com|eu)|sapsf\.(com|eu)/,
+      detect: () =>
+        /(^|\.)(successfactors|sapsf)\.(com|eu)$/.test(location.host) ||
+        !!document.querySelector("#fbclc_userName, form[action*='career?company'], [id^='fbclc_']"),
+      // UI5 comboboxes sit beside plain inputs on the career-site apply flow.
+      customSelectSelectors: ['.sapMComboBox', '[role="combobox"]'],
     },
     {
       name: "BambooHR",
-      stub: true,
-      detect: () => /bamboohr\.com/.test(location.host),
-      customSelectSelectors: [],
+      host: /(^|\.)bamboohr\.com$/,
+      detect: () =>
+        /(^|\.)bamboohr\.com$/.test(location.host) ||
+        !!document.querySelector(".ResAts, .ApplicationForm, [data-fabric-component]"),
+      // BambooHR's fabric selects are buttons that open a listbox.
+      customSelectSelectors: ['button.fab-SelectToggle', '[role="combobox"]'],
     },
+    {
+      name: "Rippling",
+      host: /(^|\.)rippling\.com$/,
+      detect: () => /^ats\.rippling\.com$/.test(location.host),
+      customSelectSelectors: ['[role="combobox"]', '[class*="select__control"]'],
+    },
+    {
+      name: "Jobvite",
+      host: /(^|\.)jobvite\.com$/,
+      detect: () =>
+        /(^|\.)jobvite\.com$/.test(location.host) ||
+        !!document.querySelector(".jv-page-body, form.jv-form, [class^='jv-']"),
+      customSelectSelectors: ['[role="combobox"]'],
+    },
+    // --- Detection-only stubs ---
     {
       name: "Recruitee",
       stub: true,
@@ -116,26 +176,6 @@
       stub: true,
       detect: () => /paylocity\.com/.test(location.host),
       customSelectSelectors: [],
-    },
-    {
-      name: "iCIMS",
-      stub: true,
-      detect: () => /icims\.com/.test(location.host),
-      customSelectSelectors: [],
-    },
-    {
-      name: "Taleo",
-      stub: true,
-      detect: () => /taleo\.net|tbe\.taleo/.test(location.host),
-      customSelectSelectors: [],
-    },
-    {
-      name: "Workable",
-      stub: true,
-      detect: () =>
-        /workable\.com|apply\.workable/.test(location.host) ||
-        !!document.querySelector('[data-ui="application-form"]'),
-      customSelectSelectors: ['[class*="styles__select"]', '[role="combobox"]'],
     },
   ];
 

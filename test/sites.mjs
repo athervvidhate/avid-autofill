@@ -1,5 +1,5 @@
 // Fill checks against saved-form layouts from other hiring sites (iCIMS, Taleo,
-// Jobvite, BambooHR, Breezy, Recruitee, JazzHR, Teamtailor, Paylocity). These
+// Jobvite, BambooHR, Oracle, SuccessFactors, Rippling, Breezy, Recruitee, JazzHR, Teamtailor, Paylocity). These
 // are hand-built to match each site's markup, not captures, so they pin down
 // the layout patterns (table rows, label-less placeholders, question spans)
 // rather than any one company's form.
@@ -39,6 +39,9 @@ const CASES = [
   { name: "taleo", url: "https://acme.taleo.net/careersection/2/jobapply.ftl", ats: "Taleo", values: { f2: "Rivera", f3: "alex.rivera@example.com", f4: "5551230000", f5: "Portland", f6: "94016", f7: "United States", f8: "California", f9: "https://linkedin.com/in/alexrivera" } },
   { name: "jobvite", url: "https://jobs.jobvite.com/acme/job/oX/apply", ats: "Jobvite", values: { "jv-first": "Alex", "jv-email": "alex.rivera@example.com", "jv-loc": "Portland", "jv-co": "Globex" }, radios: { auth: "yes" }, unchecked: ['input[name="alerts"]'] },
   { name: "bamboohr", url: "https://acme.bamboohr.com/careers/12", ats: "BambooHR", values: { firstName: "Alex", streetAddress: "1 Market Street", state: "CA", zip: "94016", linkedinUrl: "https://linkedin.com/in/alexrivera", q1: "Yes", q2: "No" } },
+  { name: "oracle", url: "https://eaaa.fa.us2.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1/job/1/apply", ats: "Oracle Recruiting", values: { firstName: "Alex", lastName: "Rivera", email: "alex.rivera@example.com", phone: "5551230000", city: "Portland" } },
+  { name: "successfactors", url: "https://career5.successfactors.com/career?company=acme&career_ns=job_application", ats: "SuccessFactors", values: { fbclc_firstName: "Alex", fbclc_lastName: "Rivera", fbclc_userName: "alex.rivera@example.com", fbclc_city: "Portland", fbclc_zip: "94016", fbclc_country: "United States" } },
+  { name: "rippling", url: "https://ats.rippling.com/acme/jobs/1/apply", ats: "Rippling", values: { name: "Alex Rivera", email: "alex.rivera@example.com", phone: "5551230000", linkedin: "https://linkedin.com/in/alexrivera" }, radios: { auth: "yes" } },
   { name: "breezy", url: "https://acme.breezy.hr/p/abc-engineer", ats: "Breezy", values: {}, byName: { cName: "Alex Rivera", cEmail: "alex.rivera@example.com", cAddress: "1 Market Street", cLinkedIn: "https://linkedin.com/in/alexrivera" } },
   { name: "recruitee", url: "https://acme.recruitee.com/o/engineer/c/new", ats: "Recruitee", values: { name: "Alex Rivera", email: "alex.rivera@example.com", phone: "5551230000", q_1: "Yes" } },
   { name: "jazzhr", url: "https://app.jazz.co/apply/abc", ats: "JazzHR", values: { "resumator-firstname-value": "Alex", "resumator-address-value": "1 Market Street", "resumator-city-value": "Portland", "resumator-state-value": "CA", "resumator-postal-value": "94016" } },
