@@ -15,7 +15,8 @@ export default defineConfig({
       }
       // Only store installs carry update_url, and the drawer uses that to pick Report a problem
       // over Export DOM. AVID_STORE_PREVIEW=1 npm run build fakes it to try the store drawer locally.
-      if ((globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env.AVID_STORE_PREVIEW) manifest.update_url = "https://clients2.google.com/service/update2/crx";
+      if ((globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env.AVID_STORE_PREVIEW)
+        manifest.update_url = "https://clients2.google.com/service/update2/crx";
     },
   },
   manifest: {
