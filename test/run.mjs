@@ -1614,6 +1614,24 @@ test("a select's options do not become its label; education level and 'currently
   win.close();
 });
 
+test("graduate fields read the graduate degree, undergraduate ones the bachelor's, and essay prompts are not work-sample links", () => {
+  const A = blankWindow().AvidAutofill, profile = testProfile(A), helpers = A.matcher.makeHelpers(profile);
+  profile.links.portfolio = "https://alex.example.dev";
+  profile.education = [{ school: "Tech Institute", degree: "Master of Science", field: "Robotics", gpa: "3.9" }, { school: "State University", degree: "Bachelor of Arts", field: "History", gpa: "3.5" }];
+  const answer = signal => A.matcher.match(signal, profile, helpers)?.value ?? null;
+  assert.equal(answer("undergraduate university"), "State University");
+  assert.equal(answer("undergraduate gpa"), "3.5");
+  assert.equal(answer("graduate university 1"), "Tech Institute");
+  assert.equal(answer("graduate gpa 1"), "3.9");
+  assert.equal(answer("graduate university 1 area of study"), "Robotics");
+  assert.equal(answer("which school did you graduate from?"), "Tech Institute", "an unqualified school question reads the most recent entry");
+  profile.education = [{ school: "State University", degree: "Bachelor of Arts", gpa: "3.5" }];
+  assert.equal(answer("graduate gpa 2"), null, "no graduate degree saved: leave it empty");
+  assert.equal(answer("undergraduate gpa"), "3.5");
+  assert.equal(answer("please provide relevant work samples"), "https://alex.example.dev");
+  assert.equal(answer("share 2-3 concrete examples of work you've done, ideally around speech recognition or any other area we work in and why you picked them"), null);
+});
+
 test("name pronunciation questions are not answered with the legal name", () => {
   const A = blankWindow().AvidAutofill, profile = testProfile(A), helpers = A.matcher.makeHelpers(profile);
   assert.equal(A.matcher.match("type your response | name pronunciation | how do you pronounce your name? | cards a69a985a field2", profile, helpers), null);

@@ -165,6 +165,14 @@
       (profile.personal.fullName || "").split(" ").slice(1).join(" "),
     work0: () => profile.work[0] || {},
     edu0: () => profile.education[0] || {},
+    // The entry a field asks about: a graduate field reads the master's or doctorate (or
+    // nothing), an undergraduate one the bachelor's, any other the most recent.
+    eduFor: (signal) => {
+      const list = profile.education || [], graduate = /\b(graduate[ -](university|school|college|gpa|degree|program|institution|studies|study|level)|master|post-?grad|phd|doctora)/.test(signal.replace(/undergraduate/g, ""));
+      if (graduate) return list.find((e) => /master|\bm\.?[sab]\b|\bmba\b|ph\.?d|doctor/i.test(e.degree)) || {};
+      if (/undergraduate|bachelor/.test(signal)) return list.find((e) => /bachelor|\bb\.?[sa]\b/i.test(e.degree)) || list[0] || {};
+      return list[0] || {};
+    },
   });
 
   // Each rule: { any:[regex], not:[regex], get:(profile,helpers)=>string, kind }.
@@ -199,7 +207,7 @@
     // --- Links ---
     { any: [/linkedin/], get: (p) => p.links.linkedin },
     { any: [/github/], not: [/contribution|repositor|project|describe|example/], get: (p) => p.links.github },
-    { any: [/work samples?/, /samples? of (your )?work/, /examples? of (your )?work/], not: [/describe|explain|tell us/], get: (p) => p.links.portfolio || p.links.website || p.links.github },
+    { any: [/work samples?/, /samples? of (your )?work/, /examples? of (your )?work/], not: [/describe|explain|tell us/], get: (p, h, signal) => (signal.split(" | ")[0].length > 90 ? "" : p.links.portfolio || p.links.website || p.links.github) },
     { any: [/portfolio/, /personal (web)?site/, /^website$/, /web ?site url/], get: (p) => p.links.portfolio || p.links.website },
     { any: [/twitter|(^| )x( |$)/], get: (p) => p.links.twitter },
 
@@ -208,14 +216,15 @@
     { any: [/current title/, /current role/, /job title/, /(^|\| )title( \||$)/, /current position/], not: [/mr\.?|mrs\.?|salutation/, /why|reason|leav|consider|looking for|seeking/], get: (p, h) => h.work0().title },
 
     // --- Education ---
-    { any: [/which (university|college|school)/, /(university|college|school) (did|do) you (last )?(attend|graduate)/, /last attended/], get: (p, h) => h.edu0().school },
-    { any: [/school/, /university/, /college/, /institution/], not: [/high school diploma\?/, /are you/, /current.*student/, /enrolled/, /graduation/, /anticipated/], get: (p, h) => h.edu0().school },
+    { any: [/area of study/], get: (p, h, signal) => h.eduFor(signal).field || h.eduFor(signal).degree },
+    { any: [/which (university|college|school)/, /(university|college|school) (did|do) you (last )?(attend|graduate)/, /last attended/], get: (p, h, signal) => h.eduFor(signal).school },
+    { any: [/school/, /university/, /college/, /institution/], not: [/high school diploma\?/, /are you/, /current.*student/, /enrolled/, /graduation/, /anticipated/], get: (p, h, signal) => h.eduFor(signal).school },
     // "Highest level of education" is answered by the degree level, which dropdowns word as "Bachelor's Degree".
     { any: [/highest (level of )?(education|degree|schooling)/, /(level of|education) (education|level)\b/], expand: "degree", get: (p, h) => h.edu0().degree },
-    { any: [/degree/], expand: "degree", get: (p, h) => h.edu0().degree },
-    { any: [/major/, /field of study/, /discipline/], get: (p, h) => h.edu0().field || h.edu0().degree },
-    { any: [/\bgpa\b/, /grade point/], get: (p, h) => h.edu0().gpa },
-    { any: [/graduation/, /grad(uation)? date/, /end date/, /expected graduation/], get: (p, h) => h.edu0().endDate },
+    { any: [/degree/], expand: "degree", get: (p, h, signal) => h.eduFor(signal).degree },
+    { any: [/major/, /field of study/, /discipline/], get: (p, h, signal) => h.eduFor(signal).field || h.eduFor(signal).degree },
+    { any: [/\bgpa\b/, /grade point/], get: (p, h, signal) => h.eduFor(signal).gpa },
+    { any: [/graduation/, /grad(uation)? date/, /end date/, /expected graduation/], get: (p, h, signal) => h.eduFor(signal).endDate },
 
     // --- Work authorization (yes/no) ---
     // Sponsorship before authorization: sponsorship questions often say "work
