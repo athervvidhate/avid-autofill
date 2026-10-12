@@ -76,15 +76,19 @@
           <div class="copy-groups"></div>
         </section>
         <section class="report-view" id="avid-report-view" aria-labelledby="avid-report-title" hidden>
+          <div class="report-scroll">
           <h1 id="avid-report-title">Report a problem</h1>
           <p class="copy-help">This sends the developer the page so the problem can be fixed. Nothing is sent until you attach the saved file to the email yourself. Your saved profile details, anything you typed into the form, and hidden form values are removed first.</p>
           <label class="report-label" for="avid-report-note">What went wrong? (optional)</label>
           <textarea class="report-note" id="avid-report-note" rows="3" maxlength="500"></textarea>
-          <label class="report-label" for="avid-report-preview">What the file contains: details about this application, then the page</label>
-          <textarea class="report-facts" id="avid-report-preview" rows="7" readonly spellcheck="false"></textarea>
-          <textarea class="report-preview" aria-label="Page HTML in the report" rows="7" readonly spellcheck="false"></textarea>
+          <dl class="report-facts"></dl>
+          <details class="report-file">
+            <summary>View the full file</summary>
+            <pre class="report-preview" tabindex="0"></pre>
+          </details>
           <p class="copy-status report-status" role="status" aria-live="polite"></p>
-          <div class="report-actions"><button class="primary report-send" type="button">Save report and open email</button><button class="track report-cancel" type="button">Cancel</button></div>
+          </div>
+          <div class="report-actions"><button class="primary report-send" type="button">Save report and open email</button><button class="report-cancel" type="button">Cancel</button></div>
         </section>
         <footer class="foot"><button class="opt" type="button">Edit profile</button>${canReport ? `<button class="opt report-open" type="button">Report a problem</button>` : ""}<span class="review">Stored locally<br />Review before submitting</span></footer>
       </section>
@@ -186,6 +190,7 @@
       $(".copy-view").hidden = !copying;
       $(".report-view").hidden = !reporting;
       $(".tabs").hidden = reporting;
+      $(".foot").hidden = reporting;
       $(".fill-tab").setAttribute("aria-selected", String(!copying));
       $(".copy-tab").setAttribute("aria-selected", String(copying));
       $(".fill-tab").tabIndex = copying ? -1 : 0;
@@ -254,12 +259,18 @@
 
     function mountReport() {
       // The page is scrubbed once per open: cloning and scanning it on every keystroke made typing lag.
-      let built = null, html = "";
+      let built = null, html = "", fileHead = "", fileBody = "";
       const status = $(".report-status"), note = $(".report-note"), facts = $(".report-facts"), preview = $(".report-preview");
       const PREVIEW_CHARS = 20000;
       const rebuild = (profile) => {
         built = AvidAutofill.report.buildReport({ adapter, profile, fillReport: lastFillReport, note: note.value, html });
-        facts.value = built.header;
+        facts.replaceChildren(...built.facts.filter(([key]) => key !== "What went wrong").flatMap(([key, value]) => {
+          const dt = document.createElement("dt"), dd = document.createElement("dd");
+          dt.textContent = key; dd.textContent = value;
+          return [dt, dd];
+        }));
+        fileHead = built.header;
+        if (preview.textContent) preview.textContent = fileHead + fileBody;
       };
       $(".report-open").addEventListener("click", async () => {
         status.textContent = "";
@@ -268,9 +279,10 @@
         html = AvidAutofill.report.scrubbedHtml(profile, { strict: true });
         rebuild(profile);
         // A very large page is shown in part so the drawer stays responsive; the saved file has all of it.
-        preview.value = html.length > PREVIEW_CHARS
+        fileBody = html.length > PREVIEW_CHARS
           ? `${html.slice(0, PREVIEW_CHARS)}\n\n... ${Math.round((html.length - PREVIEW_CHARS) / 1000)} KB more of page HTML, scrubbed the same way, is in the saved file.`
           : html;
+        preview.textContent = fileHead + fileBody;
         note.focus();
       });
       note.addEventListener("input", () => { if (built) rebuild(); });

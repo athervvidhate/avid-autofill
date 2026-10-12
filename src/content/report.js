@@ -50,22 +50,23 @@
     const manifest = (() => { try { return chrome.runtime.getManifest(); } catch (_) { return {}; } })();
     const page = new URL(location.href);
     const fields = document.querySelectorAll("input:not([type=hidden]):not([type=submit]):not([type=button]), select, textarea").length;
-    const lines = [
-      "Avid Autofill problem report",
-      `Extension version: ${manifest.version || "unknown"}`,
-      `Site recognized as: ${adapter && adapter.name ? adapter.name : "unknown"}`,
-      `Page: ${page.origin}${page.pathname} (query string and fragment removed)`,
-      `Frame: ${window === window.top ? "top page" : "embedded frame"}`,
-      `Form fields on page: ${fields}`,
-      `Browser: ${navigator.userAgent}`,
-      `Captured: ${new Date().toISOString()}`,
-      `What went wrong: ${oneLine(note) || "(not said)"}`,
+    const lastFill = fillReport && Array.isArray(fillReport.results)
+      ? `${fillReport.filledCount || 0} filled, ${fillReport.results.length} matched`
+      : "Fill was not run on this page";
+    // Shown to the user as a short list before they send anything.
+    const facts = [
+      ["Extension version", manifest.version || "unknown"],
+      ["Site recognized as", adapter && adapter.name ? adapter.name : "unknown"],
+      ["Page", `${page.origin}${page.pathname} (query string and fragment removed)`],
+      ["Frame", window === window.top ? "top page" : "embedded frame"],
+      ["Form fields on page", String(fields)],
+      ["Browser", navigator.userAgent],
+      ["Last fill", lastFill],
+      ["What went wrong", oneLine(note) || "(not said)"],
     ];
+    const lines = ["Avid Autofill problem report", ...facts.map(([k, v]) => `${k}: ${v}`), `Captured: ${new Date().toISOString()}`];
     if (fillReport && Array.isArray(fillReport.results)) {
-      lines.push(`Last fill: ${fillReport.filledCount || 0} filled, ${fillReport.results.length} matched`);
       for (const r of fillReport.results) lines.push(`  - ${oneLine(r.label).slice(0, 120)}: ${oneLine(r.status)}`);
-    } else {
-      lines.push("Last fill: Fill was not run on this page");
     }
     const ats = String((adapter && adapter.name) || "generic").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "generic";
     const stamp = new Date().toISOString().slice(0, 16).replace(/[-:]/g, "").replace("T", "-");
@@ -74,6 +75,7 @@
     return {
       filename: `avid-report-${ats}-${stamp}.html`,
       header,
+      facts,
       html: pageHtml,
       text: header + pageHtml,
       subject: `Avid Autofill problem: ${adapter && adapter.name ? adapter.name : "unknown site"} (${page.hostname})`,

@@ -131,7 +131,7 @@ test("Copy info shows every saved section and copies full work descriptions", as
     Object.defineProperty(dom.window.navigator, "clipboard", { value: undefined });
     dom.window.document.execCommand = (command) => {
       assert.equal(command, "copy");
-      copied.push(dom.window.document.querySelector("#avid-autofill-root").shadowRoot.querySelector("textarea:not(.report-note):not(.report-facts):not(.report-preview)").value);
+      copied.push(dom.window.document.querySelector("#avid-autofill-root").shadowRoot.querySelector("textarea:not(.report-note)").value);
       return true;
     };
     descriptionField.querySelector("button").click();
@@ -403,7 +403,7 @@ test("a problem report strips the profile, typed answers, hidden tokens and emai
   await new Promise((resolve) => setTimeout(resolve, 10));
   assert.equal(shadow.querySelector(".report-view").hidden, false);
   assert.equal(shadow.querySelector(".fill-view").hidden, true);
-  const text = shadow.querySelector(".report-facts").value + shadow.querySelector(".report-preview").value;
+  const text = shadow.querySelector(".report-facts").textContent + shadow.querySelector(".report-preview").textContent;
   for (const secret of ["ada@example.com", "tok-9f8e7d", "Analytical Engines", "recruiter@acme.test", "Ada Lovelace", "secret", "avid-autofill-root"]) {
     assert.ok(!text.includes(secret), `report leaked ${secret}`);
   }
@@ -431,13 +431,13 @@ test("a very large page is previewed in part and typing a note does not rescrub 
   shadow.querySelector(".report-open").click();
   await new Promise((resolve) => setTimeout(resolve, 10));
   const preview = shadow.querySelector(".report-preview");
-  assert.ok(preview.value.length < 21000);
-  assert.match(preview.value, /KB more of page HTML/);
-  const before = preview.value;
+  assert.ok(preview.textContent.length < 21500);
+  assert.match(preview.textContent, /KB more of page HTML/);
+  const before = preview.textContent.slice(preview.textContent.indexOf("<!doctype"));
   const note = shadow.querySelector(".report-note");
   note.value = "Resume upload missed";
   note.dispatchEvent(new dom.window.Event("input"));
-  assert.match(shadow.querySelector(".report-facts").value, /What went wrong: Resume upload missed/);
-  assert.equal(preview.value, before);
+  assert.match(shadow.querySelector(".report-facts").textContent, /What went wrong\s*Resume upload missed/);
+  assert.equal(preview.textContent.slice(preview.textContent.indexOf("<!doctype")), before);
   dom.window.close();
 });
