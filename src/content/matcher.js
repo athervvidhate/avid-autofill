@@ -185,6 +185,9 @@
   // Each rule: { any:[regex], not:[regex], get:(profile,helpers)=>string, kind }.
   // `kind` hints the filler (text | yesno | select). Default text.
   const RULES = [
+    // The name of whoever referred the applicant is not the applicant's own.
+    { any: [/referred (you|me)\b/, /\breferr(er|ing)\b/, /employee referral/], not: [/referral source/], get: () => "" },
+
     // --- Name ---
     { any: [/first name/, /given name/, /^fname$/, /legal first/, /(^|\| )first( \||$)/], not: [/preferred/], get: (p, h) => h.firstName() },
     { any: [/last name/, /family name/, /surname/, /^lname$/, /legal last/, /(^|\| )last( \||$)/], get: (p, h) => h.lastName() },
@@ -250,7 +253,7 @@
     { any: [/outside (work|employment|business|activit)/, /advisory (commitment|role|disclosure|position)/, /other (employment|jobs?) (commitments|outside)/, /moonlight/], kind: "yesno", get: (p) => p.questions.outsideEmployment },
     { any: [/security clearance/, /active clearance/, /\bclearance (level|status)\b/], alts: ["No", "N/A", "Not applicable", "I do not hold", "I don't hold"], get: (p) => p.questions.securityClearance },
     { any: [/work(ed|ing)? (in )?(a )?(fully )?remote/, /remote or hybrid/, /hybrid (work )?environment/], not: [/willing|open to|prefer/], get: (p) => p.questions.remoteExperience },
-    { any: [/how did you (hear|find)/, /referral source/, /source/], not: [/open ?source/], get: (p) => p.misc.howHeard },
+    { any: [/how did you (hear|find)/, /referral source/, /source/], not: [/open[ -]?source/], get: (p) => p.misc.howHeard },
     { any: [/cover letter/], get: (p) => p.misc.coverLetter },
     { any: [/graduation date/, /anticipated graduation/, /expected graduation/, /grad(uation)? date/], get: (p, h) => p.misc.graduationDate || h.edu0().endDate },
 
@@ -444,10 +447,13 @@
   }
 
   // "If yes, please provide details ..." follows a yes/no question but is free text.
-  const FOLLOW_UP = /^if (yes|so|you answered|applicable)\b|\b(provide|explain|describe|list|specify)\b.{0,30}\b(details|detail|explanation|more)\b/;
+  const FOLLOW_UP = /^if (yes|so|you (answered|selected|chose|checked)|applicable)\b|\b(provide|explain|describe|list|specify)\b.{0,30}\b(details|detail|explanation|more)\b/;
 
   // Return { value, alts, kind, eeo, place } for a signal, or null if no rule matches.
   function match(signal, profile, helpers) {
+    // A follow-up to an earlier answer ("If you answered yes to ..., please list")
+    // is the applicant's to write, whatever keyword it repeats from the question.
+    if (FOLLOW_UP.test(signal)) return null;
     for (const rule of RULES) {
       if (rule.not && rule.not.some((re) => re.test(signal))) continue;
       if (rule.any.some((re) => re.test(signal))) {
