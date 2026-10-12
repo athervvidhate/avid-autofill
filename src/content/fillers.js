@@ -216,15 +216,13 @@
       const labelText = normalize(AvidAutofill.labelTextFor(el));
       const v = normalize(el.value);
       if (v === target || labelText === target) {
-        clickChoice(el);
-        return el.checked;
+        return chooseRadio(el);
       }
     }
     for (const el of inputs) {
       const labelText = normalize(AvidAutofill.labelTextFor(el));
       if (labelText && (hasWord(labelText, target) || hasWord(target, labelText))) {
-        clickChoice(el);
-        return el.checked;
+        return chooseRadio(el);
       }
     }
     return false;
@@ -249,6 +247,15 @@
       clickChoice(el);
     }
     return el.checked === shouldCheck;
+  }
+
+  // Rippling wraps each radio input in a div[role=radio] that owns the state, so
+  // a click on the hidden input alone can leave the answer unset.
+  function chooseRadio(el) {
+    clickChoice(el);
+    const wrap = el.closest('[role="radio"]');
+    if (wrap && !el.checked && wrap.getAttribute("aria-checked") !== "true") press(wrap);
+    return el.checked || (!!wrap && wrap.getAttribute("aria-checked") === "true");
   }
 
   function clickChoice(el) {

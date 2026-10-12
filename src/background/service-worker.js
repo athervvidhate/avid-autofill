@@ -23,11 +23,16 @@ chrome.action.onClicked.addListener(async (tab) => {
         return { loaded: !!A?.adapters, opened: !!didOpen };
       },
     });
-    if (states.some((item) => item.result?.opened || item.result?.loaded)) return;
+    if (states.some((item) => item.result?.opened)) return;
+    // Avid already runs in some frame but nothing opened: the form frame (iCIMS)
+    // defers to the outer page, so load Avid into the top frame alone.
+    if (states.some((item) => item.frameId === 0 && item.result?.loaded)) return;
+    const anyLoaded = states.some((item) => item.result?.loaded);
+    const target = anyLoaded ? { tabId: tab.id, frameIds: [0] } : { tabId: tab.id, allFrames: true };
     const files = chrome.runtime.getManifest().content_scripts[0].js;
-    await chrome.scripting.executeScript({ target: { tabId: tab.id, allFrames: true }, files });
+    await chrome.scripting.executeScript({ target, files });
     await chrome.scripting.executeScript({
-      target: { tabId: tab.id, allFrames: true },
+      target,
       func: () => { globalThis.AvidAutofill?.openDrawer?.(); },
     });
   } catch (err) {

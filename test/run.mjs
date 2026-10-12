@@ -1835,3 +1835,17 @@ test("setReactSelect searches each fallback when the first answer filters every 
   assert.equal(ok, true);
   assert.equal(input.value, "Asian");
 });
+
+test("a Rippling radio whose wrapper owns the state is chosen through the wrapper", async () => {
+  const win = blankWindow();
+  const { document, AvidAutofill: A } = win;
+  document.body.innerHTML = '<div role="radiogroup">' + ["Yes", "No"].map((v) => `<div role="radio" aria-checked="false" data-value="${v}"><input type="radio" name="q" value="${v}" aria-labelledby="l${v}"></div><span id="l${v}">${v}</span>`).join("") + "</div>";
+  // The page keeps inputs unchecked and only answers clicks on the wrapper.
+  document.querySelectorAll("input").forEach((i) => i.addEventListener("click", (e) => { e.preventDefault(); }));
+  document.querySelectorAll('[role="radio"]').forEach((w) => w.addEventListener("click", (e) => {
+    if (e.target !== w) return;
+    document.querySelectorAll('[role="radio"]').forEach((o) => o.setAttribute("aria-checked", String(o === w)));
+  }));
+  assert.equal(A.fillers.setRadio(Array.from(document.querySelectorAll("input")), "No"), true);
+  assert.equal(document.querySelector('[data-value="No"]').getAttribute("aria-checked"), "true");
+});

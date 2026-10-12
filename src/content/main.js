@@ -65,6 +65,8 @@
   // as an application and the watch above has already given up.
   AvidAutofill.openDrawer = () => {
     if (window !== window.top && !document.querySelector("input, select, textarea")) return false;
+    // The iCIMS form frame is filled from the outer page's drawer, never its own.
+    if (window !== window.top && AvidAutofill.adapters.detect().name === "iCIMS") return false;
     AvidAutofill.widget.mount(AvidAutofill.adapters.detect());
     return AvidAutofill.widget.open();
   };
