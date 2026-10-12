@@ -14,11 +14,11 @@
     // 1. <label for=id>
     if (el.id) {
       const l = root.querySelector(`label[for="${cssEscape(el.id)}"]`);
-      if (l) parts.push(l.textContent);
+      if (l) parts.push(textWithoutControls(l));
     }
-    // 2. wrapping <label>
+    // 2. wrapping <label>. A select inside it would add every option to the label.
     const wrap = el.closest("label");
-    if (wrap) parts.push(wrap.textContent);
+    if (wrap) parts.push(textWithoutControls(wrap));
     // 3. aria-labelledby
     const labelledby = el.getAttribute && el.getAttribute("aria-labelledby");
     if (labelledby) {
@@ -180,6 +180,14 @@
       (profile.personal.fullName || "").split(" ").slice(1).join(" "),
     work0: () => profile.work[0] || {},
     edu0: () => profile.education[0] || {},
+    // The entry a field asks about: a graduate field reads the master's or doctorate (or
+    // nothing), an undergraduate one the bachelor's, any other the most recent.
+    eduFor: (signal) => {
+      const list = profile.education || [], graduate = /\b(graduate[ -](university|school|college|gpa|degree|program|institution|studies|study|level)|master|post-?grad|phd|doctora)/.test(signal.replace(/undergraduate/g, ""));
+      if (graduate) return list.find((e) => /master|\bm\.?[sab]\b|\bmba\b|ph\.?d|doctor/i.test(e.degree)) || {};
+      if (/undergraduate|bachelor/.test(signal)) return list.find((e) => /bachelor|\bb\.?[sa]\b/i.test(e.degree)) || list[0] || {};
+      return list[0] || {};
+    },
   });
 
   // Each rule: { any:[regex], not:[regex], get:(profile,helpers)=>string, kind }.
@@ -201,7 +209,7 @@
     // --- Address ---
     { any: [/(primary |permanent |current )?(residence|residential|home) address/, /address of (your )?(primary )?residence/], get: (p) => fullAddress(p.personal) },
     { any: [/street address/, /address line ?1/, /(^|\| )address( \||$)/, /mailing address/], not: [/email/], get: (p) => p.personal.address },
-    { any: [/\bcity\b/, /\btown\b/, /(^|\| )(current )?location( \||$)/, /(^|\| )current location\b/, /\bwork location\b/, /where (are you|do you) (located|based|live)/], not: [/velocity|capacity|ethnic/], expand: "place", get: (p) => p.personal.city },
+    { any: [/\bcity\b/, /\btown\b/, /(^|\| )(current )?location( \||$)/, /(^|\| )current location\b/, /\bwork location\b/, /where (are you|do you) (currently )?(located|based|live)/], not: [/velocity|capacity|ethnic/], expand: "place", get: (p) => p.personal.city },
     { any: [/\bstate\b/, /\bprovince\b/, /\bregion\b/], not: [/statement|estate|united states|work|\bcountry\b/], expand: "usState", get: (p) => p.personal.state },
     { any: [/zip/, /postal code/, /post ?code/], get: (p) => p.personal.postalCode },
     { any: [/\bresident of\b/, /\bdo you (live|reside) in\b/], not: [/relocat|willing/], kind: "yesno", get: (p, h, signal) => residentOfState(signal, p.personal.state) },
@@ -214,21 +222,24 @@
     // --- Links ---
     { any: [/linkedin/], get: (p) => p.links.linkedin },
     { any: [/github/], not: [/contribution|repositor|project|describe|example/], get: (p) => p.links.github },
-    { any: [/work samples?/, /samples? of (your )?work/, /examples? of (your )?work/], not: [/describe|explain|tell us/], get: (p) => p.links.portfolio || p.links.website || p.links.github },
+    { any: [/work samples?/, /samples? of (your )?work/, /examples? of (your )?work/], not: [/describe|explain|tell us/], get: (p, h, signal) => (signal.split(" | ")[0].length > 90 ? "" : p.links.portfolio || p.links.website || p.links.github) },
     { any: [/portfolio/, /personal (web)?site/, /^website$/, /web ?site url/], get: (p) => p.links.portfolio || p.links.website },
     { any: [/twitter|(^| )x( |$)/], get: (p) => p.links.twitter },
 
     // --- Current role / employer ---
-    { any: [/current company/, /current employer/, /present employer/, /(^|\| )company( \||$)/, /employer/], not: [/why|reason|previous|agreement|restriction/], get: (p, h) => h.work0().company },
+    { any: [/current company/, /current employer/, /present employer/, /(^|\| )company( \||$)/, /employer/], not: [/why|reason|(?<!current (or|\/) )previous|agreement|restriction/], get: (p, h) => h.work0().company },
     { any: [/current title/, /current role/, /job title/, /(^|\| )title( \||$)/, /current position/], not: [/mr\.?|mrs\.?|salutation/, /why|reason|leav|consider|looking for|seeking/], get: (p, h) => h.work0().title },
 
     // --- Education ---
-    { any: [/(which|what) (university|college|school)/, /(university|college|school) (did|do) you (last )?(attend|graduate)/, /last attended/], get: (p, h) => h.edu0().school },
-    { any: [/school/, /university/, /college/, /institution/], not: [/high school diploma\?/, /are you/, /current.*student/, /enrolled/, /graduation/, /anticipated/], get: (p, h) => h.edu0().school },
-    { any: [/degree/], not: [/graduation date/], get: (p, h) => h.edu0().degree },
-    { any: [/major/, /field of study/, /discipline/], get: (p, h) => h.edu0().field || h.edu0().degree },
-    { any: [/\bgpa\b/, /grade point/], get: (p, h) => h.edu0().gpa },
-    { any: [/graduation/, /grad(uation)? date/, /end date/, /expected graduation/], not: [/require|sponsor|authori[sz]/], get: (p, h) => h.edu0().endDate },
+    { any: [/area of study/], get: (p, h, signal) => h.eduFor(signal).field || h.eduFor(signal).degree },
+    { any: [/(which|what) (university|college|school)/, /(university|college|school) (did|do) you (last )?(attend|graduate)/, /last attended/], get: (p, h, signal) => h.eduFor(signal).school },
+    { any: [/school/, /university/, /college/, /institution/], not: [/high school diploma\?/, /are you/, /current.*student/, /enrolled/, /graduation/, /anticipated/], get: (p, h, signal) => h.eduFor(signal).school },
+    // "Highest level of education" is answered by the degree level, which dropdowns word as "Bachelor's Degree".
+    { any: [/highest (level of )?(education|degree|schooling)/, /(level of|education) (education|level)\b/], expand: "degree", get: (p, h) => h.edu0().degree },
+    { any: [/degree/], not: [/graduation date/], expand: "degree", get: (p, h, signal) => h.eduFor(signal).degree },
+    { any: [/major/, /field of study/, /discipline/], get: (p, h, signal) => h.eduFor(signal).field || h.eduFor(signal).degree },
+    { any: [/\bgpa\b/, /grade point/], get: (p, h, signal) => h.eduFor(signal).gpa },
+    { any: [/graduation/, /grad(uation)? date/, /end date/, /expected graduation/], not: [/require|sponsor|authori[sz]/], get: (p, h, signal) => h.eduFor(signal).endDate },
 
     // --- Work authorization (yes/no) ---
     // Sponsorship before authorization: sponsorship questions often say "work
@@ -308,6 +319,20 @@
     }
     const ab = US_STATES[v.toLowerCase()];
     return ab ? [ab] : [];
+  }
+
+  // The common wordings of a degree level, for dropdowns that list "Bachelor's Degree"
+  // where the profile says "Bachelor of Science".
+  function degreeAlternates(value) {
+    const v = norm(value);
+    const levels = [
+      [/bachelor|\bb\.?(s|a|sc|eng|tech)\b/, ["Bachelor's Degree", "Bachelor's", "Bachelors", "Bachelor"]],
+      [/master|\bm\.?(s|a|sc|eng|ba)\b|\bmba\b/, ["Master's Degree", "Master's", "Masters", "Master"]],
+      [/ph\.?d|doctor/, ["Doctorate", "Doctoral Degree", "PhD", "Ph.D."]],
+      [/associate/, ["Associate's Degree", "Associate's", "Associates", "Associate"]],
+    ];
+    const hit = levels.find(([re]) => re.test(v));
+    return hit ? hit[1] : [];
   }
 
   // Self-ID dropdowns word their options as sentences ("I am not a protected
@@ -457,7 +482,7 @@
         const value = rule.get(profile, helpers, signal);
         if (value == null || value === "") return null;
         // "None" clearance reads as "No" on a yes/no control, and so on.
-        const alts = rule.expand === "veteran" || rule.expand === "disability" ? selfIdAlternates(rule.expand, value) : rule.expand === "race" ? raceAlternates(value) : rule.expand === "usState" ? stateAlternates(value) : rule.expand === "place" ? placeAlternates(value, profile) : /^none$/i.test(value) ? rule.alts || [] : rule.answers || [];
+        const alts = rule.expand === "veteran" || rule.expand === "disability" ? selfIdAlternates(rule.expand, value) : rule.expand === "race" ? raceAlternates(value) : rule.expand === "degree" ? degreeAlternates(value) : rule.expand === "usState" ? stateAlternates(value) : rule.expand === "place" ? placeAlternates(value, profile) : /^none$/i.test(value) ? rule.alts || [] : [];
         return { value: String(value), alts, duration: !!rule.duration, kind: rule.kind || "text", eeo: !!rule.eeo, assumed: !!rule.assumed, place: rule.expand === "place" };
       }
     }

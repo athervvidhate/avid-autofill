@@ -10,7 +10,9 @@
     el &&
     F().isRendered(el) &&
     !el.disabled &&
-    el.getAttribute("aria-hidden") !== "true" &&
+    // Select2 (Lever's school list) hides the real <select> from assistive tech
+    // and shows a styled box that follows it, so the select is still the field.
+    (el.getAttribute("aria-hidden") !== "true" || el.classList.contains("select2-hidden-accessible")) &&
     el.type !== "hidden";
 
   // A radio styled away with display:none behind a visible wrapper (Rippling's

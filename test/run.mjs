@@ -1272,6 +1272,34 @@ test("setReactSelect never chooses an unrelated first option", async () => {
   assert.equal(clicked, false);
 });
 
+// A react-select-style filter box: the list shows only the options containing what is typed.
+function filteringSelect(win, options) {
+  const { document } = win;
+  document.body.innerHTML = `<input role="combobox" aria-controls="lb"><div id="lb"></div>`;
+  const input = document.querySelector("input"), list = document.getElementById("lb");
+  const render = () => {
+    list.innerHTML = options.filter((o) => o.toLowerCase().includes(input.value.toLowerCase())).map((o) => `<div role="option">${o}</div>`).join("");
+    for (const o of list.querySelectorAll("div")) {
+      Object.defineProperty(o, "offsetParent", { configurable: true, get: () => document.body });
+      o.addEventListener("click", () => { picked = o.textContent; });
+    }
+  };
+  let picked = "";
+  input.addEventListener("input", render);
+  return { input, picked: () => picked };
+}
+
+test("setReactSelect searches each target in turn and clears a search that found nothing", async () => {
+  const win = blankWindow(), A = win.AvidAutofill;
+  const found = filteringSelect(win, ["High School Diploma", "Bachelor's Degree", "Master's Degree"]);
+  assert.equal(await A.fillers.setReactSelect(found.input, ["Bachelor of Science", "Bachelor's Degree"]), true);
+  assert.equal(found.picked(), "Bachelor's Degree");
+  const none = filteringSelect(win, ["High School Diploma"]);
+  assert.equal(await A.fillers.setReactSelect(none.input, ["Bachelor of Science", "Bachelor's"]), false);
+  assert.equal(none.input.value, "", "unmatched search text is not left in the box");
+  win.close();
+});
+
 const RACE_OPTIONS = [
   "American Indian or Alaska Native (Not Hispanic or Latino) (United States of America)",
   "Asian (Not Hispanic or Latino) (United States of America)",
@@ -1566,6 +1594,43 @@ test("profile links do not answer questions that only mention the platform", () 
   for (const signal of ["github profile", "github url", "link to your github", "*github profile github profile"]) assert.equal(answer(signal), profile.links.github, signal);
   assert.equal(answer("*share 2–3 of your open-source contributions with links (github prs, issues, etc.)"), null);
   assert.equal(answer("link to a github repository for a project you are proud of"), null);
+});
+
+test("a select's options do not become its label; education level and 'currently located' questions are answered", async () => {
+  const win = blankWindow(), A = win.AvidAutofill, doc = win.document;
+  win.Element.prototype.getClientRects = () => [{}];
+  doc.body.innerHTML = `<label>Select a university or college <select id="school"><option value="">Select</option><option>Washington State University</option><option>State University</option></select></label>
+    <div>What university did you attend? <select id="s2" class="select2-hidden-accessible" aria-hidden="true"><option value="">Select a university</option><option>State University</option></select></div>
+    <label>Highest level of education <select id="level"><option value="">Select</option><option>High School Diploma</option><option>Bachelor's Degree</option><option>Master's Degree</option></select></label>`;
+  const profile = testProfile(A);
+  profile.education = [{ school: "State University", degree: "Bachelor of Science" }];
+  await A.engine.fillPage(profile, A.DEFAULT_SETTINGS, null);
+  assert.equal(doc.getElementById("school").value, "State University", "'Washington State University' in the options must not read as a state question");
+  assert.equal(doc.getElementById("level").value, "Bachelor's Degree");
+  assert.equal(doc.getElementById("s2").value, "State University", "a Select2 select is hidden from assistive tech but is still the field");
+  const helpers = A.matcher.makeHelpers(profile);
+  assert.equal(A.matcher.match("where are you currently located?", profile, helpers)?.value, "Portland");
+  assert.equal(A.matcher.match("who is your current or previous employer?", profile, helpers)?.value, "Globex");
+  assert.equal(A.matcher.match("name of your previous employer", profile, helpers), null);
+  win.close();
+});
+
+test("graduate fields read the graduate degree, undergraduate ones the bachelor's, and essay prompts are not work-sample links", () => {
+  const A = blankWindow().AvidAutofill, profile = testProfile(A), helpers = A.matcher.makeHelpers(profile);
+  profile.links.portfolio = "https://alex.example.dev";
+  profile.education = [{ school: "Tech Institute", degree: "Master of Science", field: "Robotics", gpa: "3.9" }, { school: "State University", degree: "Bachelor of Arts", field: "History", gpa: "3.5" }];
+  const answer = signal => A.matcher.match(signal, profile, helpers)?.value ?? null;
+  assert.equal(answer("undergraduate university"), "State University");
+  assert.equal(answer("undergraduate gpa"), "3.5");
+  assert.equal(answer("graduate university 1"), "Tech Institute");
+  assert.equal(answer("graduate gpa 1"), "3.9");
+  assert.equal(answer("graduate university 1 area of study"), "Robotics");
+  assert.equal(answer("which school did you graduate from?"), "Tech Institute", "an unqualified school question reads the most recent entry");
+  profile.education = [{ school: "State University", degree: "Bachelor of Arts", gpa: "3.5" }];
+  assert.equal(answer("graduate gpa 2"), null, "no graduate degree saved: leave it empty");
+  assert.equal(answer("undergraduate gpa"), "3.5");
+  assert.equal(answer("please provide relevant work samples"), "https://alex.example.dev");
+  assert.equal(answer("share 2-3 concrete examples of work you've done, ideally around speech recognition or any other area we work in and why you picked them"), null);
 });
 
 test("name pronunciation questions are not answered with the legal name", () => {
