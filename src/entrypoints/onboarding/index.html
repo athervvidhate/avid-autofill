@@ -47,9 +47,10 @@
       <section class="ob-card" data-step="import" hidden>
         <span class="section-icon" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M16 13H8"/><path d="M16 17H8"/></svg></span>
         <h1><span class="hl">Resume and import</span></h1>
-        <p class="lead">Add the resume to attach on applications. If you used Avid before, import your exported profile and skip the typing.</p>
-        <div class="resume-row"><div><b id="ob-resume-name">No resume saved</b><p>PDF or DOCX. Read only when you fill a page.</p></div><label class="btn secondary">Choose file<input type="file" id="ob-resume-file" accept=".pdf,.doc,.docx,application/pdf" hidden></label></div>
+        <p class="lead">Add your resume and Avid reads your contact details, jobs, schools and skills from it, right here in your browser. You review everything before it is saved. If you used Avid before, import your exported profile instead.</p>
+        <div class="resume-row"><div><b id="ob-resume-name">No resume saved</b><p>PDF or DOCX. Read on this device only. It is also attached when an application asks for a resume.</p></div><div class="io-actions"><button class="btn secondary" id="ob-resume-read" type="button" hidden>Read it again</button><label class="btn secondary">Choose file<input type="file" id="ob-resume-file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden></label></div></div>
         <div class="resume-row"><div><b>Import a profile file</b><p>The JSON file from My Info &gt; Export JSON.</p></div><label class="btn secondary">Import JSON<input type="file" id="ob-import-file" accept="application/json" hidden></label></div>
+        <p id="ob-resume-msg" class="ob-msg" role="status" aria-live="polite"></p>
         <p id="ob-import-msg" class="ob-msg" role="status" aria-live="polite"></p>
       </section>
 

@@ -224,15 +224,13 @@
       const labelText = normalize(AvidAutofill.labelTextFor(el));
       const v = normalize(el.value);
       if (v === target || labelText === target) {
-        clickChoice(el);
-        return el.checked;
+        return chooseRadio(el);
       }
     }
     for (const el of inputs) {
       const labelText = normalize(AvidAutofill.labelTextFor(el));
       if (labelText && (hasWord(labelText, target) || hasWord(target, labelText))) {
-        clickChoice(el);
-        return el.checked;
+        return chooseRadio(el);
       }
     }
     return false;
@@ -257,6 +255,15 @@
       clickChoice(el);
     }
     return el.checked === shouldCheck;
+  }
+
+  // Rippling wraps each radio input in a div[role=radio] that owns the state, so
+  // a click on the hidden input alone can leave the answer unset.
+  function chooseRadio(el) {
+    clickChoice(el);
+    const wrap = el.closest('[role="radio"]');
+    if (wrap && !el.checked && wrap.getAttribute("aria-checked") !== "true") press(wrap);
+    return el.checked || (!!wrap && wrap.getAttribute("aria-checked") === "true");
   }
 
   function clickChoice(el) {
@@ -346,6 +353,17 @@
         if (!again || !pick.isConnected || again !== pick || optText(again) !== optText(pick)) pick = null;
       }
       if (!pick && typeInput && attempt < 7) await sleep(150);
+    }
+    // Typing the first answer filters the list down to it. When nothing matched
+    // ("South Asian" on a list that only has "Asian"), search each fallback in turn.
+    for (const alt of typeInput && !pick ? targets.slice(1) : []) {
+      if (normalize(alt) === normalize(typed)) continue;
+      setSearchValue(typeInput, alt);
+      for (let attempt = 0; attempt < 5 && !pick; attempt++) {
+        await sleep(attempt ? 150 : 240);
+        pick = findOption();
+      }
+      if (pick) break;
     }
     // Workday's search prompts (skills, field of study) list matches only after
     // Enter runs the search.
