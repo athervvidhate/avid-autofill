@@ -2,11 +2,7 @@
   const box = document.getElementById("anysite-enabled");
   const msg = document.getElementById("anysite-msg");
   const ORIGINS = ["http://*/*", "https://*/*"];
-  async function send(type, data = {}) {
-    const result = await chrome.runtime.sendMessage({ type, ...data });
-    if (!result?.ok) throw new Error(result?.error || "Reload the extension and try again.");
-    return result;
-  }
+  const send = (type, data = {}) => globalThis.AvidAutofill.request({ type, ...data }, "Reload the extension and try again.");
   box.onchange = async () => {
     const enabled = box.checked;
     box.disabled = true;

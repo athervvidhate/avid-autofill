@@ -2,11 +2,7 @@
   const M = globalThis.AvidAutofill.trackerModel;
   const $ = id => document.getElementById(id);
   let busy = false;
-  async function send(action, data = {}) {
-    const result = await chrome.runtime.sendMessage({ type: `AVID_TRACKER_${action}`, ...data });
-    if (!result?.ok) throw new Error(result?.error || "Reload the extension and reopen Connections.");
-    return result;
-  }
+  const send = (action, data = {}) => globalThis.AvidAutofill.request({ type: `AVID_TRACKER_${action}`, ...data }, "Reload the extension and reopen Connections.");
   function render(s) {
     $("google-account").textContent = s.email || "Not connected";
     $("google-badge").textContent = s.connected ? s.pending ? "Sync pending" : "Connected" : "Not connected";

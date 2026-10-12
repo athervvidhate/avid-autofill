@@ -1,11 +1,7 @@
 (function () {
   const J = globalThis.AvidAutofill.jev, $ = id => document.getElementById(id);
   let busy = false;
-  async function send(action, data = {}) {
-    const response = await chrome.runtime.sendMessage({ type: `AVID_JEV_${action}`, ...data });
-    if (!response?.ok) throw new Error(response?.error || "Reload the extension and reopen My Info.");
-    return response;
-  }
+  const send = (action, data = {}) => globalThis.AvidAutofill.request({ type: `AVID_JEV_${action}`, ...data }, "Reload the extension and reopen My Info.");
   function render(state) {
     $("jev-enabled").checked = state.enabled;
     $("jev-status").textContent = !state.enabled ? "Jev is off. Saved answers still stay available in your profile." : !state.hasKey ? "Jev has no key. Enter your key and save." : !state.hasAccess ? "Jev needs TypeSafe page access. Save again and allow it." : "Jev is enabled.";
