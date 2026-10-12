@@ -9,4 +9,5 @@ import "../../options/options.js";
 import "../../options/connections.js";
 import "../../options/jev.js";
 import "../../options/anysite.js";
+import "../../options/sync.js";
 import "../../options/nav.js";
