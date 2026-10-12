@@ -380,6 +380,7 @@ test("a non-iCIMS frame on the page ignores the iCIMS fill relay", () => {
   assert.equal(listener({ type: "AVID_FILL_ICIMS_FRAME" }, {}, () => { answered = true; }), undefined);
   assert.equal(answered, false);
   win.close();
+});
 
 function loadReportPage(manifest, bodyHtml = "") {
   const dom = new JSDOM(`<!doctype html><body>${bodyHtml}</body>`, { url: "https://boards.greenhouse.io/acme/jobs/1?token=secret#apply", runScripts: "outside-only", pretendToBeVisual: true });
