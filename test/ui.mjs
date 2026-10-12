@@ -416,8 +416,13 @@ test("a problem report strips the profile, typed answers, hidden tokens and emai
 test("the report link is an email when an address is set and a prefilled issue otherwise", () => {
   const dom = loadReportPage({ update_url: "x" });
   const { reportLink } = dom.window.AvidAutofill.report;
-  const mail = reportLink({ subject: "Bad fill", filename: "r.html", email: "dev@example.com" });
+  const header = `<!--\nAvid Autofill problem report\nSite recognized as: Greenhouse\n${"x".repeat(5000)}\n-->\n`;
+  const mail = reportLink({ subject: "Bad fill", filename: "r.html", email: "dev@example.com", header });
   assert.match(mail, /^mailto:dev@example\.com\?subject=Bad%20fill&body=/);
+  const body = decodeURIComponent(mail.split("&body=")[1]);
+  assert.match(body, /^>>> DELETE THIS LINE: attach r\.html/);
+  assert.match(body, /Site recognized as: Greenhouse/);
+  assert.ok(!body.includes("<!--") && body.length < 1800);
   assert.match(reportLink({ subject: "Bad fill", filename: "r.html", email: "" }), /^https:\/\/github\.com\/athervvidhate\/avid-autofill\/issues\/new\?title=/);
   dom.window.close();
 });

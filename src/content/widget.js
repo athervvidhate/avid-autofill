@@ -294,7 +294,7 @@
           save.href = URL.createObjectURL(blob); save.download = built.filename; save.click();
           setTimeout(() => URL.revokeObjectURL(save.href), 1000);
           const mail = document.createElement("a");
-          mail.href = AvidAutofill.report.reportLink({ subject: built.subject, filename: built.filename });
+          mail.href = AvidAutofill.report.reportLink({ subject: built.subject, filename: built.filename, header: built.header });
           mail.target = "_blank"; mail.rel = "noopener";
           mail.click();
           status.textContent = `Saved ${built.filename}. In the message that opened, attach that file and send it.`;

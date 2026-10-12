@@ -82,10 +82,14 @@
     };
   }
 
-  // The link that opens a prefilled message. The file itself cannot ride along in a link,
-  // so the body asks the user to attach what they just saved.
-  function reportLink({ subject, filename, email = REPORT_EMAIL }) {
-    const body = `Please attach the file ${filename} that was just saved to your Downloads folder, and add anything else that helps.`;
+  // The link that opens a prefilled message. The file itself cannot ride along in a link and
+  // mail clients cap the length, so the body carries the application info (trimmed to fit) and a
+  // first line telling the user to attach the saved file and delete that line.
+  const BODY_INFO_CHARS = 1500;
+  function reportLink({ subject, filename, header = "", email = REPORT_EMAIL }) {
+    let info = header.replace(/^<!--\n?|\n?-->\n?$/g, "");
+    if (info.length > BODY_INFO_CHARS) info = `${info.slice(0, BODY_INFO_CHARS)}\n...(the saved file has the rest)`;
+    const body = `>>> DELETE THIS LINE: attach ${filename} (saved in your Downloads folder), then send. <<<\n\n${info}`;
     if (email) return `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     return `${ISSUES_URL}?title=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   }
