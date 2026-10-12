@@ -88,6 +88,44 @@ test("reads education details and skills, dropping category labels", () => {
   assert.deepEqual(p.skills, ["Python", "Go", "TypeScript", "Docker", "Kubernetes", "AWS"]);
 });
 
+// Company and dates on one line, the title on the next, bullets that wrap, and a PDF column gap
+// between the school and its city.
+const COMPANY_FIRST = `Sam Rivera
+(555)-010-0199 | sam@example.com | samrivera.dev | in/samrivera | github.com/samrivera
+Education
+State University, Springfield | Springfield, IL
+B.S. Data Science, Minor in Business Analytics | Expected March 2027
+• GPA: 3.91/4.00.
+• Research Assistant: built a Python collector for 100,000+ records with retry and checkpoint
+support, delivering 300+ grouped publications for the lab lead.
+Experience
+Acme Technologies | June 2026 - Present
+Machine Learning Engineer Intern
+• Built a Python anomaly pipeline across 38 forecast models, cutting monthly review volume 88%.
+Benchmarked 6 detection methods to select a production configuration.
+• Routed validator issues into 3 severity levels and sent them to
+engineering, QA, or integration teams.
+Globex | Jan 2026 - June 2026
+AI Research Intern
+• Built a 6-agent workflow with Redis Streams.
+Initech | Aug 2025 - Jan 2026
+Full-Stack Developer Intern
+• Served 1,000+ concurrent users.
+Technical skills
+Languages : Python, SQL`;
+
+test("reads a company-and-date line followed by the title, and wrapped bullets", () => {
+  const p = loadParser().parseResumeText(COMPANY_FIRST);
+  assert.deepEqual(p.work.map(w => [w.title, w.company, w.startDate, w.endDate, w.current]), [
+    ["Machine Learning Engineer Intern", "Acme Technologies", "Jun 2026", "", true],
+    ["AI Research Intern", "Globex", "Jan 2026", "Jun 2026", false],
+    ["Full-Stack Developer Intern", "Initech", "Aug 2025", "Jan 2026", false],
+  ]);
+  assert.equal(p.work[0].description, "Built a Python anomaly pipeline across 38 forecast models, cutting monthly review volume 88%.\nBenchmarked 6 detection methods to select a production configuration.\nRouted validator issues into 3 severity levels and sent them to engineering, QA, or integration teams.");
+  assert.deepEqual(p.education, [{ school: "State University, Springfield", degree: "B.S.", field: "Data Science", location: "Springfield, IL", startDate: "", endDate: "Mar 2027", gpa: "3.91" }]);
+  assert.equal(p.links.linkedin, "https://linkedin.com/in/samrivera");
+});
+
 test("returns nothing rather than guessing for text that is not a resume", () => {
   const p = loadParser().parseResumeText("Lorem ipsum dolor sit amet.\nNothing to see here.");
   assert.deepEqual([p.work, p.education, p.skills, p.personal.email], [[], [], [], undefined]);
@@ -130,8 +168,11 @@ test("rejects files that are neither PDF nor DOCX and files with no text", async
 
 test("joins PDF text runs into lines by baseline and position", () => {
   const item = (str, x, y) => ({ str, transform: [1, 0, 0, 1, x, y] });
+  const wide = (str, x, y, width) => ({ ...item(str, x, y), width });
   const text = pdfItemsToText([[item("2021", 400, 700), item("Engineer, Stripe", 40, 700.5), item("Built APIs", 60, 680), item("JANE DOE", 40, 760)]]);
   assert.equal(text, "JANE DOE\nEngineer, Stripe 2021\nBuilt APIs");
+  // A wide gap between runs becomes a column marker; a normal word gap does not.
+  assert.equal(pdfItemsToText([[wide("State University", 40, 700, 80), wide("Springfield, IL", 400, 700, 70), wide("B.S.", 40, 680, 20), wide("Data", 62, 680, 20)]]), "State University | Springfield, IL\nB.S. Data");
 });
 
 // --- review dialog and import ---

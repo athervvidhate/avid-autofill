@@ -71,8 +71,10 @@
     const flat = lines.slice(0, 60).join(" ");
     const grab = re => { const m = flat.match(re); return m ? `https://${m[0].replace(/^https?:\/\//i, "").replace(/[).,;|]+$/, "")}` : ""; };
     const linkedin = grab(/(?:https?:\/\/)?(?:[a-z]{2,3}\.)?(?:www\.)?linkedin\.com\/(?:in|pub)\/[A-Za-z0-9_%-]+/i);
+    const shortIn = !linkedin && flat.match(/(?:^|[\s|•·])in\/([A-Za-z0-9_%-]+)/);
     const github = grab(/(?:https?:\/\/)?(?:www\.)?github\.com\/[A-Za-z0-9_-]+/i);
     if (linkedin) out.links.linkedin = linkedin;
+    else if (shortIn) out.links.linkedin = `https://linkedin.com/in/${shortIn[1]}`;
     if (github) out.links.github = github;
     const skipHost = /linkedin\.com|github\.com|gmail\.|yahoo\.|outlook\.|hotmail\.|icloud\./i;
     for (const m of all.matchAll(/(?:https?:\/\/)?(?:www\.)?[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.(?:com|io|dev|me|net|org|co|app|ai|design|tech|xyz)(?:\/[^\s|,;]*)?/gi)) {
@@ -107,6 +109,8 @@
   }
 
   const endsSentence = l => /[.!?]$/.test(l) && l.split(" ").length > 5;
+  // A plausible company/title line: short, starts like a name, not the end of a wrapped bullet.
+  const looksLikeHeader = l => l.length <= 70 && /^[A-Z0-9(]/.test(l) && !endsSentence(l) && !/[a-z]\.$/.test(l.replace(/\b(?:Inc|Corp|Ltd|Co|LLC|Jr|Sr)\.$/, ""));
   const stripBullet = l => l.replace(BULLET, "");
   const isBullet = l => BULLET.test(l);
 
@@ -140,16 +144,17 @@
       const head = [];
       for (let j = at - 1; j >= prevEnd && head.length < 2; j--) {
         const l = lines[j];
-        if (isBullet(l) || l.length > 70 || endsSentence(l) || RANGE.test(l)) break;
+        if (isBullet(l) || !looksLikeHeader(l) || RANGE.test(l)) break;
         // A short line directly after a bullet-less description paragraph is still plausible; stop once the
         // line before it looks like body text.
         head.unshift(l);
       }
-      // With no title above the date, the next line often carries it (company line, date line, title line).
+      // Company line, date line, then the title on the line below: look one line down when the
+      // header still lacks a title or a company.
       const next = lines[at + 1];
-      const body = [];
       let from = at + 1;
-      if (!dates.text && head.length < 2 && next && !isBullet(next) && next.length <= 70 && !endsSentence(next) && !(anchors[a + 1] === at + 1)) { head.push(next); from++; }
+      const first = splitRole([...head, dates.text].filter(Boolean));
+      if ((!first.title || !first.company) && head.length < 2 && next && !isBullet(next) && looksLikeHeader(next) && anchors[a + 1] !== at + 1) { head.push(next); from++; }
       const stop = a + 1 < anchors.length ? anchors[a + 1] : lines.length;
       // The tail of this block already belongs to the next entry's header lines.
       let end = stop;
@@ -157,11 +162,17 @@
         let n = 0;
         while (end - 1 > from && n < 2) {
           const l = lines[end - 1];
-          if (isBullet(l) || l.length > 70 || endsSentence(l)) break;
+          if (isBullet(l) || !looksLikeHeader(l)) break;
           end--; n++;
         }
       }
-      for (let j = from; j < end; j++) body.push(stripBullet(lines[j]));
+      const body = [];
+      // Join wrapped lines back onto the bullet or sentence they continue.
+      for (let j = from; j < end; j++) {
+        const l = lines[j];
+        if (!isBullet(l) && body.length && !/[.!?:]$/.test(body[body.length - 1])) body[body.length - 1] += ` ${l}`;
+        else body.push(stripBullet(l));
+      }
       const role = splitRole([...head, dates.text].filter(Boolean));
       if (!role.title && !role.company) continue;
       entries.push({
@@ -179,10 +190,11 @@
     const flush = () => { if (cur && (cur.school || cur.degree)) entries.push(cur); cur = null; };
     const fresh = () => ({ school: "", degree: "", field: "", location: "", startDate: "", endDate: "", gpa: "" });
     for (const raw of lines) {
-      if (isBullet(raw) && cur && !SCHOOL_WORD.test(raw) && !DEGREE.test(raw)) continue;
       let line = stripBullet(raw);
       const gpa = line.match(/\bGPA\s*[:\-]?\s*([0-4](?:\.\d{1,2})?)(?:\s*\/\s*4(?:\.0+)?)?/i);
-      if (gpa) { cur ||= fresh(); cur.gpa = gpa[1]; line = clean(line.replace(gpa[0], " ")); }
+      if (gpa && cur) { cur.gpa = gpa[1]; line = clean(line.replace(gpa[0], " ")); }
+      else if (gpa) { cur = fresh(); cur.gpa = gpa[1]; line = clean(line.replace(gpa[0], " ")); }
+      if (isBullet(raw) && cur && !SCHOOL_WORD.test(raw) && !DEGREE.test(raw)) continue;
       const hasSchool = SCHOOL_WORD.test(line), hasDegree = DEGREE.test(line);
       const dates = readDates(line);
       let text = dates.text;
@@ -205,7 +217,7 @@
       const loc = text.match(LOCATION);
       if (loc) { cur.location ||= clean(loc[0]); text = clean(text.replace(loc[0], " ")); }
       // Split on commas, bars and dashes; classify each piece.
-      for (const piece of text.split(/\s+[|·•–—-]\s+|\s*\|\s*|,\s+(?=[A-Z])|;\s*/).map(p => clean(p.replace(/^[-–—|,\s]+|[-–—|,\s]+$/g, ""))).filter(Boolean)) {
+      for (const piece of text.split(/\s+[|·•–—-]\s+|\s*\|\s*|;\s*/).flatMap(p => (SCHOOL_WORD.test(p) ? [p] : p.split(/,\s+(?=[A-Z])/))).map(p => clean(p.replace(/^[-–—|,\s]+|[-–—|,\s]+$/g, ""))).filter(Boolean)) {
         if (SCHOOL_WORD.test(piece) && !cur.school) { cur.school = piece; continue; }
         const d = piece.match(DEGREE);
         if (d && !cur.degree) {

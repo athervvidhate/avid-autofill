@@ -72,26 +72,33 @@ async function docxText(buf: ArrayBuffer): Promise<string> {
   return [...part(/header/), ...part(/document/), ...part(/footer/)].join("\n");
 }
 
-type PdfItem = { str: string; transform: number[]; hasEOL?: boolean };
+type PdfItem = { str: string; transform: number[]; width?: number; hasEOL?: boolean };
 
 // Joins pdf.js text runs into lines: same baseline = same line, left to right.
 export function pdfItemsToText(pages: PdfItem[][]): string {
   const lines: string[] = [];
   for (const items of pages) {
-    const rows: { y: number; parts: { x: number; s: string }[] }[] = [];
+    const rows: { y: number; parts: { x: number; w: number; s: string }[] }[] = [];
     for (const it of items) {
       if (!it.str.trim()) continue;
       const x = it.transform[4] ?? 0,
         y = it.transform[5] ?? 0;
       const row = rows.find((r) => Math.abs(r.y - y) < 3);
-      if (row) row.parts.push({ x, s: it.str });
-      else rows.push({ y, parts: [{ x, s: it.str }] });
+      const w = it.width ?? 0;
+      if (row) row.parts.push({ x, w, s: it.str });
+      else rows.push({ y, parts: [{ x, w, s: it.str }] });
     }
     rows.sort((a, b) => b.y - a.y);
     for (const row of rows) {
       row.parts.sort((a, b) => a.x - b.x);
       let line = "";
-      for (const part of row.parts) line += (line && !/\s$/.test(line) && !/^\s/.test(part.s) ? " " : "") + part.s;
+      let end = 0;
+      for (const part of row.parts) {
+        // A wide gap is a column break (title ... dates, school ... city): mark it so the parser can split there.
+        const gap = line && part.w > 0 ? part.x - end : 0;
+        line += (gap > 24 ? " | " : line && !/\s$/.test(line) && !/^\s/.test(part.s) ? " " : "") + part.s;
+        end = part.x + part.w;
+      }
       lines.push(line);
     }
   }
