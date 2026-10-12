@@ -131,7 +131,7 @@ test("Copy info shows every saved section and copies full work descriptions", as
     Object.defineProperty(dom.window.navigator, "clipboard", { value: undefined });
     dom.window.document.execCommand = (command) => {
       assert.equal(command, "copy");
-      copied.push(dom.window.document.querySelector("#avid-autofill-root").shadowRoot.querySelector("textarea").value);
+      copied.push(dom.window.document.querySelector("#avid-autofill-root").shadowRoot.querySelector("textarea:not(.report-note):not(.report-preview)").value);
       return true;
     };
     descriptionField.querySelector("button").click();
@@ -361,4 +361,63 @@ test("a page left from before an extension reload says to refresh it", async () 
     await new Promise((resolve) => setTimeout(resolve, 0));
     assert.match(root.querySelector(".summary").textContent, /Avid was updated. Refresh this page/);
   } finally { dom.window.close(); }
+});
+
+function loadReportPage(manifest, bodyHtml = "") {
+  const dom = new JSDOM(`<!doctype html><body>${bodyHtml}</body>`, { url: "https://boards.greenhouse.io/acme/jobs/1?token=secret#apply", runScripts: "outside-only", pretendToBeVisual: true });
+  dom.window.chrome = chromeShim();
+  dom.window.chrome.runtime.getManifest = () => manifest;
+  for (const file of ["src/shared/schema.js", "src/content/report.js", "src/content/widget.js"]) {
+    dom.window.eval(fs.readFileSync(path.join(ROOT, file), "utf8"));
+  }
+  return dom;
+}
+
+test("store builds offer Report a problem and local builds keep Export DOM", () => {
+  const store = loadReportPage({ update_url: "https://clients2.google.com/service/update2/crx", version: "1.2.3" });
+  store.window.AvidAutofill.widget.mount({ name: "Greenhouse" });
+  const storeShadow = store.window.document.querySelector("#avid-autofill-root").shadowRoot;
+  assert.ok(storeShadow.querySelector(".report-open"));
+  assert.equal(storeShadow.querySelector(".export"), null);
+  store.window.close();
+
+  const dev = loadReportPage({ version: "1.2.3" });
+  dev.window.AvidAutofill.widget.mount({ name: "Greenhouse" });
+  const devShadow = dev.window.document.querySelector("#avid-autofill-root").shadowRoot;
+  assert.ok(devShadow.querySelector(".export"));
+  assert.equal(devShadow.querySelector(".report-open"), null);
+  dev.window.close();
+});
+
+test("a problem report strips the profile, typed answers, hidden tokens and emails before it is shown", async () => {
+  const dom = loadReportPage({ update_url: "x", version: "1.2.3" }, `
+    <form><label>Email <input name="email" value="ada@example.com"></label>
+    <input name="csrf" type="hidden" value="tok-9f8e7d">
+    <textarea name="why">I love Analytical Engines</textarea>
+    <p>Questions? recruiter@acme.test or call Ada Lovelace</p></form>`);
+  const A = dom.window.AvidAutofill;
+  A.getProfile = async () => ({ personal: { fullName: "Ada Lovelace", email: "ada@example.com" } });
+  A.widget.mount({ name: "Greenhouse" });
+  const shadow = dom.window.document.querySelector("#avid-autofill-root").shadowRoot;
+  shadow.querySelector(".report-open").click();
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.equal(shadow.querySelector(".report-view").hidden, false);
+  assert.equal(shadow.querySelector(".fill-view").hidden, true);
+  const text = shadow.querySelector(".report-preview").value;
+  for (const secret of ["ada@example.com", "tok-9f8e7d", "Analytical Engines", "recruiter@acme.test", "Ada Lovelace", "secret", "avid-autofill-root"]) {
+    assert.ok(!text.includes(secret), `report leaked ${secret}`);
+  }
+  assert.match(text, /Extension version: 1\.2\.3/);
+  assert.match(text, /Page: https:\/\/boards\.greenhouse\.io\/acme\/jobs\/1 /);
+  assert.match(text, /<form>/);
+  dom.window.close();
+});
+
+test("the report link is an email when an address is set and a prefilled issue otherwise", () => {
+  const dom = loadReportPage({ update_url: "x" });
+  const { reportLink } = dom.window.AvidAutofill.report;
+  const mail = reportLink({ subject: "Bad fill", filename: "r.html", email: "dev@example.com" });
+  assert.match(mail, /^mailto:dev@example\.com\?subject=Bad%20fill&body=/);
+  assert.match(reportLink({ subject: "Bad fill", filename: "r.html", email: "" }), /^https:\/\/github\.com\/athervvidhate\/avid-autofill\/issues\/new\?title=/);
+  dom.window.close();
 });

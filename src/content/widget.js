@@ -32,6 +32,9 @@
     const fillLabel = adapter.name === "Generic" ? "Try filling this page" : "Fill this application";
     AvidAutofill.loadWidgetFonts?.();
     root.appendChild(el(`<style>${AvidAutofill.widgetStyle || ""}</style>`));
+    // Store builds report problems; local builds capture fixtures instead (mountDevTools).
+    const canReport = !isDevBuild() && !!AvidAutofill.report;
+    let lastFillReport = null;
     const wrap = el(`<div class="wrap"></div>`);
     const launcher = el(`<button class="launcher" hidden aria-label="Open Avid Autofill">Open Avid</button>`);
     const panel = el(`
@@ -72,7 +75,17 @@
           <p class="copy-status" role="status" aria-live="polite"></p>
           <div class="copy-groups"></div>
         </section>
-        <footer class="foot"><button class="opt" type="button">Edit profile</button><span class="review">Stored locally<br />Review before submitting</span></footer>
+        <section class="report-view" id="avid-report-view" aria-labelledby="avid-report-title" hidden>
+          <h1 id="avid-report-title">Report a problem</h1>
+          <p class="copy-help">This sends the developer the page so the problem can be fixed. Nothing is sent until you attach the saved file to the email yourself. Your saved profile details, anything you typed into the form, and hidden form values are removed first.</p>
+          <label class="report-label" for="avid-report-note">What went wrong? (optional)</label>
+          <textarea class="report-note" id="avid-report-note" rows="3" maxlength="500"></textarea>
+          <label class="report-label" for="avid-report-preview">Exactly what the file contains</label>
+          <textarea class="report-preview" id="avid-report-preview" rows="9" readonly spellcheck="false"></textarea>
+          <p class="copy-status report-status" role="status" aria-live="polite"></p>
+          <div class="report-actions"><button class="primary report-send" type="button">Save report and open email</button><button class="track report-cancel" type="button">Cancel</button></div>
+        </section>
+        <footer class="foot"><button class="opt" type="button">Edit profile</button>${canReport ? `<button class="opt report-open" type="button">Report a problem</button>` : ""}<span class="review">Stored locally<br />Review before submitting</span></footer>
       </section>
     `);
     wrap.append(panel, launcher);
@@ -167,9 +180,11 @@
     }
 
     function showView(view) {
-      const copying = view === "copy";
-      $(".fill-view").hidden = copying;
+      const copying = view === "copy", reporting = view === "report";
+      $(".fill-view").hidden = copying || reporting;
       $(".copy-view").hidden = !copying;
+      $(".report-view").hidden = !reporting;
+      $(".tabs").hidden = reporting;
       $(".fill-tab").setAttribute("aria-selected", String(!copying));
       $(".copy-tab").setAttribute("aria-selected", String(copying));
       $(".fill-tab").tabIndex = copying ? -1 : 0;
@@ -234,6 +249,38 @@
     $(".skills").addEventListener("change", persistToggles);
 
     if (isDevBuild()) mountDevTools(panel, adapter);
+    if (canReport) mountReport();
+
+    function mountReport() {
+      let built = null;
+      const status = $(".report-status"), note = $(".report-note"), preview = $(".report-preview");
+      const rebuild = async () => {
+        built = AvidAutofill.report.buildReport({ adapter, profile: await AvidAutofill.getProfile(), fillReport: lastFillReport, note: note.value });
+        preview.value = built.text;
+      };
+      $(".report-open").addEventListener("click", async () => {
+        status.textContent = "";
+        showView("report");
+        await rebuild();
+        note.focus();
+      });
+      note.addEventListener("input", () => { rebuild(); });
+      $(".report-cancel").addEventListener("click", () => { showView("fill"); $(".report-open").focus(); });
+      $(".report-send").addEventListener("click", async () => {
+        try {
+          await rebuild();
+          const blob = new Blob([built.text], { type: "text/html" });
+          const save = document.createElement("a");
+          save.href = URL.createObjectURL(blob); save.download = built.filename; save.click();
+          setTimeout(() => URL.revokeObjectURL(save.href), 1000);
+          const mail = document.createElement("a");
+          mail.href = AvidAutofill.report.reportLink({ subject: built.subject, filename: built.filename });
+          mail.target = "_blank"; mail.rel = "noopener";
+          mail.click();
+          status.textContent = `Saved ${built.filename}. In the message that opened, attach that file and send it.`;
+        } catch (error) { status.textContent = explain(error); }
+      });
+    }
 
     $(".fill").addEventListener("click", async () => {
       const btn = $(".fill");
@@ -251,6 +298,7 @@
         const settings = await AvidAutofill.getSettings();
         const resume = await AvidAutofill.getResume();
         const report = await AvidAutofill.engine.fillPage(profile, settings, resume);
+        lastFillReport = report;
         renderReport($, report);
       } catch (err) {
         renderError($, explain(err));
@@ -414,32 +462,6 @@
     catch (_) { return false; }
   }
 
-  function collectPii(profile) {
-    const vals = [];
-    const push = (v) => { const s = String(v == null ? "" : v).trim(); if (s.length >= 3) vals.push(s); };
-    const p = profile.personal || {};
-    [p.firstName, p.lastName, p.fullName, p.preferredName, p.email, p.phone, p.address, p.city, p.postalCode].forEach(push);
-    Object.values(profile.links || {}).forEach(push);
-    return [...new Set(vals)].sort((a, b) => b.length - a.length);
-  }
-
-  function escapeRegExp(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
-
-  function buildFixtureHtml(profile) {
-    const clone = document.documentElement.cloneNode(true);
-    clone.querySelectorAll("#avid-autofill-root, script").forEach((n) => n.remove());
-    clone.querySelectorAll("input").forEach((i) => {
-      const t = (i.getAttribute("type") || "text").toLowerCase();
-      if (t === "checkbox" || t === "radio") i.removeAttribute("checked");
-      else if (!["submit", "button", "image", "reset"].includes(t)) i.setAttribute("value", "");
-    });
-    clone.querySelectorAll("textarea").forEach((t) => { t.textContent = ""; });
-    clone.querySelectorAll("option").forEach((o) => o.removeAttribute("selected"));
-    let html = "<!doctype html>\n" + clone.outerHTML;
-    for (const val of collectPii(profile)) html = html.replace(new RegExp(escapeRegExp(val), "gi"), "[REDACTED]");
-    return html;
-  }
-
   function slugify(s) { return String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, ""); }
 
   function download(filename, text) {
@@ -457,7 +479,7 @@
     dev.querySelector(".export").addEventListener("click", async () => {
       const step = slugify(dev.querySelector(".step").value) || "capture";
       const profile = await AvidAutofill.getProfile();
-      download(`${ats}-${step}.html`, buildFixtureHtml(profile));
+      download(`${ats}-${step}.html`, AvidAutofill.report.scrubbedHtml(profile));
       msg.textContent = `Saved ${ats}-${step}.html. Move it into test/fixtures.`;
     });
   }
