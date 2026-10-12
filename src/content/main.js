@@ -16,8 +16,19 @@
   let captured = false;
   function init() {
     const adapter = AvidAutofill.adapters.detect();
-    if (adapter.name === "iCIMS" && window.parent !== window) return true;
-    if (adapter.name === "iCIMS" && document.querySelector("iframe#icims_content_iframe")) {
+    if (adapter.name === "iCIMS" && window.parent !== window) {
+      // The outer page's drawer fills this frame through the relay below. Later
+      // steps of the form load inside this frame, so it watches for them itself.
+      AvidAutofill.widget.fill = fillHere;
+      try {
+        const sent = chrome.runtime.sendMessage({ type: "AVID_ICIMS_FRAME_READY" });
+        if (sent && sent.catch) sent.catch(() => {});
+      } catch (_) { /* extension reloaded */ }
+      if (AvidAutofill.steps) AvidAutofill.steps.start();
+      return true;
+    }
+    const icimsHost = adapter.name === "iCIMS" && !!document.querySelector("iframe#icims_content_iframe");
+    if (icimsHost) {
       AvidAutofill.engine.fillPage = async () => {
         const response = await chrome.runtime.sendMessage({ type: "AVID_FILL_ICIMS_FRAME" });
         if (!response?.ok) throw new Error(response?.error || "Avid could not reach the iCIMS form.");
@@ -27,7 +38,8 @@
     if (!captured && AvidAutofill.workday && AvidAutofill.workday.captureDescription) AvidAutofill.workday.captureDescription().catch(() => {});
     captured = true;
     const requested = !!g.__avidOpenDrawer;
-    const known = adapter.name !== "Generic" && !AvidAutofill.adapters.markupOnly(adapter);
+    // A company careers page wrapping the iCIMS form frame counts as iCIMS.
+    const known = icimsHost || (adapter.name !== "Generic" && !AvidAutofill.adapters.markupOnly(adapter));
     if (known || requested || AvidAutofill.generic.detect().isApplication) {
       AvidAutofill.widget.mount(adapter);
       if (!requested && AvidAutofill.steps) AvidAutofill.steps.start();
@@ -57,9 +69,18 @@
   // as an application and the watch above has already given up.
   AvidAutofill.openDrawer = () => {
     if (window !== window.top && !document.querySelector("input, select, textarea")) return false;
+    // The iCIMS form frame is filled from the outer page's drawer, never its own.
+    if (window !== window.top && AvidAutofill.adapters.detect().name === "iCIMS") return false;
     AvidAutofill.widget.mount(AvidAutofill.adapters.detect());
     return AvidAutofill.widget.open();
   };
+
+  async function fillHere() {
+    const profile = await AvidAutofill.getProfile();
+    const settings = await AvidAutofill.getSettings();
+    const resume = await AvidAutofill.getResume();
+    return AvidAutofill.engine.fillPage(profile, settings, resume);
+  }
 
   function start() { if (!init()) watch(); }
   if ("requestIdleCallback" in window) requestIdleCallback(start, { timeout: 2000 });
@@ -70,13 +91,16 @@
       AvidAutofill.openDrawer();
       return false;
     }
-    if (msg && (msg.type === "AVID_FILL" || (msg.type === "AVID_FILL_ICIMS_FRAME" && window.parent !== window))) {
+    // The iCIMS relay reaches every frame in the tab. Only the iCIMS form frame
+    // answers: an ad or tracker frame running this script on an any-site page
+    // would otherwise answer first with an empty report.
+    const icimsFrame = msg && msg.type === "AVID_FILL_ICIMS_FRAME" && window.parent !== window && /(^|\.)icims\.com$/.test(window.location.hostname);
+    if (msg && (msg.type === "AVID_FILL" || icimsFrame)) {
       (async () => {
         try {
-          const profile = await AvidAutofill.getProfile();
-          const settings = await AvidAutofill.getSettings();
-          const resume = await AvidAutofill.getResume();
-          const report = await AvidAutofill.engine.fillPage(profile, settings, resume);
+          const report = await fillHere();
+          // The applicant's Fill on the outer page arms this frame's later steps.
+          if (icimsFrame && AvidAutofill.steps) AvidAutofill.steps.arm();
           sendResponse({ ok: true, report });
         } catch (err) {
           sendResponse({ ok: false, error: String((err && err.message) || err) });
