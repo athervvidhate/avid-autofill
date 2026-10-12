@@ -7,7 +7,7 @@ release moves them under a version heading, bumps `version` in `package.json`
 
 ## Unreleased
 
-- Avid now fills each application page as it appears, so you no longer click Fill on every step. Turn it off with *Fill each new step automatically* in the drawer or toolbar popup.
+- After you click Fill once, Avid fills each later application page as it appears, so you no longer click Fill on every step. Turn it off with *Fill each new step automatically* in the drawer or toolbar popup.
 
 ## 0.1.0
 

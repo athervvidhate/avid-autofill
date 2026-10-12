@@ -272,7 +272,10 @@
       }
     }
     runFillHandle = runFill;
-    $(".fill").addEventListener("click", () => runFill());
+    $(".fill").addEventListener("click", async () => {
+      const report = await runFill();
+      if (report && AvidAutofill.steps) AvidAutofill.steps.arm();
+    });
   }
 
   // After the extension reloads, this page's copy of Avid can no longer reach it.

@@ -1,5 +1,6 @@
 // Fills each application page as it appears, so the applicant does not click
-// Fill on every step. Watches for a set of fillable fields it has not filled yet
+// Fill on every step. Nothing fills until the applicant has clicked Fill once in
+// this tab; that click arms it for the rest of the application. Watches for a set of fillable fields it has not filled yet
 // (a Next click, a route change, a section that opens) and runs one fill for it.
 (function () {
   const AvidAutofill = (globalThis.AvidAutofill = globalThis.AvidAutofill || {});
@@ -10,11 +11,17 @@
   const FIELDS = 'input:not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="reset"]):not([type="image"]):not([type="password"]), select, textarea, [role="combobox"]';
 
   const filled = new Set(); // keys of fields already given a fill pass
+  const FLAG = "avidStepsArmed";
   let started = false;
+  let armed = false;
   let running = false;
   let runs = 0;
   let timer = null;
   let lastUrl = location.href;
+
+  const wasArmed = () => {
+    try { return armed || sessionStorage.getItem(FLAG) === "1"; } catch (_) { return armed; }
+  };
 
   const text = (s) => String(s || "").replace(/\s+/g, " ").trim().slice(0, 80);
 
@@ -47,7 +54,7 @@
 
   async function maybeFill() {
     timer = null;
-    if (running || runs >= MAX_RUNS || document.visibilityState === "hidden") return;
+    if (!wasArmed() || running || runs >= MAX_RUNS || document.visibilityState === "hidden") return;
     let settings;
     try { settings = await AvidAutofill.getSettings(); } catch (_) { return; }
     if (settings.autoFillSteps === false) return;
@@ -72,7 +79,7 @@
   }
 
   function schedule() {
-    if (running) return;
+    if (running || !wasArmed()) return;
     clearTimeout(timer);
     timer = setTimeout(maybeFill, QUIET_MS);
   }
@@ -90,5 +97,14 @@
     schedule();
   }
 
-  AvidAutofill.steps = { start, _freshFields: freshFields, _reset: () => { filled.clear(); runs = 0; } };
+  // Called after the applicant's own Fill click: this page counts as done, and
+  // every later step fills by itself.
+  function arm() {
+    armed = true;
+    try { sessionStorage.setItem(FLAG, "1"); } catch (_) { /* private mode */ }
+    freshFields().forEach((k) => filled.add(k));
+    start();
+  }
+
+  AvidAutofill.steps = { start, arm, _freshFields: freshFields, _reset: () => { filled.clear(); runs = 0; } };
 })();

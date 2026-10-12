@@ -44,7 +44,12 @@ test("a new step fills once when the page changes", async () => {
   let fills = 0;
   win.AvidAutofill.widget = { fill: async () => { fills += 1; return {}; } };
   win.AvidAutofill.steps.start();
-  await new Promise((r) => setTimeout(r, 1500));
+  await new Promise((r) => setTimeout(r, 1800));
+  assert.equal(fills, 0); // nothing fills before the first click
+  win.document.getElementById("f").insertAdjacentHTML("beforeend", '<input name="email" aria-label="Email">');
+  win.AvidAutofill.steps.arm(); // the applicant's own Fill click
+  win.document.getElementById("f").innerHTML = '<input name="city" aria-label="City">';
+  await new Promise((r) => setTimeout(r, 1800));
   assert.equal(fills, 1);
   win.document.getElementById("f").innerHTML = '<input name="phone" aria-label="Phone">';
   await new Promise((r) => setTimeout(r, 3000));
@@ -58,7 +63,8 @@ test("turning the setting off stops automatic fills", async () => {
   const win = setup('<form><input name="first_name" aria-label="First name"></form>', { autoFillSteps: false });
   let fills = 0;
   win.AvidAutofill.widget = { fill: async () => { fills += 1; return {}; } };
-  win.AvidAutofill.steps.start();
+  win.AvidAutofill.steps.arm();
+  win.document.body.insertAdjacentHTML("beforeend", '<input name="x" aria-label="X">');
   await new Promise((r) => setTimeout(r, 1800));
   assert.equal(fills, 0);
 }, 10000);
