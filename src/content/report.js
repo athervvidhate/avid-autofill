@@ -5,9 +5,9 @@
   const AvidAutofill = (globalThis.AvidAutofill = globalThis.AvidAutofill || {});
   if (AvidAutofill.report) return;
 
-  // Where problem reports are emailed. While this is empty the drawer opens a prefilled
+  // Where problem reports are emailed. If this is ever emptied the drawer opens a prefilled
   // GitHub issue instead.
-  const REPORT_EMAIL = "";
+  const REPORT_EMAIL = "athervvidhate@gmail.com";
   const ISSUES_URL = "https://github.com/athervvidhate/avid-autofill/issues/new";
 
   function collectPii(profile) {
