@@ -35,11 +35,7 @@
 
   const loadState = async () => { state = { step: 0, skipped: [], ...(await chrome.storage.local.get(KEY))[KEY] }; state.step = Math.min(Math.max(+state.step || 0, 0), STEPS.length - 1); };
   const saveState = () => chrome.storage.local.set({ [KEY]: state });
-  async function send(type, data = {}) {
-    const result = await chrome.runtime.sendMessage({ type, ...data });
-    if (!result?.ok) throw new Error(result?.error || "Reload the extension and reopen setup.");
-    return result;
-  }
+  const send = (type, data = {}) => A.request({ type, ...data }, "Reload the extension and reopen setup.");
   const say = (id, text) => { $(id).textContent = text; };
 
   function control(id, label, type, options) {
