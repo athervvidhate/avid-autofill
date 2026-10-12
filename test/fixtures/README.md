@@ -7,7 +7,8 @@ these come from the maintainer's own runs.
 ## How to capture one
 
 1. Load the extension unpacked (dev build). The widget's **Export DOM** button only
-   appears in dev builds — store users never see it.
+   appears in dev builds. Store builds show **Report a problem** instead, which saves a
+   stricter-scrubbed copy of the page for the user to email.
 2. Open a real application form and reach the step you want to snapshot.
 3. Open the Autofill widget, type a `step` label (e.g. `page1`), and click
    **Export DOM**. A `{ats}-{step}.html` file downloads.

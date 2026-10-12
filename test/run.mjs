@@ -65,6 +65,7 @@ const SCRIPTS = [
   "src/content/adapters.js",
   "src/shared/skills.js",
   "src/content/workday.js",
+  "src/content/repeaters.js",
   "src/content/engine.js",
 ].map((p) => fs.readFileSync(path.join(ROOT, p), "utf8"));
 
@@ -1814,4 +1815,37 @@ test("setRadio and setCheckbox report false when the click does not take", () =>
   stuck(document.getElementById("c"));
   assert.equal(A.fillers.setRadio([document.getElementById("a")], "Yes"), false);
   assert.equal(A.fillers.setCheckbox(document.getElementById("c"), true), false);
+});
+
+test("setReactSelect searches each fallback when the first answer filters every option out", async () => {
+  const win = blankWindow();
+  const { document, AvidAutofill: A } = win;
+  document.body.innerHTML = '<div id="c"><input role="combobox" aria-controls="lb"></div><ul id="lb" role="listbox"></ul>';
+  const input = document.querySelector("input"), list = document.getElementById("lb");
+  const all = ["White", "Asian", "Black or African American"];
+  // A Rippling-style search box: the list shows only options containing the query.
+  input.addEventListener("input", () => {
+    list.innerHTML = all.filter((o) => o.toLowerCase().includes(input.value.toLowerCase())).map((o) => `<li role="option">${o}</li>`).join("");
+    list.querySelectorAll("li").forEach((li) => {
+      Object.defineProperty(li, "offsetParent", { configurable: true, get: () => document.body });
+      li.addEventListener("click", () => { input.value = li.textContent; });
+    });
+  });
+  const ok = await A.fillers.setReactSelect(document.getElementById("c"), ["South Asian", "asian"]);
+  assert.equal(ok, true);
+  assert.equal(input.value, "Asian");
+});
+
+test("a Rippling radio whose wrapper owns the state is chosen through the wrapper", async () => {
+  const win = blankWindow();
+  const { document, AvidAutofill: A } = win;
+  document.body.innerHTML = '<div role="radiogroup">' + ["Yes", "No"].map((v) => `<div role="radio" aria-checked="false" data-value="${v}"><input type="radio" name="q" value="${v}" aria-labelledby="l${v}"></div><span id="l${v}">${v}</span>`).join("") + "</div>";
+  // The page keeps inputs unchecked and only answers clicks on the wrapper.
+  document.querySelectorAll("input").forEach((i) => i.addEventListener("click", (e) => { e.preventDefault(); }));
+  document.querySelectorAll('[role="radio"]').forEach((w) => w.addEventListener("click", (e) => {
+    if (e.target !== w) return;
+    document.querySelectorAll('[role="radio"]').forEach((o) => o.setAttribute("aria-checked", String(o === w)));
+  }));
+  assert.equal(A.fillers.setRadio(Array.from(document.querySelectorAll("input")), "No"), true);
+  assert.equal(document.querySelector('[data-value="No"]').getAttribute("aria-checked"), "true");
 });
