@@ -60,7 +60,7 @@ body::after { content: ""; position: fixed; z-index: -1; width: 420px; height: 4
 .sidebar-note span:last-child { grid-column: 2; line-height: 1.4; }
 .local-dot { width: 9px; height: 9px; border-radius: 3px 6px 3px 6px; background: var(--lime); }
 .content { position: relative; width: min(900px, 100%); margin: 0 auto; padding: 40px 32px 112px; }
-.squiggle { position: absolute; right: 36px; top: 30px; width: 64px; height: 18px; fill: none; stroke: var(--green); stroke-width: 3; stroke-linecap: round; }
+.squiggle { position: absolute; right: 36px; top: 27px; width: 64px; height: 24px; overflow: visible; fill: none; stroke: var(--green); stroke-width: 3; stroke-linecap: round; }
 .page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 8px; padding-top: 18px; }
 h1 { margin: 0 0 6px; font: 800 40px/1 var(--display); letter-spacing: -0.035em; }
 .hl { background: linear-gradient(transparent 58%, var(--lime) 58%, var(--lime) 92%, transparent 92%); padding: 0 4px; margin-left: -4px; }
@@ -167,3 +167,19 @@ input[type="checkbox"] { width: 17px; min-height: 17px; height: 17px; padding: 0
   html { scroll-behavior: auto; }
   * { transition: none !important; }
 }
+
+/* Resume review dialog */
+.rv-overlay { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 20px; background: rgb(23 32 26 / 0.45); backdrop-filter: blur(4px); }
+.rv-dialog { display: flex; flex-direction: column; width: min(760px, 100%); max-height: calc(100vh - 40px); padding: 24px; border-radius: 24px; background: var(--card); box-shadow: 0 24px 60px rgb(23 32 26 / 0.3); }
+.rv-dialog h2 { margin: 0 0 4px; font: 800 22px/1.15 var(--display); letter-spacing: -0.02em; }
+.rv-hint { margin: 0 0 10px; color: var(--muted); font-size: 13px; }
+.rv-body { flex: 1; min-height: 0; overflow-y: auto; margin: 6px -8px 0; padding: 0 8px; }
+.rv-group { margin-top: 14px; }
+.rv-group h3 { margin: 0 0 4px; font: 800 15px var(--display); }
+.rv-row { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; align-items: end; margin-top: 8px; }
+.rv-row > input[type="checkbox"] { margin-bottom: 12px; }
+.rv-existing { grid-column: 2; color: var(--warn); font-size: 12px; }
+.rv-add { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; font-weight: 700; cursor: pointer; }
+.rv-card { padding-top: 14px; }
+.rv-empty { padding: 24px 0; color: var(--muted); text-align: center; }
+.rv-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }

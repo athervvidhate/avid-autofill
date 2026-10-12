@@ -122,6 +122,8 @@ test("Copy info shows every saved section and copies full work descriptions", as
     }
     const workGroup = [...panel.querySelectorAll(".copy-group")].find((node) => node.querySelector("h2")?.textContent === "Experience");
     assert.equal(workGroup.querySelector("h3").textContent, "Engineer at Acme");
+    const roleLabels = [...workGroup.querySelectorAll(".copy-item")[0].querySelectorAll(".copy-field b")].map((node) => node.textContent);
+    assert.deepEqual(roleLabels.slice(0, 3).map((label) => label.toLowerCase()), ["company", "title", "description"]);
     const descriptionField = [...workGroup.querySelectorAll(".copy-field")].find((node) => node.querySelector("b").textContent === "Description");
     descriptionField.querySelector("button").click();
     await new Promise((resolve) => setTimeout(resolve, 0));

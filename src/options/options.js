@@ -254,9 +254,34 @@ $("resume-file").onchange = (e) => {
     });
     await renderResume();
     flash($("resume-name"), `Saved: ${file.name} ✓`);
+    await readResume(file);
   };
   reader.readAsDataURL(file);
   e.target.value = "";
+};
+
+// Reads the resume on this device and lets the user review before the profile changes.
+async function readResume(blob) {
+  $("resume-read").disabled = true;
+  try {
+    readIntoProfile();
+    const merged = await AvidAutofill.importResume(blob, profile);
+    if (merged) {
+      profile = merged;
+      await AvidAutofill.saveProfile(profile);
+      await render();
+      flash($("io-msg"), "Added from your resume ✓");
+    }
+  } catch (err) {
+    $("io-msg").textContent = err.message;
+  }
+  $("resume-read").disabled = false;
+}
+
+$("resume-read").onclick = async () => {
+  const resume = await AvidAutofill.getResume();
+  if (!resume) { flash($("io-msg"), "Choose a resume file first."); return; }
+  await readResume(await (await fetch(resume.dataUrl)).blob());
 };
 
 $("resume-remove").onclick = async () => {
