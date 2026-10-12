@@ -30,6 +30,7 @@
     const known = adapter.name !== "Generic" && !AvidAutofill.adapters.markupOnly(adapter);
     if (known || requested || AvidAutofill.generic.detect().isApplication) {
       AvidAutofill.widget.mount(adapter);
+      if (!requested && AvidAutofill.steps) AvidAutofill.steps.start();
       if (requested) {
         delete g.__avidOpenDrawer;
         AvidAutofill.widget.open();
@@ -52,13 +53,21 @@
     setTimeout(stop, 120000);
   }
 
+  // The toolbar button asks for the drawer even when the page was not recognised
+  // as an application and the watch above has already given up.
+  AvidAutofill.openDrawer = () => {
+    if (window !== window.top && !document.querySelector("input, select, textarea")) return false;
+    AvidAutofill.widget.mount(AvidAutofill.adapters.detect());
+    return AvidAutofill.widget.open();
+  };
+
   function start() { if (!init()) watch(); }
   if ("requestIdleCallback" in window) requestIdleCallback(start, { timeout: 2000 });
   else setTimeout(start, 800);
 
   chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     if (msg && msg.type === "AVID_OPEN_DRAWER") {
-      AvidAutofill.widget.open();
+      AvidAutofill.openDrawer();
       return false;
     }
     if (msg && (msg.type === "AVID_FILL" || (msg.type === "AVID_FILL_ICIMS_FRAME" && window.parent !== window))) {

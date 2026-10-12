@@ -36,6 +36,8 @@ the field matching for your own search.
 
 - **Page drawer** - a right-edge drawer stays beside supported job sites; click
   *Fill this application* and review each field that was filled or skipped.
+- **Fills every step** - click Fill once; as you click Next, each new page is filled on its own.
+  Passwords are never filled. Turn it off in the drawer if you prefer to click.
 - **Smart field matching** - reads each field's label, name, id, placeholder,
   `aria-label`, and nearby text, de-camelCases identifier-style attributes, and
   maps them to your profile with an ordered rules table. No brittle per-site

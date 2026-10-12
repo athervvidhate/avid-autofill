@@ -30,7 +30,7 @@ const profile = (A) => {
   return p;
 };
 
-for (const name of ["acme-careers.html", "autocomplete-only.html", "placeholder-table.html"]) {
+for (const name of ["acme-careers.html", "autocomplete-only.html", "placeholder-table.html", "later-step.html"]) {
   test(`${name}: detected as a job application`, () => {
     const win = load(name);
     const r = win.AvidAutofill.generic.detect();

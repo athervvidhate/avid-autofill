@@ -30,6 +30,7 @@ jobs:
           export AVID_BROWSER="$RUNNER_TEMP/chrome"
           node test/extension-browser.mjs
           node test/tracker-browser.mjs
+          node test/resume-browser.mjs
       - run: npm run zip
       - uses: actions/upload-artifact@v4
         with:
