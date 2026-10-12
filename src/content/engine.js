@@ -262,8 +262,9 @@
           if (first) fillers.setTextValue(el, first[0]);
           record(signal, first ? first[0] : m.value, first && el.value ? "filled" : "skipped");
         } else {
-          fillers.setTextValue(el, m.value);
-          record(signal, m.value, el.value ? "filled" : "skipped");
+          const text = /date|yyyy/i.test(el.placeholder) ? matcher.typedDate(m.value, signal) : m.value;
+          fillers.setTextValue(el, text);
+          record(signal, text, el.value ? "filled" : "skipped");
         }
       } catch (_) {
         record(signal, m.value, "error");

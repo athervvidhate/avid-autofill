@@ -1572,9 +1572,11 @@ test("date inputs take ISO dates and never type into the previous field; ambiguo
   win.Element.prototype.getClientRects = () => [{}];
   doc.body.innerHTML = `<label>Undergraduate GPA <input type="number" id="gpa"></label>
     <label>Date of Undergraduate Graduation <input type="date" id="grad"></label>
+    <label>When can you start? <input type="text" placeholder="Pick date..." id="start"></label>
     <label>Undergraduate University <select id="school"><option value="">Select</option><option>State University-North Campus</option><option>State University-South Campus</option></select></label>`;
   const profile = testProfile(A);
   profile.education = [{ school: "State University", gpa: "3.8", endDate: "May 2018" }];
+  profile.misc.earliestStartDate = "2027-01-15";
   const gpa = doc.getElementById("gpa");
   // Focus stays on the GPA box, as when the page is not in front and a date input cannot take focus.
   const focus = win.HTMLElement.prototype.focus;
@@ -1582,6 +1584,7 @@ test("date inputs take ISO dates and never type into the previous field; ambiguo
   await A.engine.fillPage(profile, A.DEFAULT_SETTINGS, null);
   assert.equal(gpa.value, "3.8");
   assert.equal(doc.getElementById("grad").value, "2018-05-01");
+  assert.equal(doc.getElementById("start").value, "01/15/2027", "a typed-date box gets the day as typed, not an ISO string some pickers shift by a day");
   assert.equal(doc.getElementById("school").value, "", "two campuses match the name: neither is picked");
   win.close();
 });

@@ -340,12 +340,22 @@
     return "No";
   }
 
-  // Today's date in the order the field's placeholder shows (default month/day/year).
+  // A date in the order the field's placeholder shows (default month/day/year).
+  function formatDate(y, m, day, signal) {
+    const mm = String(m).padStart(2, "0"), dd = String(day).padStart(2, "0");
+    if (/yyyy-mm-dd/.test(signal)) return `${y}-${mm}-${dd}`;
+    if (/dd\/mm\/yyyy/.test(signal)) return `${dd}/${mm}/${y}`;
+    return `${mm}/${dd}/${y}`;
+  }
   function todayFor(signal) {
-    const d = new Date(), y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, "0"), day = String(d.getDate()).padStart(2, "0");
-    if (/yyyy-mm-dd/.test(signal)) return `${y}-${m}-${day}`;
-    if (/dd\/mm\/yyyy/.test(signal)) return `${day}/${m}/${y}`;
-    return `${m}/${day}/${y}`;
+    const d = new Date();
+    return formatDate(d.getFullYear(), d.getMonth() + 1, d.getDate(), signal);
+  }
+  // A saved ISO date reworded for a text box that wants a typed date. Some pickers
+  // read "2027-01-15" as UTC midnight and show the day before.
+  function typedDate(value, signal) {
+    const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+    return iso ? formatDate(iso[1], iso[2], iso[3], signal) : value;
   }
   function fullAddress(personal) {
     const stateZip = [personal.state, personal.postalCode].filter(Boolean).join(" ");
@@ -430,5 +440,5 @@
   }
 
   AvidAutofill.labelTextFor = labelTextFor;
-  AvidAutofill.matcher = { signalFor, groupSignal, choiceSignal, match, looksYesNo, nearestDuration, makeHelpers: P, norm, deCamel };
+  AvidAutofill.matcher = { signalFor, groupSignal, choiceSignal, match, typedDate, looksYesNo, nearestDuration, makeHelpers: P, norm, deCamel };
 })();
