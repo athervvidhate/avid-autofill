@@ -150,7 +150,13 @@
               : [entry.degree, entry.school].filter(Boolean).join(" at ") || `School ${index + 1}`;
             item.append(itemHeading);
           }
-          for (const [key, raw] of Object.entries(entry)) {
+          // Roles list company, role name, then description first; the rest keep their order.
+          const lead = section === "work" ? ["company", "title", "description"] : [];
+          const ordered = Object.entries(entry).sort(([a], [b]) => {
+            const rank = (key) => lead.includes(key) ? lead.indexOf(key) : lead.length;
+            return rank(a) - rank(b);
+          });
+          for (const [key, raw] of ordered) {
             if (raw && typeof raw === "object" && !Array.isArray(raw)) {
               for (const [question, answer] of Object.entries(raw)) {
                 if (answer !== "" && answer != null) item.append(makeCopyField(question, fieldValue(answer)));
