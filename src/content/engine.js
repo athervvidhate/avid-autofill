@@ -268,17 +268,20 @@
         } else if (m.place && adapter.locationSearch && el.matches(adapter.locationSearch)) {
           const picked = await fillers.setLocationSearch(el, m.value, m.alts);
           record(signal, picked || m.value, picked ? "filled" : "no-option-match");
+        } else if (type === "date" || type === "month") {
+          // These inputs take only an ISO value; free text such as "May 2018" is rejected.
+          const iso = isoMonth(m.value, /grad|end|expir|until|through/.test(signal));
+          if (iso) fillers.setTextValue(el, type === "month" ? iso.slice(0, 7) : iso);
+          record(signal, iso || m.value, iso && el.value ? "filled" : "skipped");
         } else if (type === "number" && !/^-?\d+(\.\d+)?$/.test(m.value)) {
           // A number input rejects text like "100,000-130,000": use its first number.
           const first = m.value.replace(/(\d),(?=\d{3})/g, "$1").match(/-?\d+(\.\d+)?/);
           if (first) fillers.setTextValue(el, first[0]);
           record(signal, first ? first[0] : m.value, first && el.value ? "filled" : "skipped");
         } else {
-          // A date input takes only YYYY-MM-DD.
-          const us = type === "date" && m.value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-          const value = us ? `${us[3]}-${us[1]}-${us[2]}` : m.value;
-          fillers.setTextValue(el, value);
-          record(signal, value, el.value ? "filled" : "skipped");
+          const text = /date|yyyy/i.test(el.placeholder) ? matcher.typedDate(m.value, signal) : m.value;
+          fillers.setTextValue(el, text);
+          record(signal, text, el.value ? "filled" : "skipped");
         }
       } catch (_) {
         record(signal, m.value, "error");
@@ -305,6 +308,9 @@
   // for date inputs. Open-ended values such as "Present" give "".
   function isoMonth(text, end) {
     const t = String(text || "").trim().toLowerCase();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(t)) return t;
+    const mdy = t.match(/^(\d{1,2})\/(\d{1,2})\/((?:19|20)\d{2})$/);
+    if (mdy) return `${mdy[3]}-${mdy[1].padStart(2, "0")}-${mdy[2].padStart(2, "0")}`;
     const year = t.match(/\b(19|20)\d{2}\b/);
     if (!year) return "";
     const monthIndex = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"].findIndex((m) => t.includes(m));
