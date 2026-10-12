@@ -1578,9 +1578,8 @@ test("date inputs take ISO dates and never type into the previous field; ambiguo
   profile.education = [{ school: "State University", gpa: "3.8", endDate: "May 2018" }];
   profile.misc.earliestStartDate = "2027-01-15";
   const gpa = doc.getElementById("gpa");
-  // Focus stays on the GPA box, as when the page is not in front and a date input cannot take focus.
-  const focus = win.HTMLElement.prototype.focus;
-  win.HTMLElement.prototype.focus = function () { if (this.id !== "grad") focus.call(this); };
+  // Chrome's insertText does nothing on a date input and the text lands in the field edited before it.
+  doc.execCommand = (_cmd, _ui, text) => { const target = doc.activeElement; (target.type === "date" ? gpa : target).value = text; return true; };
   await A.engine.fillPage(profile, A.DEFAULT_SETTINGS, null);
   assert.equal(gpa.value, "3.8");
   assert.equal(doc.getElementById("grad").value, "2018-05-01");

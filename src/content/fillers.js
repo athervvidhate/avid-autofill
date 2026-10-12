@@ -67,7 +67,9 @@
       // non-empty (masked fields may reformat, so we don't require an exact match).
       // insertText goes to whichever element holds focus: when this one could not
       // take it (a date input in an unfocused page), it would type into the previous field.
-      inserted = el.getRootNode().activeElement === el && document.execCommand("insertText", false, value) && !!el.value;
+      // Date-like inputs are not typeable: insertText lands in the previously edited field instead.
+      const typeable = !/^(date|month|week|time|datetime-local|color|range)$/.test(el.type);
+      inserted = typeable && el.getRootNode().activeElement === el && document.execCommand("insertText", false, value) && !!el.value;
     } catch (_) {
       inserted = false;
     }
