@@ -257,8 +257,11 @@
           if (first) fillers.setTextValue(el, first[0]);
           record(signal, first ? first[0] : m.value, first && el.value ? "filled" : "skipped");
         } else {
-          fillers.setTextValue(el, m.value);
-          record(signal, m.value, el.value ? "filled" : "skipped");
+          // A date input takes only YYYY-MM-DD.
+          const us = type === "date" && m.value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+          const value = us ? `${us[3]}-${us[1]}-${us[2]}` : m.value;
+          fillers.setTextValue(el, value);
+          record(signal, value, el.value ? "filled" : "skipped");
         }
       } catch (_) {
         record(signal, m.value, "error");
@@ -335,7 +338,7 @@
 
     const scored = inputs.map((i) => ({
       el: i,
-      sig: (matcher.signalFor(i) + " " + (i.accept || "")).toLowerCase(),
+      sig: (matcher.signalFor(i) + " " + (i.accept || "") + " " + ownBlockText(i)).toLowerCase(),
     }));
 
     // Prefer inputs that mention resume/cv; skip ones clearly for something else.
@@ -367,6 +370,14 @@
     } catch (_) {
       record("resume upload", resume.name, "error");
     }
+  }
+
+  // Text of the largest block around a file input that holds no other file
+  // input. Jobvite's input sits in a menu reading "File / Type or Paste Resume".
+  function ownBlockText(input) {
+    let node = input;
+    while (node.parentElement && node.parentElement.querySelectorAll('input[type="file"]').length === 1) node = node.parentElement;
+    return node === input ? "" : (node.textContent || "").replace(/\s+/g, " ").slice(0, 300);
   }
 
   // Signal for a radio/checkbox group: prefer a fieldset legend, else nearby text.

@@ -268,7 +268,7 @@ test("iCIMS keeps one outer drawer and delegates filling to its candidate iframe
 
   const candidate = dom.window.document.querySelector("iframe").contentWindow;
   candidate.document.body.innerHTML = '<form id="candidate"><input type="email"></form>';
-  const liveIcimsWindow = { parent: dom.window, requestIdleCallback: candidate.requestIdleCallback };
+  const liveIcimsWindow = { parent: dom.window, requestIdleCallback: candidate.requestIdleCallback, location: { hostname: "career-schwab.icims.com" } };
   liveIcimsWindow.top = liveIcimsWindow;
   loadFrame(candidate, undefined, (listener) => { candidateListener = listener; }, liveIcimsWindow);
   loadFrame(dom.window, async (message) => {
@@ -361,4 +361,21 @@ test("a page left from before an extension reload says to refresh it", async () 
     await new Promise((resolve) => setTimeout(resolve, 0));
     assert.match(root.querySelector(".summary").textContent, /Avid was updated. Refresh this page/);
   } finally { dom.window.close(); }
+});
+
+test("a non-iCIMS frame on the page ignores the iCIMS fill relay", () => {
+  const dom = new JSDOM("<body></body>", { runScripts: "outside-only", url: "https://ads.example.net/frame" });
+  const win = dom.window;
+  let listener;
+  win.chrome = chromeShim(undefined, (value) => { listener = value; });
+  win.requestIdleCallback = (callback) => callback();
+  for (const file of ["src/shared/schema.js", "src/content/adapters.js", "src/content/widget.js"]) win.eval(fs.readFileSync(path.join(ROOT, file), "utf8"));
+  win.AvidAutofill.generic = { detect: () => ({ isApplication: false }) };
+  win.AvidAutofill.engine = { fillPage: async () => ({ filledCount: 0, results: [] }) };
+  const frame = { parent: {}, location: win.location, requestIdleCallback: win.requestIdleCallback };
+  win.Function("window", "document", "globalThis", "chrome", fs.readFileSync(path.join(ROOT, "src/content/main.js"), "utf8"))(frame, win.document, win, win.chrome);
+  let answered = false;
+  assert.equal(listener({ type: "AVID_FILL_ICIMS_FRAME" }, {}, () => { answered = true; }), undefined);
+  assert.equal(answered, false);
+  win.close();
 });

@@ -70,7 +70,14 @@
   // sibling block), else the first radio's own signal.
   function groupSignal(radios) {
     const legend = radios[0].closest("fieldset")?.querySelector("legend");
-    if (legend && legend.textContent.trim()) return norm(legend.textContent);
+    if (legend && legend.textContent.trim()) {
+      // "Choose One" says nothing: the options carry the question (Jobvite's
+      // veteran block puts it in paragraphs above).
+      if (/^(please )?(choose|select|pick)( one| an option)?\W*$/i.test(legend.textContent.trim())) {
+        return norm([legend.textContent, ...radios.map((r) => labelTextFor(r) || r.value)].join(" | "));
+      }
+      return norm(legend.textContent);
+    }
     const title = groupTitle(radios);
     if (title) return title;
     let node = radios[0].parentElement;
@@ -112,7 +119,15 @@
   // long questions overrun nearbyText's length cap.
   function fieldTitle(el) {
     const label = el.closest("[data-field-path]")?.querySelector("label, legend");
-    return label ? norm(label.textContent) : "";
+    if (label) return norm(label.textContent);
+    // Rippling writes a custom question as a text block just before its
+    // data-testid="field" wrapper, with nothing pointing from the control to it.
+    const prev = el.closest('[data-testid="field"]')?.previousElementSibling;
+    if (prev && !prev.querySelector("input, select, textarea, [role=combobox], [role=radiogroup]")) {
+      const text = norm(prev.textContent);
+      if (text.length > 2 && text.length < 600) return text;
+    }
+    return "";
   }
 
   // Question text for a container of Yes/No buttons: the field title, else the
@@ -174,7 +189,7 @@
     { any: [/first name/, /given name/, /^fname$/, /legal first/, /(^|\| )first( \||$)/], not: [/preferred/], get: (p, h) => h.firstName() },
     { any: [/last name/, /family name/, /surname/, /^lname$/, /legal last/, /(^|\| )last( \||$)/], get: (p, h) => h.lastName() },
     { any: [/preferred (first )?name/, /nick ?name/, /goes by/, /name you('d| would) prefer/, /like us to call you/], get: (p) => p.personal.preferredName || p.personal.firstName },
-    { any: [/legal name/, /full name/, /^name$/, /(^|\| )name(\*| \||$)/, /your name/, /candidate name/], not: [/company|user|file|first|last|middle|event|account|maiden|screen|pronounc|phonetic/], get: (p) => p.personal.fullName || `${p.personal.firstName} ${p.personal.lastName}`.trim() },
+    { any: [/legal name/, /full name/, /^name$/, /(^|\| )name(\*| \||$)/, /your name/, /candidate name/], not: [/company|user|file|first|last|middle|event|account|maiden|screen|pronounc|phonetic|university|school|college/], get: (p) => p.personal.fullName || `${p.personal.firstName} ${p.personal.lastName}`.trim() },
 
     // --- Contact ---
     { any: [/confirm.*e-?mail/, /e-?mail.*confirm/], not: [/company/], get: (p) => p.personal.email },
@@ -208,17 +223,18 @@
     { any: [/current title/, /current role/, /job title/, /(^|\| )title( \||$)/, /current position/], not: [/mr\.?|mrs\.?|salutation/, /why|reason|leav|consider|looking for|seeking/], get: (p, h) => h.work0().title },
 
     // --- Education ---
-    { any: [/which (university|college|school)/, /(university|college|school) (did|do) you (last )?(attend|graduate)/, /last attended/], get: (p, h) => h.edu0().school },
+    { any: [/(which|what) (university|college|school)/, /(university|college|school) (did|do) you (last )?(attend|graduate)/, /last attended/], get: (p, h) => h.edu0().school },
     { any: [/school/, /university/, /college/, /institution/], not: [/high school diploma\?/, /are you/, /current.*student/, /enrolled/, /graduation/, /anticipated/], get: (p, h) => h.edu0().school },
-    { any: [/degree/], get: (p, h) => h.edu0().degree },
+    { any: [/degree/], not: [/graduation date/], get: (p, h) => h.edu0().degree },
     { any: [/major/, /field of study/, /discipline/], get: (p, h) => h.edu0().field || h.edu0().degree },
     { any: [/\bgpa\b/, /grade point/], get: (p, h) => h.edu0().gpa },
-    { any: [/graduation/, /grad(uation)? date/, /end date/, /expected graduation/], get: (p, h) => h.edu0().endDate },
+    { any: [/graduation/, /grad(uation)? date/, /end date/, /expected graduation/], not: [/require|sponsor|authori[sz]/], get: (p, h) => h.edu0().endDate },
 
     // --- Work authorization (yes/no) ---
     // Sponsorship before authorization: sponsorship questions often say "work
     // authorization", while "authorized ... without sponsorship" asks about authorization.
-    { any: [/require\b.{0,40}\bsponsor/, /\bsponsor (you|me)\b/, /require sponsor/, /need sponsor/, /visa sponsor/, /sponsorship( now| in the future)?/], not: [/without (\w+ )?sponsor/], kind: "yesno", get: (p) => p.workAuth.requireSponsorship },
+    { any: [/(work|employment) authori[sz]ation type/, /type of (work |employment )?authori[sz]ation/, /(citizenship|immigration) status/], get: (p) => (/^(united states|usa?|u\.s\.a?\.?)$/i.test(p.personal.citizenship || p.personal.country) && /^no$/i.test(p.workAuth.requireSponsorship) ? "US Citizen" : "") },
+    { any: [/require\b.{0,40}\bsponsor/, /\bsponsor (you|me)\b/, /require sponsor/, /need sponsor/, /visa sponsor/, /sponsorship( now| in the future)?/, /\b(require|need) (\w+ ){0,2}(work |employment )?authori[sz]ation\b/], not: [/without (\w+ )?sponsor/], kind: "yesno", get: (p) => p.workAuth.requireSponsorship },
     { any: [/authoriz(ed|ation) to work/, /legally authorized/, /eligible to work/, /work authorization/], not: [/temporary/, /\bopt\b/, /\bcpt\b/, /practical training/], kind: "yesno", get: (p) => p.workAuth.authorizedToWork },
 
     // --- Logistics ---
@@ -240,6 +256,10 @@
 
     // --- Common yes/no application questions (Tesla-style legal/consent step) ---
     { any: [/(relatives?|family|friends?|close personal relationships?).*(employed|work(s|ing)?) (by|at|for|with)/, /(employed|work(s|ing)?) (by|at|for|with).*(relatives?|family members?)/, /related to (anyone|an employee|any employee)/], kind: "yesno", assumed: true, get: (p) => p.questions.relativesAtCompany },
+    // "Are you a current Acme employee?" / "currently employed by Acme".
+    { any: [/\bare you (a |an )?current(ly)? [\w&.' -]{1,40}employee\b/, /\bcurrent employee of\b/], not: [/refer/], kind: "yesno", assumed: true, get: () => "No" },
+    // "Were you referred by a current employee?"
+    { any: [/were you referred/, /referred (to this role )?by (a|an) (current )?\w* ?employee/], not: [/name|who|if yes/], kind: "yesno", assumed: true, answers: ["no, i was not referred", "not referred"], get: () => "No" },
     { any: [/previously (been )?employed/, /\bhave you (ever )?worked (at|for)\b/, /\bhave you (ever )?worked with (us|our company|this company)\b/, /currently or have you worked (at|for)/, /previously worked (here|for|at)/, /former employee/, /worked (here|for us) before/, /previous worker/], kind: "yesno", assumed: true, get: (p) => p.questions.previouslyEmployedHere },
     { any: [/intern or contractor/, /current or former (intern|contractor)/, /former\/current (intern|contractor)/, /contractor/], kind: "yesno", get: (p) => p.questions.formerContractorOrIntern },
     { any: [/current(ly)? (a )?(university |college )?student/, /currently enrolled/, /enrolled in an academic/, /pursuing a degree/], kind: "yesno", get: (p) => p.questions.currentStudent },
@@ -249,12 +269,12 @@
     { any: [/at least 18/, /over 18/, /\b18 (years|or older)/, /age of majority/, /legally an adult/], kind: "yesno", get: (p) => p.questions.over18 },
 
     // A signature date on a form is the day it is filled in.
-    { any: [/signature date/, /(^|\| )date( \||$)/], not: [/birth|start|end|graduat|availab|expir|issue/], get: (p, h, signal) => todayFor(signal) },
+    { any: [/signature date/, /today'?s date/, /current date/, /date signed/, /(^|\| )date( \||$)/], not: [/birth|start|end|graduat|availab|expir|issue/], get: (p, h, signal) => todayFor(signal) },
 
     // --- Voluntary self-ID (only fired when settings.fillEEO) ---
     { eeo: true, any: [/gender/, /gender identity/, /\bsex\b/], get: (p) => p.eeo.gender },
     { eeo: true, any: [/hispanic|latino/], not: [/\brace\b/], kind: "yesno", get: (p) => p.eeo.hispanicLatino },
-    { eeo: true, any: [/race|ethnicit/], get: (p) => p.eeo.race },
+    { eeo: true, any: [/race|ethnicit/], expand: "race", get: (p) => p.eeo.race },
     { eeo: true, any: [/veteran/], expand: "veteran", get: (p) => p.eeo.veteranStatus },
     { eeo: true, any: [/disabilit/], expand: "disability", get: (p) => p.eeo.disabilityStatus },
   ];
@@ -340,6 +360,19 @@
     return "No";
   }
 
+  // A specific answer ("South Asian") falls back to the broader category forms
+  // use when they don't list it ("Asian").
+  function raceAlternates(value) {
+    const v = norm(value);
+    if (/\b(south|east|southeast|central) asian\b|\b(indian|chinese|japanese|korean|filipino|vietnamese|pakistani|bangladeshi)\b/.test(v) && !/american indian/.test(v)) return ["asian"];
+    if (/^black\b|african/.test(v)) return ["black or african american", "black"];
+    if (/^white\b|caucasian|european/.test(v)) return ["white"];
+    if (/hawaiian|pacific islander/.test(v)) return ["native hawaiian or other pacific islander"];
+    if (/american indian|alaska native|indigenous|native american/.test(v)) return ["american indian or alaska native"];
+    if (/two or more|multi|mixed/.test(v)) return ["two or more races"];
+    return [];
+  }
+
   // Today's date in the order the field's placeholder shows (default month/day/year).
   function todayFor(signal) {
     const d = new Date(), y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, "0"), day = String(d.getDate()).padStart(2, "0");
@@ -419,10 +452,12 @@
       if (rule.not && rule.not.some((re) => re.test(signal))) continue;
       if (rule.any.some((re) => re.test(signal))) {
         if (rule.kind === "yesno" && FOLLOW_UP.test(signal)) continue;
+        // A question that depends on the previous answer is never a profile field.
+        if (/^if (yes|so|you answered)\b/.test(signal)) continue;
         const value = rule.get(profile, helpers, signal);
         if (value == null || value === "") return null;
         // "None" clearance reads as "No" on a yes/no control, and so on.
-        const alts = rule.expand === "veteran" || rule.expand === "disability" ? selfIdAlternates(rule.expand, value) : rule.expand === "usState" ? stateAlternates(value) : rule.expand === "place" ? placeAlternates(value, profile) : /^none$/i.test(value) ? rule.alts || [] : [];
+        const alts = rule.expand === "veteran" || rule.expand === "disability" ? selfIdAlternates(rule.expand, value) : rule.expand === "race" ? raceAlternates(value) : rule.expand === "usState" ? stateAlternates(value) : rule.expand === "place" ? placeAlternates(value, profile) : /^none$/i.test(value) ? rule.alts || [] : rule.answers || [];
         return { value: String(value), alts, duration: !!rule.duration, kind: rule.kind || "text", eeo: !!rule.eeo, assumed: !!rule.assumed, place: rule.expand === "place" };
       }
     }

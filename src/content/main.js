@@ -61,7 +61,11 @@
       AvidAutofill.widget.open();
       return false;
     }
-    if (msg && (msg.type === "AVID_FILL" || (msg.type === "AVID_FILL_ICIMS_FRAME" && window.parent !== window))) {
+    // The iCIMS relay reaches every frame in the tab. Only the iCIMS form frame
+    // answers: an ad or tracker frame running this script on an any-site page
+    // would otherwise answer first with an empty report.
+    const icimsFrame = msg && msg.type === "AVID_FILL_ICIMS_FRAME" && window.parent !== window && /(^|\.)icims\.com$/.test(window.location.hostname);
+    if (msg && (msg.type === "AVID_FILL" || icimsFrame)) {
       (async () => {
         try {
           const profile = await AvidAutofill.getProfile();

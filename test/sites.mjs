@@ -199,3 +199,68 @@ test("a two-box salary range gets one end of the saved range in each box", () =>
     assert.equal(at("Negotiable", "minimum salary"), "Negotiable");
   } finally { dom.window.close(); }
 });
+
+// Reduced from live Rippling and Jobvite (NinjaOne) application captures, 2026-10-12.
+test("a Rippling custom question is read from the text block before its field", async () => {
+  const html = '<form><div><div><div><p>Do you require work authorization to work in the United States for this internship?</p></div></div><div data-testid="field"><div role="radiogroup" id="rg"><label><input type="radio" name="q1" value="Yes"> Yes</label><label><input type="radio" name="q1" value="No"> No</label></div></div></div>'
+    + '<div><div><div><p>What school or university are you currently attending? Please use your university\'s full name.</p></div></div><div data-testid="field"><div><input id="school" name="x9"></div></div></div></form>';
+  const { doc, close } = await fill(html, "https://ats.rippling.com/acme/jobs/1/apply", { education: [{ school: "University of Washington" }] });
+  try {
+    assert.equal(doc.querySelector('input[name="q1"]:checked')?.value, "No");
+    assert.equal(doc.getElementById("school").value, "University of Washington");
+  } finally { close(); }
+});
+
+test("Jobvite self-ID: race falls back to Asian, a 'Choose One' veteran block and today's date fill", async () => {
+  const html = '<form><fieldset><legend>What race or ethnicity do you most closely identify with?</legend>'
+    + '<label><input type="radio" name="f5" value="Hispanic or Latino (South or Central American)"> Hispanic or Latino (South or Central American)</label>'
+    + '<label><input type="radio" name="f5" value="Asian - origins in the Indian subcontinent"> Asian - origins in the Indian subcontinent</label></fieldset>'
+    + '<fieldset><legend>Choose One</legend><label><input type="radio" name="f18" value="I IDENTIFY AS A PROTECTED VETERAN"> I IDENTIFY AS A PROTECTED VETERAN</label>'
+    + '<label><input type="radio" name="f18" value="I AM NOT A PROTECTED VETERAN"> I AM NOT A PROTECTED VETERAN</label></fieldset>'
+    + '<label for="d">Today\'s Date*</label><input id="d" type="date"></form>';
+  const dom = await fill(html, "https://jobs.jobvite.com/acme/job/oX/apply", { eeo: { race: "South Asian", veteranStatus: "No" } });
+  try {
+    // EEO is opt-in, so this run (default settings) leaves it alone.
+    assert.equal(dom.doc.querySelector('input[name="f5"]:checked'), null);
+    assert.match(dom.doc.getElementById("d").value, /^\d{4}-\d{2}-\d{2}$/);
+  } finally { dom.close(); }
+});
+
+test("race and veteran answers use their fallbacks", () => {
+  const dom = new JSDOM("", { runScripts: "outside-only" });
+  for (const src of SCRIPTS) dom.window.eval(src);
+  const A = dom.window.AvidAutofill, p = A.mergeDefaults(A.DEFAULT_PROFILE, { eeo: { race: "South Asian", veteranStatus: "No" } });
+  const m = A.matcher.match("what race or ethnicity do you identify with?", p, A.matcher.makeHelpers(p));
+  assert.deepEqual([m.value, ...m.alts], ["South Asian", "asian"]);
+  const v = A.matcher.match(A.matcher.groupSignal(Array.from(new JSDOM('<fieldset><legend>Choose One</legend><label><input type="radio" name="v"> I AM NOT A PROTECTED VETERAN</label><label><input type="radio" name="v"> DECLINE</label></fieldset>').window.document.querySelectorAll("input"))), p, A.matcher.makeHelpers(p));
+  assert.ok(v && v.eeo);
+  dom.window.close();
+});
+
+test("Jobvite screening: referral, current employee and work authorization type", async () => {
+  const html = '<form><label for="f0">Were you referred to this role by a current NinjaOne employee?*</label><select id="f0"><option value="">Select an option...</option><option>No, I was not referred</option><option>Yes, I was referred by a NinjaOne employee</option></select>'
+    + '<label for="f5">What is your US Work Authorization type?*</label><select id="f5"><option value="">Select an option...</option><option>US Citizen</option><option>Permanent Resident</option><option>H1B</option></select>'
+    + '<fieldset><legend>Are you a current NinjaOne Employee*</legend><label><input type="radio" name="f8" value="No"> No</label><label><input type="radio" name="f8" value="Yes"> Yes</label></fieldset></form>';
+  const { doc, close } = await fill(html, "https://jobs.jobvite.com/ninjaone/job/oX/apply");
+  try {
+    assert.equal(doc.getElementById("f0").value, "No, I was not referred");
+    assert.equal(doc.getElementById("f5").value, "US Citizen");
+    assert.equal(doc.querySelector('input[name="f8"]:checked')?.value, "No");
+  } finally { close(); }
+});
+
+test("a Jobvite resume input is found from the menu around it, not the cover letter one", async () => {
+  const html = '<form><div id="a"><label for="r">File</label><input id="r" type="file"><span>Type or Paste Resume</span></div><div id="b"><label for="c">File</label><input id="c" type="file"><span>Type or Paste Cover Letter</span></div></form>';
+  const dom = new JSDOM(html, { runScripts: "outside-only", pretendToBeVisual: true, url: "https://jobs.jobvite.com/acme/job/oX/apply" });
+  const win = dom.window;
+  win.chrome = { storage: { local: { async get() { return {}; }, async set() {}, async remove() {} } } };
+  for (const src of SCRIPTS) win.eval(src);
+  win.HTMLElement.prototype.getClientRects = () => [{ width: 100, height: 20 }];
+  const A = win.AvidAutofill;
+  A.fillers.sleep = async () => {};
+  const used = [];
+  A.fillers.uploadToInput = async (el) => { used.push(el.id); };
+  await A.engine.fillPage(A.DEFAULT_PROFILE, A.DEFAULT_SETTINGS, { name: "r.pdf", type: "application/pdf", dataUrl: "data:application/pdf;base64,AA==" });
+  assert.deepEqual(used, ["r"]);
+  win.close();
+});
