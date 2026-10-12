@@ -1567,6 +1567,19 @@ test("profile links do not answer questions that only mention the platform", () 
   assert.equal(answer("link to a github repository for a project you are proud of"), null);
 });
 
+test("follow-ups, referrer names and open-source questions are not answered from the profile", () => {
+  const A = blankWindow().AvidAutofill, profile = testProfile(A), helpers = A.matcher.makeHelpers(profile);
+  profile.misc.howHeard = "Company website";
+  profile.education = [{ school: "State University", endDate: "2018" }];
+  const answer = signal => A.matcher.match(signal, profile, helpers)?.value ?? null;
+  assert.equal(answer("how did you hear about us?"), "Company website");
+  assert.equal(answer("share 2-3 of your open-source contributions with links, and where you heard about us"), null);
+  assert.equal(answer("if an acme employee referred you, please list their full name"), null);
+  assert.equal(answer("if you answered yes to the question above, please enter the school"), null);
+  assert.equal(answer("if you selected other, which university did you attend"), null);
+  assert.equal(answer("which university did you attend"), "State University");
+});
+
 test("name pronunciation questions are not answered with the legal name", () => {
   const A = blankWindow().AvidAutofill, profile = testProfile(A), helpers = A.matcher.makeHelpers(profile);
   assert.equal(A.matcher.match("type your response | name pronunciation | how do you pronounce your name? | cards a69a985a field2", profile, helpers), null);
