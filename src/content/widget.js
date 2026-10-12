@@ -12,6 +12,7 @@
 
   let mounted = false;
   let openDrawer = null;
+  let runFillHandle = null;
 
   function mount(adapter) {
     if (mounted || document.getElementById("avid-autofill-root")) return;
@@ -61,6 +62,7 @@
                 <label><input type="checkbox" class="ov" /> <span>Replace fields that already have a value</span></label>
                 <label><input type="checkbox" class="eeo" /> <span>Fill voluntary self-ID questions</span></label>
                 <label><input type="checkbox" class="skills" /> <span>Add skills to skills sections</span></label>
+                <label><input type="checkbox" class="auto" /> <span>Fill each new step automatically</span></label>
               </div>
             </details>
           </section>
@@ -248,17 +250,20 @@
       $(".ov").checked = s.overwriteFilled;
       $(".eeo").checked = s.fillEEO;
       $(".skills").checked = s.fillSkills !== false;
+      $(".auto").checked = s.autoFillSteps !== false;
     }
     async function persistToggles() {
       const s = await AvidAutofill.getSettings();
       s.overwriteFilled = $(".ov").checked;
       s.fillEEO = $(".eeo").checked;
       s.fillSkills = $(".skills").checked;
+      s.autoFillSteps = $(".auto").checked;
       await AvidAutofill.saveSettings(s);
     }
     $(".ov").addEventListener("change", persistToggles);
     $(".eeo").addEventListener("change", persistToggles);
     $(".skills").addEventListener("change", persistToggles);
+    $(".auto").addEventListener("change", persistToggles);
 
     if (isDevBuild()) mountDevTools(panel, adapter);
     if (canReport) mountReport();
@@ -308,7 +313,11 @@
       });
     }
 
-    $(".fill").addEventListener("click", async () => {
+    // One fill run, whether the applicant clicked Fill or Avid noticed a new step.
+    let filling = false;
+    async function runFill() {
+      if (filling) return false;
+      filling = true;
       const btn = $(".fill");
       btn.disabled = true;
       btn.textContent = "Filling…";
@@ -319,19 +328,27 @@
         const profile = await AvidAutofill.getProfile();
         if (!profile.personal.email && !profile.personal.fullName) {
           renderEmpty($);
-          return;
+          return false;
         }
         const settings = await AvidAutofill.getSettings();
         const resume = await AvidAutofill.getResume();
         const report = await AvidAutofill.engine.fillPage(profile, settings, resume);
         lastFillReport = report;
         renderReport($, report);
+        return report;
       } catch (err) {
         renderError($, explain(err));
+        return false;
       } finally {
+        filling = false;
         btn.disabled = false;
         btn.textContent = fillLabel;
       }
+    }
+    runFillHandle = runFill;
+    $(".fill").addEventListener("click", async () => {
+      const report = await runFill();
+      if (report && AvidAutofill.steps) AvidAutofill.steps.arm();
     });
   }
 
@@ -510,6 +527,6 @@
     });
   }
 
-  AvidAutofill.widget = { mount, open: () => openDrawer ? openDrawer() : false };
+  AvidAutofill.widget = { mount, open: () => openDrawer ? openDrawer() : false, fill: () => runFillHandle ? runFillHandle() : Promise.resolve(false) };
   AvidAutofill.isDevBuild = isDevBuild;
 })();

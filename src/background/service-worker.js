@@ -17,9 +17,9 @@ chrome.action.onClicked.addListener(async (tab) => {
       target: { tabId: tab.id, allFrames: true },
       func: () => {
         const A = globalThis.AvidAutofill;
-        const open = A?.widget?.open;
+        const open = A?.openDrawer || A?.widget?.open;
         const didOpen = typeof open === "function" && open();
-        if (!didOpen) globalThis.__avidOpenDrawer = true;
+        if (!didOpen && !A?.openDrawer) globalThis.__avidOpenDrawer = true;
         return { loaded: !!A?.adapters, opened: !!didOpen };
       },
     });
@@ -28,7 +28,7 @@ chrome.action.onClicked.addListener(async (tab) => {
     await chrome.scripting.executeScript({ target: { tabId: tab.id, allFrames: true }, files });
     await chrome.scripting.executeScript({
       target: { tabId: tab.id, allFrames: true },
-      func: () => { globalThis.AvidAutofill?.widget?.open?.(); },
+      func: () => { globalThis.AvidAutofill?.openDrawer?.(); },
     });
   } catch (err) {
     console.warn("Avid Autofill: couldn't open the drawer", err);

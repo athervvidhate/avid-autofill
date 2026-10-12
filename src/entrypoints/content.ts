@@ -17,6 +17,7 @@ import "../content/jev.js";
 import "../content/engine.js";
 import "../content/report.js";
 import "../content/widget.js";
+import "../content/steps.js";
 import "../content/main.js";
 
 export default defineContentScript({
