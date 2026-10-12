@@ -96,6 +96,7 @@
     fillEEO: false, // opt-in: only fill voluntary self-ID when explicitly enabled
     fillSkills: true, // add skills to Workday skills sections
     tickAcknowledgements: true, // tick "I agree" / "I have read and understand" boxes
+    autoFillSteps: true, // fill each new application page as it appears
     highlightFilled: true, // briefly outline fields we touched
     jevEnabled: false, // optional matching of approved saved answers
   };

@@ -30,6 +30,7 @@
     const known = adapter.name !== "Generic" && !AvidAutofill.adapters.markupOnly(adapter);
     if (known || requested || AvidAutofill.generic.detect().isApplication) {
       AvidAutofill.widget.mount(adapter);
+      if (!requested && AvidAutofill.steps) AvidAutofill.steps.start();
       if (requested) {
         delete g.__avidOpenDrawer;
         AvidAutofill.widget.open();
