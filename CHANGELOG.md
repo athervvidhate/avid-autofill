@@ -7,6 +7,10 @@ release moves them under a version heading, bumps `version` in `package.json`
 
 ## Unreleased
 
+- SmartRecruiters screening questions drawn inside web components are answered: Yes/No radios per question, and labels read through shadow roots instead of showing as "*".
+- Ashby: the Education History entry fills school, degree, field of study and start/end dates; Yes/No buttons that update a moment after the click count as filled; GitHub fills despite an "example.com" placeholder; "in-office" questions use your on-site answer.
+- Export DOM keeps open shadow roots, so captures of web-component forms are complete.
+
 ## 0.2.0 (2026-10-12)
 
 - Optional profile sync across your Chrome browsers through Chrome's own sync, turned on in Connections. The resume file, Jev key and settings stay on each device.

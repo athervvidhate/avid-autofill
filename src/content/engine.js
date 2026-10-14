@@ -194,7 +194,8 @@
         record(signal, m.value, "kept-existing");
         continue;
       }
-      const ok = [m.value, ...(m.alts || [])].some((v) => fillers.setButtonChoice(buttons, v));
+      let ok = false;
+      for (const v of [m.value, ...(m.alts || [])]) if (!ok) ok = await fillers.setButtonChoice(buttons, v);
       record(signal, m.value, ok ? (m.assumed ? "assumed" : "filled") : "skipped");
       if (!ok) unmatched.push({ el: buttons[0], buttons, signal });
     }

@@ -229,8 +229,9 @@
   }
 
   // Yes/No answered with a pair of buttons rather than inputs (Ashby). Clicks the
-  // button whose text is the answer; true once it reports itself pressed.
-  function setButtonChoice(buttons, value) {
+  // button whose text is the answer; true once it reports itself pressed. React
+  // renders the pressed state a moment after the click, so wait for it.
+  async function setButtonChoice(buttons, value) {
     const target = normalize(value);
     const el = buttons.find((b) => normalize(b.textContent) === target);
     if (!el) return false;
@@ -239,6 +240,7 @@
       el.click();
       flash(el);
     }
+    for (let i = 0; i < 10 && el.getAttribute("aria-pressed") === "false"; i++) await sleep(50);
     return el.getAttribute("aria-pressed") !== "false";
   }
 

@@ -122,7 +122,7 @@
             record(ok && A.matcher.norm(A.fillers.customValue(el)) === A.matcher.norm(label) ? "filled" : "skipped", label);
           } else if (buttons) {
             const label = field.options[result.optionId];
-            const ok = A.fillers.setButtonChoice(buttons, label);
+            const ok = await A.fillers.setButtonChoice(buttons, label);
             record(ok ? "filled" : "skipped", label);
           } else if (group) {
             const radio = group[index];

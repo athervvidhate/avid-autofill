@@ -16,9 +16,9 @@
       const l = root.querySelector(`label[for="${cssEscape(el.id)}"]`);
       if (l) parts.push(flatText(l));
     }
-    // 2. wrapping <label>
+    // 2. wrapping <label>, unless it is the label already read
     const wrap = el.closest("label");
-    if (wrap) parts.push(flatText(wrap));
+    if (wrap && !(el.id && wrap.htmlFor === el.id)) parts.push(flatText(wrap));
     // 3. aria-labelledby
     const labelledby = el.getAttribute && el.getAttribute("aria-labelledby");
     if (labelledby) {
@@ -26,6 +26,14 @@
         const n = root.getElementById(id);
         if (n) parts.push(flatText(n));
       }
+    }
+    // 4. Ashby points a label at a wrapper ("Start Date" names the div holding
+    //    the month and year selects) or at an id no control has (its school search).
+    for (let node = el.parentElement, i = 0; !parts.length && node && i < 4; node = node.parentElement, i++) {
+      const named = node.id && root.querySelector(`label[for="${cssEscape(node.id)}"]`);
+      const orphan = Array.from(node.children).find((c) => c.tagName === "LABEL" && c.htmlFor && !root.getElementById(c.htmlFor));
+      if (named) parts.push(flatText(named));
+      else if (orphan && node.querySelectorAll("input:not([type=hidden]), select, textarea").length === 1) parts.push(flatText(orphan));
     }
     const text = parts.join(" ").replace(/\s+/g, " ").trim();
     // A choice whose drawn label is out of reach takes its name from the site's
@@ -279,7 +287,8 @@
 
     // --- Links ---
     { any: [/linkedin/], get: (p) => p.links.linkedin },
-    { any: [/github/], not: [/contribution|repositor|project|describe|example/], get: (p) => p.links.github },
+    // "Give an example" asks for more than a link; an "https://example.com" placeholder does not.
+    { any: [/github/], not: [/contribution|repositor|project|describe|example(?!\.com)/], get: (p) => p.links.github },
     { any: [/work samples?/, /samples? of (your )?work/, /examples? of (your )?work/], not: [/describe|explain|tell us/], get: (p) => p.links.portfolio || p.links.website || p.links.github },
     { any: [/portfolio/, /personal (web)?site/, /^website$/, /web ?site url/], get: (p) => p.links.portfolio || p.links.website },
     { any: [/twitter|(^| )x( |$)/], get: (p) => p.links.twitter },
@@ -312,7 +321,7 @@
     // "If you live in one of these states, would you consider relocation?" does not apply to someone living elsewhere.
     { any: [/willing to relocate/, /open to relocat/, /relocat/], not: [/relocat\w* to \w/, /assistance|package|stipend|support/], kind: "yesno", get: (p, h, signal) => (/\bif you (live|reside) in\b/.test(signal) && residentOfState(signal, p.personal.state) === "No" ? "N/A" : p.misc.willingToRelocate) },
     // In-office attendance ("This role is onsite ... willing to work from our local office?").
-    { any: [/on-?site/, /in[- ]person/, /(work|working|come|commute|report)\w* (from|in|into|to|at)\b.{0,60}\boffice\b/], not: [/relocat/, /remote(ly)? (work|position|role)? ?only/], kind: "yesno", get: (p) => p.questions.willingOnsite },
+    { any: [/on-?site/, /in[- ]person/, /\bin[- ]office\b/, /(work|working|come|commute|report)\w* (from|in|into|to|at)\b.{0,60}\boffice\b/], not: [/relocat/, /remote(ly)? (work|position|role)? ?only/], kind: "yesno", get: (p) => p.questions.willingOnsite },
     { any: [/on-?call/], kind: "yesno", get: (p) => p.questions.willingOnCall },
     { any: [/outside (work|employment|business|activit)/, /advisory (commitment|role|disclosure|position)/, /other (employment|jobs?) (commitments|outside)/, /moonlight/], kind: "yesno", get: (p) => p.questions.outsideEmployment },
     { any: [/security clearance/, /active clearance/, /\bclearance (level|status)\b/], alts: ["No", "N/A", "Not applicable", "I do not hold", "I don't hold"], get: (p) => p.questions.securityClearance },

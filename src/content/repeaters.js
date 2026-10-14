@@ -9,7 +9,9 @@
   const F = () => AvidAutofill.fillers;
   const label = (el) => {
     const own = (AvidAutofill.labelTextFor && AvidAutofill.labelTextFor(el)) || "";
-    return String(own || el.getAttribute("aria-label") || el.placeholder || el.name || "")
+    // A select's empty first option says which part of a date it is ("Month...").
+    const first = el.tagName === "SELECT" && el.options[0] && !el.options[0].value ? el.options[0].textContent : "";
+    return String(own || el.getAttribute("aria-label") || el.placeholder || el.name || "").concat(first ? ` ${first}` : "")
       .toLowerCase().replace(/\s+/g, " ").trim();
   };
 
@@ -40,7 +42,7 @@
         { re: /\b(degree|diploma|qualification)\b/, degree: true, get: (e) => e.degree },
         { re: /\b(major|field|discipline|concentration|area of study|subject)\b/, get: (e) => e.field },
         { re: /\b(gpa|grade point)\b/, get: (e) => e.gpa },
-        { re: /still attending|currently (attending|enrolled)/, yesno: true, get: (e) => stillAttending(e) },
+        { re: /still (attending|(a )?student)|currently (attending|enrolled)/, yesno: true, get: (e) => stillAttending(e) },
         { re: /\b(start|from|begin)/, date: "start", get: (e) => e.startDate },
         { re: /\b(end|to|until|graduat|completion|completed)\b/, date: "end", get: (e) => e.endDate },
         { re: /\b(location|city)\b/, get: (e) => e.location },
@@ -144,11 +146,14 @@
       return l.length <= 40 && kind.anchor.test(l) && !kind.notAnchor.test(l);
     });
     const rows = new Map(); // row element -> anchor
+    const adds = addButtons();
     for (const a of anchors) {
       let node = a;
       while (node.parentElement && node.parentElement !== document.body) {
         const parent = node.parentElement;
         if (anchors.some((o) => o !== a && parent.contains(o) && !node.contains(o))) break;
+        // The Add button sits beside the rows: a lone row (Ashby) ends below it.
+        if (adds.some((b) => parent.contains(b) && !node.contains(b)) && looksLikeRow(node, kind)) break;
         node = parent;
       }
       if (!rows.has(node) && looksLikeRow(node, kind)) rows.set(node, a);
@@ -227,13 +232,19 @@
     return [...groups.values()];
   }
 
+  // School names as search lists spell them: "UC San Diego" -> "University of California, San Diego".
+  function schoolAlts(school) {
+    const uc = String(school || "").match(/^UC[ -](.+)$/i);
+    return uc ? [`University of California, ${uc[1]}`, `University of California ${uc[1]}`, `University of California-${uc[1]}`] : [];
+  }
+
   // Fill one row's boxes from one profile entry. Returns how many boxes were set.
-  function fillRow(row, kindName, entry, ctx, n) {
+  async function fillRow(row, kindName, entry, ctx, n) {
     const kind = KINDS[kindName];
     const fillers = F();
     let count = 0;
     const tag = `${kindName === "work" ? "Job" : "School"} ${n}`;
-    const setOne = (el, rule, lab) => {
+    const setOne = async (el, rule, lab) => {
       let value = rule.get(entry, ctx.profile);
       if (rule.yesno) value = value ? "Yes" : "No";
       if (value == null || value === "") return;
@@ -253,6 +264,13 @@
         ctx.record(`${tag}: ${lab}`, Array.isArray(value) ? value[0] : value, ok ? "filled" : "no-option-match");
         return;
       }
+      // A search box (Ashby's school) takes a picked option, not typed text.
+      if (el.getAttribute("role") === "combobox") {
+        const ok = await fillers.setReactSelect(el, [String(value), ...(kindName === "education" && rule.re.test("school") ? schoolAlts(value) : [])]);
+        if (ok) count++;
+        ctx.record(`${tag}: ${lab}`, String(value), ok ? "filled" : "no-option-match");
+        return;
+      }
       fillers.setTextValue(el, String(value));
       if (el.value) count++;
       ctx.record(`${tag}: ${lab}`, String(value), el.value ? "filled" : "skipped");
@@ -270,7 +288,7 @@
       const hasValue = el.tagName === "SELECT" ? el.selectedIndex > 0 && !!el.value : type === "checkbox" ? false : !!el.value;
       if (hasValue && !ctx.settings.overwriteFilled) continue;
       ctx.tried.add(el);
-      try { setOne(el, rule, lab); } catch (_) { ctx.record(`${tag}: ${lab}`, "", "error"); }
+      try { await setOne(el, rule, lab); } catch (_) { ctx.record(`${tag}: ${lab}`, "", "error"); }
     }
     for (const group of radioGroups(row)) {
       group.forEach((r) => ctx.handled.add(r));
@@ -327,14 +345,14 @@
       for (const r of empty) {
         const next = todo.shift();
         if (!next) break;
-        fillRow(r.row, group.kind, next.e, ctx, next.i + 1);
+        await fillRow(r.row, group.kind, next.e, ctx, next.i + 1);
         n++;
       }
       // Rows whose "end date" or similar appears only after "current" is answered.
       await F().sleep(250);
       for (const r of empty.slice(0, n)) {
         const entry = entries.find((e) => sameName(kind.key(e), anchorValue(r.anchor)));
-        if (entry) fillRow(r.row, group.kind, entry, later, entries.indexOf(entry) + 1);
+        if (entry) await fillRow(r.row, group.kind, entry, later, entries.indexOf(entry) + 1);
       }
 
       // Missing entries get a new row each.
@@ -347,9 +365,9 @@
         group = { ...made.group, add: made.group.add || group.add };
         const next = todo.shift();
         F().queryAll("input, select, textarea, [role=combobox]", made.row.row).forEach((el) => ctx.handled.add(el));
-        fillRow(made.row.row, group.kind, next.e, ctx, next.i + 1);
+        await fillRow(made.row.row, group.kind, next.e, ctx, next.i + 1);
         await F().sleep(250);
-        fillRow(made.row.row, group.kind, next.e, later, next.i + 1);
+        await fillRow(made.row.row, group.kind, next.e, later, next.i + 1);
         added++;
       }
       if (todo.length) {

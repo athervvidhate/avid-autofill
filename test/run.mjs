@@ -1957,3 +1957,50 @@ test("a Rippling radio whose wrapper owns the state is chosen through the wrappe
   assert.equal(A.fillers.setRadio(Array.from(document.querySelectorAll("input")), "No"), true);
   assert.equal(document.querySelector('[data-value="No"]').getAttribute("aria-checked"), "true");
 });
+
+test("fillPage fills a captured Ashby education entry, late-rendering Yes/No buttons and GitHub", async () => {
+  const { document, A, dom } = loadFixture("ashby-application-3.html", "https://jobs.ashbyhq.com/applied/example/application");
+  dom.window.HTMLElement.prototype.getClientRects = function () { return [{}]; };
+  A.fillers.sleep = () => new Promise((r) => setTimeout(r, 1));
+  // React sets each select's value to "" (the hidden "Month..." option); a static page selects January.
+  document.querySelectorAll("select").forEach((s) => { s.value = ""; });
+  // React renders the pressed state after the click event, not during it.
+  document.querySelectorAll("button[aria-pressed]").forEach((b) =>
+    b.addEventListener("click", () => setTimeout(() => {
+      b.parentElement.querySelectorAll("button").forEach((o) => o.setAttribute("aria-pressed", String(o === b)));
+    }, 0))
+  );
+  // The school search lists matches in a popup once typed into.
+  const school = document.querySelector('input[placeholder="Search schools..."]');
+  school.addEventListener("input", () => {
+    document.querySelectorAll("[data-popup]").forEach((n) => n.remove());
+    const popup = document.createElement("div");
+    popup.setAttribute("data-popup", "");
+    for (const text of /california/i.test(school.value) ? ["University of California, San Diego"] : []) {
+      const option = document.createElement("div");
+      option.setAttribute("role", "option");
+      option.textContent = text;
+      option.addEventListener("click", () => { school.value = text; popup.remove(); });
+      popup.append(option);
+    }
+    document.body.append(popup);
+  });
+  const profile = testProfile(A);
+  profile.links.github = "https://github.com/alexrivera";
+  profile.education = [{ school: "UC San Diego", degree: "BS", field: "Data Science", startDate: "Sep 2021", endDate: "Jun 2025" }];
+  const report = await A.engine.fillPage(profile, { ...A.DEFAULT_SETTINGS, jevEnabled: false, highlightFilled: false }, null);
+
+  const entry = (path) => document.querySelector(`[data-field-path="${path}"]`);
+  const pressed = (path) => entry(path).querySelector('button[aria-pressed="true"]')?.textContent;
+  const [startMonth, startYear, endMonth, endYear] = Array.from(entry("_systemfield_education_history").querySelectorAll("select"), (s) => s.options[s.selectedIndex].textContent);
+  assert.equal(school.value, "University of California, San Diego");
+  assert.equal(document.getElementById("_systemfield_education_history-degree").value, "BS");
+  assert.equal(document.getElementById("_systemfield_education_history-major").value, "Data Science");
+  assert.deepEqual([startMonth, startYear, endMonth, endYear], ["September", "2021", "June", "2025"]);
+  assert.equal(pressed("e85fc512-3143-49ef-9036-280e901449cf"), "No", "sponsorship");
+  assert.equal(pressed("acedfd27-7fc3-4cd6-84a9-1e301b4eb619"), "Yes", "in office");
+  assert.equal(document.getElementById("758529ef-3354-4c36-be99-b4298490d800").value, "https://github.com/alexrivera");
+  assert.equal(document.getElementById("_systemfield_name").value, "Alex Rivera", "the education entry does not swallow the rest of the form");
+  assert.ok(!report.results.some((r) => r.status === "skipped"), JSON.stringify(report.results.filter((r) => r.status === "skipped")));
+  assert.ok(!report.results.some((r) => /^education history/.test(r.label)), "education boxes are named by their own labels");
+});
