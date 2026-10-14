@@ -26,20 +26,45 @@
   // leave the device) also blanks hidden fields, which carry session tokens, and any email
   // address the page contains.
   function scrubbedHtml(profile, { strict = false } = {}) {
-    const clone = document.documentElement.cloneNode(true);
-    clone.querySelectorAll("#avid-autofill-root, script").forEach((n) => n.remove());
-    clone.querySelectorAll("input").forEach((i) => {
+    const clone = cloneWithShadows(document.documentElement, document.implementation.createHTMLDocument(""));
+    const all = (selector) => everyIn(clone, selector);
+    all("#avid-autofill-root, #avid-tracker-root, script").forEach((n) => n.remove());
+    all("input").forEach((i) => {
       const t = (i.getAttribute("type") || "text").toLowerCase();
       if (t === "checkbox" || t === "radio") i.removeAttribute("checked");
       else if (!["submit", "button", "image", "reset"].includes(t)) i.setAttribute("value", "");
       else if (strict && t === "hidden") i.setAttribute("value", "");
     });
-    clone.querySelectorAll("textarea").forEach((t) => { t.textContent = ""; });
-    clone.querySelectorAll("option").forEach((o) => o.removeAttribute("selected"));
+    all("textarea").forEach((t) => { t.textContent = ""; });
+    all("option").forEach((o) => o.removeAttribute("selected"));
     let html = "<!doctype html>\n" + clone.outerHTML;
     for (const val of collectPii(profile)) html = html.replace(new RegExp(escapeRegExp(val), "gi"), "[REDACTED]");
     if (strict) html = html.replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[REDACTED-EMAIL]");
     return html;
+  }
+
+  // A copy of the page in another document, with each open shadow root kept as
+  // a declarative <template shadowrootmode="open">. Forms drawn inside web
+  // components (SmartRecruiters) are otherwise missing from the capture. The
+  // other document has no custom elements defined, so nothing in the copy runs.
+  function cloneWithShadows(node, doc) {
+    if (node.nodeName === "TEMPLATE") return doc.importNode(node, true);
+    const copy = doc.importNode(node, false);
+    if (node.shadowRoot) {
+      const template = doc.createElement("template");
+      template.setAttribute("shadowrootmode", "open");
+      for (const child of node.shadowRoot.childNodes) template.content.appendChild(cloneWithShadows(child, doc));
+      copy.appendChild(template);
+    }
+    for (const child of node.childNodes) copy.appendChild(cloneWithShadows(child, doc));
+    return copy;
+  }
+
+  // querySelectorAll that also searches the copied shadow roots.
+  function everyIn(root, selector) {
+    const found = Array.from(root.querySelectorAll(selector));
+    for (const template of root.querySelectorAll("template[shadowrootmode]")) found.push(...everyIn(template.content, selector));
+    return found;
   }
 
   const oneLine = (s) => String(s == null ? "" : s).replace(/\s+/g, " ").replace(/--/g, "- -").trim();

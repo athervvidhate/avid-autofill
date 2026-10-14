@@ -54,6 +54,114 @@ test("SmartRecruiters shadow fields are filled and notify the component host", a
   } finally { dom.window.close(); }
 });
 
+// SmartRecruiters screening questions: the form is drawn in the shadow tree of
+// sr-screening-questions-form, each choice is an spl-radio drawing its own input
+// (every question's radios are named "value"), and a label's text is slotted in,
+// so the label element itself holds only "*". The live page could not be
+// captured with its shadow roots, so this mirrors that structure by hand.
+const SR_QUESTIONS = [
+  { id: "6e60e5af-2a9f-4104-82bf-75c7925d48b8", type: "radio", label: "Are you legally authorized to work in the country where the job is located without restrictions?" },
+  { id: "5765407d-de20-46a7-94b8-a2fd7fb7cd5c", type: "radio", label: "Will you now or in the future require sponsorship for employment visa status (e.g./ H-1B visa status)?" },
+  { id: "e6001430-3d5f-4925-b730-2942b09ffb9d", type: "radio", label: "Have you previously worked for Intuitive Surgical as an Intern, Co-Op, Employee, or Contingent Worker in any capacity?" },
+  { id: "220c4c69-0d3e-4c1f-9d2a-6f7b1c2d3e4f", type: "text", label: "What is your postal code?" },
+];
+
+function smartRecruitersScreening({ definition, questionIds }) {
+  const dom = new JSDOM("<oc-app-root><sr-screening-questions-form></sr-screening-questions-form></oc-app-root>", {
+    runScripts: "outside-only", pretendToBeVisual: true, url: "https://jobs.smartrecruiters.com/oneclick-ui/company/Example/publication/example/screening",
+  });
+  const win = dom.window;
+  win.chrome = chromeShim();
+  for (const src of SCRIPTS) win.eval(src);
+  const doc = win.document;
+  const form = doc.querySelector("sr-screening-questions-form");
+  if (definition) {
+    const choices = [{ fieldValue: "1", label: "Yes", id: "1" }, { fieldValue: "0", label: "No", id: "0" }];
+    form.setAttribute("definition", JSON.stringify({ id: "", questions: SR_QUESTIONS.map((q) => ({ ...q, required: true, fields: [{ name: "value", type: q.type, values: q.type === "radio" ? choices : [] }] })) }));
+  }
+  const shadow = form.attachShadow({ mode: "open" });
+  const inputs = [];
+  SR_QUESTIONS.forEach((q, n) => {
+    const wrap = doc.createElement("div");
+    if (questionIds) wrap.setAttribute("data-test", `question-${q.id}`);
+    shadow.appendChild(wrap);
+    if (q.type === "radio") {
+      const group = doc.createElement("spl-radio-group");
+      group.innerHTML = `<span slot="label">${q.label}</span>`;
+      group.attachShadow({ mode: "open" }).innerHTML = '<style>legend{color:red}</style><fieldset><legend><slot name="label"></slot> *</legend><slot></slot></fieldset>';
+      for (const [value, text] of [["1", "Yes"], ["0", "No"]]) {
+        const radio = doc.createElement("spl-radio");
+        radio.textContent = text;
+        radio.attachShadow({ mode: "open" }).innerHTML = `<input type="radio" id="r${n}${value}" name="value" value="${value}" autocomplete="off"><label for="r${n}${value}"><slot></slot></label>`;
+        group.appendChild(radio);
+        inputs.push(radio.shadowRoot.querySelector("input"));
+      }
+      wrap.appendChild(group);
+    } else {
+      const field = doc.createElement("spl-input");
+      field.innerHTML = `<span slot="label">${q.label}</span>`;
+      field.attachShadow({ mode: "open" }).innerHTML = `<label for="t${n}"><slot name="label"></slot><span>*</span></label><input id="t${n}" autocomplete="off">`;
+      wrap.appendChild(field);
+      inputs.push(field.shadowRoot.querySelector("input"));
+    }
+  });
+  for (const input of inputs) input.getClientRects = () => [{ width: 20, height: 20 }];
+  return { dom, inputs, A: win.AvidAutofill };
+}
+
+for (const variant of [
+  { name: "question ids and definition", definition: true, questionIds: true },
+  { name: "slotted labels only", definition: false, questionIds: false },
+]) {
+  test(`SmartRecruiters screening radios are answered per question (${variant.name})`, async () => {
+    const { dom, inputs, A } = smartRecruitersScreening(variant);
+    try {
+      A.fillers.sleep = async () => {};
+      const [authYes, authNo, sponsorYes, sponsorNo, formerYes, formerNo, postal] = inputs;
+      assert.match(A.matcher.signalFor(postal), /^what is your postal code\?\*?( \||$)/, "the slotted question text names the field");
+      assert.equal(A.matcher.groupSignal([authYes, authNo]), A.matcher.norm(SR_QUESTIONS[0].label) + (variant.definition ? "" : " *"));
+      assert.notEqual(A.matcher.radioGroupKey(authYes), A.matcher.radioGroupKey(sponsorYes), "radios of different questions are different groups");
+      assert.equal(A.labelTextFor(authYes), "Yes");
+
+      const report = await A.engine.fillPage(testProfile(A), { ...A.DEFAULT_SETTINGS, jevEnabled: false, highlightFilled: false }, null);
+      assert.equal(authYes.checked, true, "authorized to work: Yes");
+      assert.equal(authNo.checked, false);
+      assert.equal(sponsorNo.checked, true, "sponsorship: No");
+      assert.equal(sponsorYes.checked, false);
+      assert.equal(formerNo.checked, true, "previously worked here: No");
+      assert.equal(formerYes.checked, false);
+      assert.equal(postal.value, "94016");
+      assert.ok(report.results.every((r) => /[a-z]/.test(r.label) && r.label !== "*"), JSON.stringify(report.results));
+    } finally { dom.window.close(); }
+  });
+}
+
+test("SmartRecruiters relocation question for listed states answers N/A for a resident elsewhere", () => {
+  const { A } = loadFixture("smartrecruiters-application.html");
+  const profile = testProfile(A);
+  const helpers = A.matcher.makeHelpers(profile);
+  const signal = A.matcher.norm("Preference will be given to qualified candidates who do not reside, or plan to reside, in Alabama, Arkansas, Delaware, or Tennessee. If you live in one of these states, would you consider relocation?");
+  assert.equal(A.matcher.match(signal, profile, helpers).value, "N/A");
+  profile.personal.state = "Delaware";
+  assert.equal(A.matcher.match(signal, profile, helpers).value, profile.misc.willingToRelocate);
+});
+
+test("Export DOM keeps open shadow roots as declarative templates, scrubbed", () => {
+  const dom = new JSDOM('<body><sr-form></sr-form><div id="avid-autofill-root"></div></body>', { runScripts: "outside-only", url: "https://jobs.smartrecruiters.com/" });
+  try {
+    const win = dom.window;
+    win.chrome = chromeShim();
+    for (const src of [...SCRIPTS, fs.readFileSync(path.join(ROOT, "src/content/report.js"), "utf8")]) win.eval(src);
+    const host = win.document.querySelector("sr-form");
+    host.attachShadow({ mode: "open" }).innerHTML = '<label for="z">What is your postal code?</label><input id="z" value="94016"><script>1</script>';
+    win.document.getElementById("avid-autofill-root").attachShadow({ mode: "open" }).innerHTML = "<p>drawer</p>";
+    const html = win.AvidAutofill.report.scrubbedHtml(win.AvidAutofill.DEFAULT_PROFILE);
+    assert.match(html, /<sr-form><template shadowrootmode="open"><label for="z">What is your postal code\?<\/label><input id="z" value=""><\/template><\/sr-form>/);
+    assert.doesNotMatch(html, /drawer|avid-autofill-root|<script/);
+    assert.equal(host.shadowRoot.querySelector("input").getAttribute("value"), "94016", "the page itself is untouched");
+  } finally { dom.window.close(); }
+});
+
 // The fill logic, in manifest load order. Widget and main stay excluded because
 // they mount UI and register Chrome listeners. engine.js is included so
 // integration tests can exercise the public fillPage seam.

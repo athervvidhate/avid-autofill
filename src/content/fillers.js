@@ -309,7 +309,7 @@
       return !!field && field !== ownField;
     };
     const findOption = () => {
-      const listbox = listboxId && document.getElementById(listboxId);
+      const listbox = listboxId && byId(typeInput, listboxId);
       const visible = Array.from(
         queryAll(
           '[data-automation-id="promptOption"], [class*="option"], [role="option"], li[id*="option"]',
@@ -439,7 +439,7 @@
     if (!input) return [];
     press(control);
     await sleep(250);
-    const listbox = document.getElementById(input.getAttribute("aria-controls") || "");
+    const listbox = byId(input, input.getAttribute("aria-controls"));
     const labels = listbox ? queryAll('[role="option"]', listbox).map((o) => o.textContent.trim()).filter(Boolean) : [];
     input.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, cancelable: true, key: "Escape" }));
     // While the browser window is unfocused, blur() fires nothing and
@@ -448,6 +448,14 @@
     input.blur();
     await sleep(100);
     return [...new Set(labels)];
+  }
+
+  // The element an id names, looked up in the opener's own tree first: a
+  // component drawn in a shadow tree (SmartRecruiters) keeps its listbox there.
+  function byId(el, id) {
+    if (!id) return null;
+    const root = el.getRootNode();
+    return (root !== document && typeof root.getElementById === "function" && root.getElementById(id)) || document.getElementById(id);
   }
 
   function pressEnter(el) {
@@ -460,7 +468,7 @@
   async function buttonOptions(button) {
     press(button);
     await sleep(300);
-    const named = document.getElementById(button.getAttribute("aria-controls") || "");
+    const named = byId(button, button.getAttribute("aria-controls"));
     const boxes = named ? [named] : queryAll('[role="listbox"]').filter(isRendered);
     const labels = boxes.flatMap((box) => queryAll('[role="option"], [data-automation-id="promptOption"]', box)).map((o) => (o.getAttribute("data-automation-label") || o.textContent).trim()).filter(Boolean);
     for (const target of [button, document.activeElement || button]) {

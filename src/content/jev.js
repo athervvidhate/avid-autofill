@@ -32,7 +32,8 @@
     const { el, group } = candidate;
     if (candidate.buttons) return JSON.stringify(candidate.buttons.map(b => [b.textContent, b.disabled]));
     if (group) {
-      const current = A.fillers.queryAll('input[type="radio"]').filter(r => r.name === el.name && visible(r));
+      const key = A.matcher.radioGroupKey(el);
+      const current = A.fillers.queryAll('input[type="radio"]').filter(r => A.matcher.radioGroupKey(r) === key && visible(r));
       if (current.length !== group.length || current.some((r, i) => r !== group[i])) return "changed-radio-group";
     }
     return JSON.stringify({
@@ -46,8 +47,9 @@
   const NEEDS_APPLICANT = ["ai-needs-answer", "ai-unavailable", "ai-incompatible", "ai-limit"];
   function questionText(candidate) {
     const { el, group, custom, buttons } = candidate;
-    const text = group || buttons ? "" : A.labelTextFor(custom ? inner(el) : el);
-    return (text.replace(/\s+/g, " ").trim() || clean(candidate.signal).split(" | ")[0]).replace(/\s*\*$/, "").slice(0, 500);
+    const text = group || buttons ? "" : A.labelTextFor(custom ? inner(el) : el).replace(/\s+/g, " ").replace(/\s*\*$/, "").trim();
+    // A label that is only the required "*" names nothing: use the question text.
+    return (/[\p{L}\p{N}]/u.test(text) ? text : clean(candidate.signal).split(" | ")[0].replace(/\s*\*$/, "")).slice(0, 500);
   }
   function currentAnswer({ el, group, custom, buttons }) {
     if (buttons) return buttons.find(b => b.getAttribute("aria-pressed") === "true")?.textContent.trim() || "";

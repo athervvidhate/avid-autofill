@@ -14,33 +14,94 @@
     // 1. <label for=id>
     if (el.id) {
       const l = root.querySelector(`label[for="${cssEscape(el.id)}"]`);
-      if (l) parts.push(l.textContent);
+      if (l) parts.push(flatText(l));
     }
     // 2. wrapping <label>
     const wrap = el.closest("label");
-    if (wrap) parts.push(wrap.textContent);
+    if (wrap) parts.push(flatText(wrap));
     // 3. aria-labelledby
     const labelledby = el.getAttribute && el.getAttribute("aria-labelledby");
     if (labelledby) {
       for (const id of labelledby.split(/\s+/)) {
         const n = root.getElementById(id);
-        if (n) parts.push(n.textContent);
+        if (n) parts.push(flatText(n));
       }
     }
-    return parts.join(" ").replace(/\s+/g, " ").trim();
+    const text = parts.join(" ").replace(/\s+/g, " ").trim();
+    // A choice whose drawn label is out of reach takes its name from the site's
+    // own question data (SmartRecruiters).
+    if (!wordy(text)) {
+      const asked = siteQuestion(el);
+      if (asked && asked.option) return asked.option;
+    }
+    return text;
+  }
+
+  // True when a label says something: a bare required-field "*" does not.
+  const wordy = (text) => /[\p{L}\p{N}]/u.test(text || "");
+
+  // The question an adapter reads from the page's own form data, if any.
+  const siteQuestion = (el) => (AvidAutofill.adapters && AvidAutofill.adapters.siteQuestion ? AvidAutofill.adapters.siteQuestion(el) : null);
+
+  // A node's children as the page draws them: an element's shadow tree in place
+  // of its own children, and a slot's assigned nodes in place of its fallback.
+  function flatChildren(node) {
+    if (node.tagName === "SLOT" && typeof node.assignedNodes === "function") {
+      const assigned = node.assignedNodes({ flatten: true });
+      if (assigned.length) return assigned;
+    }
+    return Array.from((node.shadowRoot || node).childNodes);
+  }
+
+  // Text as the page draws it. SmartRecruiters puts a question's text inside a
+  // component's shadow tree, so the label's own textContent is only "*".
+  function flatText(node) {
+    if (node.nodeType === 3) return node.textContent;
+    if (node.nodeType !== 1 || node.tagName === "STYLE" || node.tagName === "SCRIPT") return "";
+    return flatChildren(node).map(flatText).join("");
+  }
+
+  // The parent a node is drawn in: its slot, its parent, or its shadow host.
+  const drawnParent = (node) => node.assignedSlot || node.parentElement || (node.parentNode && node.parentNode.host) || null;
+
+  // closest() that continues past shadow boundaries.
+  function composedClosest(el, selector) {
+    for (let node = el; node; node = drawnParent(node)) {
+      if (node.nodeType === 1 && node.matches(selector)) return node;
+    }
+    return null;
+  }
+
+  // Radios that answer one question. Radios in the page itself group by name.
+  // In a shadow tree a name alone says less: SmartRecruiters names every
+  // question's radios "value", each in its own component, so the question, or
+  // the group box drawn around the radios, comes first.
+  const boxIds = new WeakMap();
+  let boxCount = 0;
+  function radioGroupKey(radio) {
+    const asked = siteQuestion(radio);
+    if (asked) return `question:${asked.id}:${radio.name}`;
+    const root = radio.getRootNode();
+    if (root === radio.ownerDocument) return radio.name ? `name:${radio.name}` : "";
+    const box = composedClosest(radio, 'fieldset, [role="radiogroup"]');
+    if (!box && !radio.name) return "";
+    const scope = box || root;
+    if (!boxIds.has(scope)) boxIds.set(scope, ++boxCount);
+    return `box:${boxIds.get(scope)}:${radio.name}`;
   }
 
   function cssEscape(s) {
     return window.CSS && CSS.escape ? CSS.escape(s) : s.replace(/"/g, '\\"');
   }
 
-  const CONTROLS = new Set(["INPUT", "TEXTAREA", "SELECT", "BUTTON"]);
+  const CONTROLS = new Set(["INPUT", "TEXTAREA", "SELECT", "BUTTON", "STYLE", "SCRIPT"]);
   function textWithoutControls(root, skipLabels) {
     let out = "";
     const walk = (n) => {
-      for (const child of n.childNodes) {
+      for (const child of flatChildren(n)) {
         if (child.nodeType === 3) out += child.textContent;
-        else if (child.nodeType === 1 && !CONTROLS.has(child.tagName) && !(skipLabels && child.tagName === "LABEL")) walk(child);
+        // A component drawing its own control is another field, not this one's label.
+        else if (child.nodeType === 1 && !CONTROLS.has(child.tagName) && !(skipLabels && child.tagName === "LABEL") && !(child.shadowRoot && child.shadowRoot.querySelector("input, textarea, select"))) walk(child);
       }
     };
     walk(root);
@@ -69,14 +130,17 @@
   // the smallest element holding every radio (Lever puts the question in a
   // sibling block), else the first radio's own signal.
   function groupSignal(radios) {
-    const legend = radios[0].closest("fieldset")?.querySelector("legend");
-    if (legend && legend.textContent.trim()) {
+    const asked = siteQuestion(radios[0]);
+    if (asked) return norm(asked.label);
+    const legend = composedClosest(radios[0], "fieldset")?.querySelector("legend");
+    const legendText = legend ? flatText(legend).trim() : "";
+    if (wordy(legendText)) {
       // "Choose One" says nothing: the options carry the question (Jobvite's
       // veteran block puts it in paragraphs above).
-      if (/^(please )?(choose|select|pick)( one| an option)?\W*$/i.test(legend.textContent.trim())) {
-        return norm([legend.textContent, ...radios.map((r) => labelTextFor(r) || r.value)].join(" | "));
+      if (/^(please )?(choose|select|pick)( one| an option)?\W*$/i.test(legendText)) {
+        return norm([legendText, ...radios.map((r) => labelTextFor(r) || r.value)].join(" | "));
       }
-      return norm(legend.textContent);
+      return norm(legendText);
     }
     const title = groupTitle(radios);
     if (title) return title;
@@ -103,7 +167,7 @@
   // options. Without it the sibling-text fallback below sweeps up neighbouring
   // questions and the group is answered as the wrong one.
   function groupTitle(radios) {
-    const box = radios[0].closest('fieldset, [role="radiogroup"], [role="group"]');
+    const box = composedClosest(radios[0], 'fieldset, [role="radiogroup"], [role="group"]');
     if (!box) return "";
     const named = norm(attr(box, "aria-label")) || fieldTitle(box);
     if (named) return named;
@@ -151,19 +215,21 @@
   // Aggregate signal string used for matching. Human-readable sources are used
   // as-is; identifier-like attributes are de-camelCased first.
   function signalFor(el) {
+    const asked = siteQuestion(el);
     const labelled = labelTextFor(el);
     const human = [
-      labelled || fieldTitle(el),
+      asked ? asked.label : wordy(labelled) ? labelled : fieldTitle(el),
       attr(el, "aria-label"),
       el.placeholder,
-      nearbyText(el),
+      asked ? "" : nearbyText(el),
     ];
     const ids = [
       el.name,
       el.id,
       attr(el, "data-automation-id"),
       attr(el, "data-qa"),
-      attr(el, "autocomplete"),
+      // "off" turns the browser's autofill off and says nothing about the field.
+      /^(on|off)$/i.test(attr(el, "autocomplete")) ? "" : attr(el, "autocomplete"),
     ].map(deCamel);
     // Standard-attribute hints help on sites whose labels and names say nothing.
     const hint = AvidAutofill.generic ? AvidAutofill.generic.hints(el) : "";
@@ -243,7 +309,8 @@
     { any: [/notice period/], duration: true, get: (p) => p.misc.noticePeriod || p.misc.earliestStartDate },
     { any: [/notice period/, /availability to start/, /when can you start/, /earliest start/, /start date/], get: (p) => p.misc.earliestStartDate || p.misc.noticePeriod },
     // General willingness only: a named destination or relocation assistance is a different question.
-    { any: [/willing to relocate/, /open to relocat/, /relocat/], not: [/relocat\w* to \w/, /assistance|package|stipend|support/], kind: "yesno", get: (p) => p.misc.willingToRelocate },
+    // "If you live in one of these states, would you consider relocation?" does not apply to someone living elsewhere.
+    { any: [/willing to relocate/, /open to relocat/, /relocat/], not: [/relocat\w* to \w/, /assistance|package|stipend|support/], kind: "yesno", get: (p, h, signal) => (/\bif you (live|reside) in\b/.test(signal) && residentOfState(signal, p.personal.state) === "No" ? "N/A" : p.misc.willingToRelocate) },
     // In-office attendance ("This role is onsite ... willing to work from our local office?").
     { any: [/on-?site/, /in[- ]person/, /(work|working|come|commute|report)\w* (from|in|into|to|at)\b.{0,60}\boffice\b/], not: [/relocat/, /remote(ly)? (work|position|role)? ?only/], kind: "yesno", get: (p) => p.questions.willingOnsite },
     { any: [/on-?call/], kind: "yesno", get: (p) => p.questions.willingOnCall },
@@ -465,5 +532,5 @@
   }
 
   AvidAutofill.labelTextFor = labelTextFor;
-  AvidAutofill.matcher = { signalFor, groupSignal, choiceSignal, match, looksYesNo, nearestDuration, makeHelpers: P, norm, deCamel };
+  AvidAutofill.matcher = { signalFor, groupSignal, choiceSignal, radioGroupKey, flatText, match, looksYesNo, nearestDuration, makeHelpers: P, norm, deCamel };
 })();

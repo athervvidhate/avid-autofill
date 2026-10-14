@@ -179,6 +179,48 @@
     },
   ];
 
+  // SmartRecruiters lists every screening question, with its choices, in the
+  // `definition` attribute of the form's host element and draws the form in that
+  // host's shadow tree. A control there carries its question's id in an id, name
+  // or other attribute of itself or an ancestor, so its question can be read
+  // from the definition even when the drawn label cannot be.
+  const definitions = new WeakMap();
+  function screeningQuestions() {
+    const out = [];
+    for (const host of document.querySelectorAll("sr-screening-questions-form[definition]")) {
+      const raw = host.getAttribute("definition");
+      let cached = definitions.get(host);
+      if (!cached || cached.raw !== raw) {
+        let questions = [];
+        try { questions = JSON.parse(raw).questions || []; } catch (_) { /* malformed definition: no questions */ }
+        cached = { raw, questions: questions.filter((q) => q && typeof q.id === "string" && q.id.length >= 8 && q.label) };
+        definitions.set(host, cached);
+      }
+      out.push(...cached.questions);
+    }
+    return out;
+  }
+
+  // Labels are Markdown: "Are you a protected veteran? [(definitions)](https://...)".
+  const plainText = (md) => String(md).replace(/\[([^\]]*)\]\([^)]*\)/g, "$1").replace(/[*_#`>]+/g, " ").replace(/\s+/g, " ").trim();
+
+  // { id, label, option } for the screening question a control answers, where
+  // `option` is the label of the choice a radio or checkbox stands for; or null.
+  function siteQuestion(el) {
+    const questions = screeningQuestions();
+    if (!questions.length) return null;
+    for (let node = el; node; node = node.assignedSlot || node.parentElement || (node.parentNode && node.parentNode.host) || null) {
+      for (const { value } of node.attributes || []) {
+        const q = value.length >= 8 && questions.find((question) => value.includes(question.id));
+        if (!q) continue;
+        const choices = (q.fields || q.questionsFields || []).flatMap((f) => f.values || f.questionsFieldValues || []);
+        const choice = /^(radio|checkbox)$/.test(el.type) && choices.find((c) => c.fieldValue === el.value || c.id === el.value);
+        return { id: q.id, label: plainText(q.label), option: choice ? plainText(choice.label) : "" };
+      }
+    }
+    return null;
+  }
+
   function detect() {
     for (const a of ADAPTERS) {
       try {
@@ -197,5 +239,5 @@
     return !!adapter.host && !adapter.host.test(location.host + location.href);
   }
 
-  AvidAutofill.adapters = { detect, markupOnly, ADAPTERS };
+  AvidAutofill.adapters = { detect, markupOnly, siteQuestion, ADAPTERS };
 })();

@@ -15,8 +15,11 @@
 
   // A radio styled away with display:none behind a visible wrapper (Rippling's
   // div[role=radio], or a label drawn as the button) is still a live choice.
+  // A component that draws one choice in its own shadow tree stands for it too.
   const styledChoice = (el) => {
-    const wrap = el.closest('[role="radio"], [role="checkbox"], label');
+    const root = el.getRootNode();
+    const lone = root.host && root.querySelectorAll('input[type="radio"], input[type="checkbox"]').length === 1;
+    const wrap = el.closest('[role="radio"], [role="checkbox"], label') || (lone ? root.host : null);
     return !!wrap && !el.disabled && wrap.getAttribute("aria-hidden") !== "true" && F().isRendered(wrap);
   };
 
@@ -129,11 +132,11 @@
     await fillers.sleep(500);
     await dropdownPass();
 
-    // --- 2. Radio groups (grouped by name). ---
+    // --- 2. Radio groups (grouped by name, per question in shadow trees). ---
     const radioGroups = {};
     F().queryAll('input[type="radio"]').forEach((r) => {
-      if (!r.name) return;
-      (radioGroups[r.name] = radioGroups[r.name] || []).push(r);
+      const key = matcher.radioGroupKey(r);
+      if (key) (radioGroups[key] = radioGroups[key] || []).push(r);
     });
     // Yes/No written as two checkboxes (Lever) are one choice, like radios.
     const choiceLabel = /^(yes|no|prefer not to say|decline to answer|n\/a)$/;
