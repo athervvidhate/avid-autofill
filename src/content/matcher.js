@@ -202,7 +202,7 @@
     { any: [/(primary |permanent |current )?(residence|residential|home) address/, /address of (your )?(primary )?residence/], get: (p) => fullAddress(p.personal) },
     { any: [/street address/, /address line ?1/, /(^|\| )address( \||$)/, /mailing address/], not: [/email/], get: (p) => p.personal.address },
     { any: [/\bcity\b/, /\btown\b/, /(^|\| )(current )?location( \||$)/, /(^|\| )current location\b/, /\bwork location\b/, /where (are you|do you) (located|based|live)/], not: [/velocity|capacity|ethnic/], expand: "place", get: (p) => p.personal.city },
-    { any: [/\bstate\b/, /\bprovince\b/, /\bregion\b/], not: [/statement|estate|united states|work|\bcountry\b/], expand: "usState", get: (p) => p.personal.state },
+    { any: [/\bstate\b/, /\bprovince\b/, /\bregion\b/], not: [/statement|estate|united states|work|county|subdivision|\bcountry\b(?! region)/], expand: "usState", get: (p) => p.personal.state },
     { any: [/zip/, /postal code/, /post ?code/], get: (p) => p.personal.postalCode },
     { any: [/\bresident of\b/, /\bdo you (live|reside) in\b/], not: [/relocat|willing/], kind: "yesno", get: (p, h, signal) => residentOfState(signal, p.personal.state) },
     { any: [/\b(located|location|based|living|reside|residing) in\b/], not: [/relocat|willing|commut|authoriz|work|time ?zone|hours/], kind: "yesno", get: (p, h, signal) => inListedCountry(signal, p.personal.country) },
@@ -276,7 +276,7 @@
     { eeo: true, any: [/hispanic|latino/], not: [/\brace\b/], kind: "yesno", get: (p) => p.eeo.hispanicLatino },
     { eeo: true, any: [/race|ethnicit/], expand: "race", get: (p) => p.eeo.race },
     { eeo: true, any: [/veteran/], expand: "veteran", get: (p) => p.eeo.veteranStatus },
-    { eeo: true, any: [/disabilit/], expand: "disability", get: (p) => p.eeo.disabilityStatus },
+    { eeo: true, any: [/disabilit/], not: [/employee id|language|signed on|\bname\b/], expand: "disability", get: (p) => p.eeo.disabilityStatus },
   ];
 
   // US state <-> abbreviation, so a "CA" profile fills a "California" dropdown
