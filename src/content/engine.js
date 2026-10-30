@@ -96,6 +96,15 @@
     // --- 1. Custom (react-select / combobox / Workday) dropdowns first, so their
     //        inner <input> is marked handled before the text pass sees it.
     //        Runs twice: selecting Country reveals the State dropdown, etc. ---
+    const dropdownFills = [], retryDropdowns = [], textFills = [];
+    const norm = (v) => fillers.normalize(v);
+    const showsAnyOf = (control, values) => {
+      const shown = norm(fillers.customValue(control));
+      return !!shown && values.some((v) => {
+        const want = norm(v);
+        return !!want && (shown === want || shown.startsWith(want + " "));
+      });
+    };
     async function dropdownPass() {
       const controls = [];
       for (const sel of adapter.customSelectSelectors || []) {
@@ -114,10 +123,17 @@
         try {
           // Location autocompletes search as you type: lead with "City, State".
           const values = m.place ? [...m.alts, m.value] : [m.value, ...(m.alts || [])];
+          // Already showing the right answer: re-picking it makes Workday reset
+          // the fields that depend on it (a re-picked Country clears State and
+          // re-renders the address lines).
+          if (showsAnyOf(control, values)) { record(signal, m.value, "kept-existing"); continue; }
           const ok = await fillers.setReactSelect(control, values);
           record(signal, m.value, ok ? (m.assumed ? "assumed" : "filled") : "skipped");
+          if (ok) dropdownFills.push({ control, id: control.id, values });
+          // Picking one answer reloads what depends on it (Workday's State list).
+          if (ok && adapter.name === "Workday") await fillers.sleep(800);
           // No option read like the profile value: leave the question to Jev.
-          if (!ok) unmatched.push({ el: control, custom: true, signal });
+          if (!ok) { unmatched.push({ el: control, custom: true, signal }); retryDropdowns.push({ control, id: control.id, values }); }
         } catch (_) {
           record(signal, m.value, "error");
         }
@@ -279,9 +295,48 @@
           const value = us ? `${us[3]}-${us[1]}-${us[2]}` : m.value;
           fillers.setTextValue(el, value);
           record(signal, value, el.value ? "filled" : "skipped");
+          textFills.push({ el, id: el.id, name: el.name, value });
         }
       } catch (_) {
         record(signal, m.value, "error");
+      }
+    }
+
+    // Workday re-renders a section when a dependent answer lands (Country ->
+    // address lines and State), and a slow or backgrounded tab can deliver that
+    // re-render after the fields were filled. Wait for the page to settle, then
+    // put back anything that was wiped or replaced, and retry dropdowns whose
+    // options had not loaded yet.
+    if (adapter.name === "Workday") await settleWorkday();
+
+    async function settleWorkday() {
+      const live = (f) => (f.el && f.el.isConnected ? f.el : f.id ? document.getElementById(f.id) : null);
+      for (let round = 0; round < 3; round++) {
+        await fillers.sleep(600);
+        let repaired = false;
+        for (const f of retryDropdowns.splice(0)) {
+          const control = live(f);
+          if (!control || showsAnyOf(control, f.values)) continue;
+          try {
+            const ok = await fillers.setReactSelect(control, f.values);
+            if (ok) { dropdownFills.push(f); repaired = true; await fillers.sleep(800); }
+            else retryDropdowns.push(f);
+          } catch (_) { retryDropdowns.push(f); }
+        }
+        for (const f of dropdownFills) {
+          const control = live(f);
+          if (!control || fillers.customValue(control)) continue;
+          try {
+            if (await fillers.setReactSelect(control, f.values)) { repaired = true; await fillers.sleep(800); }
+          } catch (_) { /* leave it for the applicant */ }
+        }
+        for (const f of textFills) {
+          const el = live(f);
+          if (!el || !isVisible(el) || el.value) continue;
+          fillers.setTextValue(el, f.value);
+          repaired = true;
+        }
+        if (!repaired && !retryDropdowns.length) break;
       }
     }
 

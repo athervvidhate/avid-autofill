@@ -1849,3 +1849,63 @@ test("a Rippling radio whose wrapper owns the state is chosen through the wrappe
   assert.equal(A.fillers.setRadio(Array.from(document.querySelectorAll("input")), "No"), true);
   assert.equal(document.querySelector('[data-value="No"]').getAttribute("aria-checked"), "true");
 });
+
+// --- Workday address section (fkit forms: ids like address--countryRegion) --
+
+const ADDRESS_FORM = `
+  <div data-automation-id="applyFlowPage">
+    <div data-automation-id="formField-country"><label for="country--country">Country</label>
+      <button aria-haspopup="listbox" type="button" name="country" id="country--country" aria-label="Country United States of America Required">United States of America</button></div>
+    <div data-automation-id="formField-addressLine1"><label for="address--addressLine1">Address Line 1</label><input id="address--addressLine1" name="addressLine1"></div>
+    <div data-automation-id="formField-city"><label for="address--city">City</label><input id="address--city" name="city"></div>
+    <div data-automation-id="formField-countryRegion"><label for="address--countryRegion">State</label>
+      <button aria-haspopup="listbox" type="button" name="countryRegion" id="address--countryRegion" aria-label="State Select One Required">Select One</button></div>
+    <div data-automation-id="formField-postalCode"><label for="address--postalCode">Postal Code</label><input id="address--postalCode" name="postalCode"></div>
+    <div data-automation-id="formField-regionSubdivision1"><label for="address--regionSubdivision1">County</label><input id="address--regionSubdivision1" name="regionSubdivision1"></div>
+  </div>`;
+
+test("Workday State maps to the state, not the country, and County is left alone", () => {
+  const win = blankWindow();
+  const { document, AvidAutofill: A } = win;
+  document.body.innerHTML = ADDRESS_FORM;
+  const p = testProfile(A);
+  const h = A.matcher.makeHelpers(p);
+  const sig = (id) => A.matcher.signalFor(document.getElementById(id));
+  assert.equal(A.matcher.match(sig("address--countryRegion"), p, h).value, "CA");
+  assert.equal(A.matcher.match(sig("country--country"), p, h).value, "United States");
+  assert.equal(A.matcher.match(sig("address--regionSubdivision1"), p, h), null);
+});
+
+test("Workday disability rule ignores employee id and language fields", () => {
+  const win = blankWindow();
+  const { AvidAutofill: A } = win;
+  const p = testProfile(A);
+  p.eeo.disabilityStatus = "No";
+  const h = A.matcher.makeHelpers(p);
+  assert.equal(A.matcher.match("employee id (if applicable) | self identified disability data employee id", p, h), null);
+});
+
+test("Workday refills address lines a late re-render wipes, and does not re-pick Country", async () => {
+  const win = blankWindow();
+  const { document, AvidAutofill: A } = win;
+  document.body.innerHTML = ADDRESS_FORM;
+  for (const el of document.querySelectorAll("input, button")) {
+    Object.defineProperty(el, "offsetParent", { configurable: true, value: document.body });
+    el.getClientRects = () => [{ width: 200, height: 32 }];
+  }
+  let sleeps = 0, countryPicks = 0;
+  A.fillers.sleep = async () => { sleeps++; };
+  // Workday resets the address lines after the first settle wait.
+  const real = A.fillers.sleep;
+  A.fillers.sleep = async (ms) => {
+    await real(ms);
+    if (sleeps === 1) document.querySelectorAll("input").forEach((i) => { i.value = ""; });
+  };
+  document.getElementById("country--country").addEventListener("click", () => { countryPicks++; });
+  await A.engine.fillPage(testProfile(A), { overwriteFilled: false, fillEEO: false, highlightFilled: false }, null);
+  assert.equal(countryPicks, 0, "Country already correct: must not be re-picked");
+  assert.equal(document.getElementById("address--addressLine1").value, "1 Market Street");
+  assert.equal(document.getElementById("address--city").value, "Portland");
+  assert.equal(document.getElementById("address--postalCode").value, "94016");
+  assert.equal(document.getElementById("address--regionSubdivision1").value, "");
+});
